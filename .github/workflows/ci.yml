@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: List repository files
+        run: ls -la
+
+      - name: Check required docs
+        run: |
+          test -f README.md
+          test -f ARCHITECTURE.md
+          test -f COMPETITION_SUBMISSION.md
+          test -f DEMO_SCRIPT.md
+          test -f MODEL_VERSIONING.md
+          test -f CONTRIBUTING.md
+          test -f SECURITY.md
+          test -f SUPPORT.md
+          test -f .env.example
+
+  python-syntax:
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('src/**/*.py') != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Syntax check
+        run: |
+          python -m compileall ai
+
+  dotnet-check:
+    runs-on: ubuntu-latest
+    if: ${{ hashFiles('src/**/*.csproj') != '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore

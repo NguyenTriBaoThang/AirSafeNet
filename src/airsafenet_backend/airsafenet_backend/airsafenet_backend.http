@@ -1,0 +1,6 @@
+@airsafenet_backend_HostAddress = http://localhost:5001
+
+GET {{airsafenet_backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
