@@ -8,18 +8,17 @@ on:
 
 jobs:
   docs-check:
+    name: Docs Check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: List repository files
-        run: ls -la
-
       - name: Check required docs
         run: |
           test -f README.md
           test -f ARCHITECTURE.md
+          test -f BRANCHING.md
           test -f COMPETITION_SUBMISSION.md
           test -f DEMO_SCRIPT.md
           test -f MODEL_VERSIONING.md
@@ -29,8 +28,8 @@ jobs:
           test -f .env.example
 
   python-syntax:
+    name: Python Syntax Check
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('src/**/*.py') != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,13 +39,28 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Syntax check
+      - name: Check Python files exist
+        id: pyfiles
+        shell: bash
         run: |
-          python -m compileall ai
+          if find src/airsafenet_ai -type f -name "*.py" | grep -q .; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Syntax check
+        if: steps.pyfiles.outputs.found == 'true'
+        run: |
+          python -m compileall src/airsafenet_ai
+
+      - name: Skip Python check
+        if: steps.pyfiles.outputs.found != 'true'
+        run: echo "No Python files found in src/airsafenet_ai"
 
   dotnet-check:
+    name: .NET Build Check
     runs-on: ubuntu-latest
-    if: ${{ hashFiles('src/**/*.csproj') != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,8 +70,24 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Check .NET project files exist
+        id: dotnetfiles
+        shell: bash
+        run: |
+          if find src/airsafenet_backend -type f \( -name "*.csproj" -o -name "*.sln" \) | grep -q .; then
+            echo "found=true" >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Restore
-        run: dotnet restore
+        if: steps.dotnetfiles.outputs.found == 'true'
+        run: dotnet restore src/airsafenet_backend/airsafenet_backend.sln
 
       - name: Build
-        run: dotnet build --no-restore
+        if: steps.dotnetfiles.outputs.found == 'true'
+        run: dotnet build src/airsafenet_backend/airsafenet_backend.sln --no-restore --configuration Release
+
+      - name: Skip .NET check
+        if: steps.dotnetfiles.outputs.found != 'true'
+        run: echo "No .NET solution or project files found in src/airsafenet_backend"
