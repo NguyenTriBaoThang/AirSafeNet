@@ -1,0 +1,100 @@
+{
+  "project": "AirSafeNet",
+  "model_version": "airsafenet_pm25_linearregression_v2",
+  "location_name": "Ho Chi Minh City",
+  "latitude": 10.7769,
+  "longitude": 106.7009,
+  "start_date": "2024-01-01",
+  "end_date": "2026-04-02",
+  "forecast_hours": 24,
+  "selected_model": "LinearRegression",
+  "selected_model_metrics_test": {
+    "MAE": 2.053967109164937e-13,
+    "RMSE": 2.5956014647970217e-13,
+    "R2": 1.0
+  },
+  "baseline_metrics": [
+    {
+      "model_name": "Baseline_LastHour",
+      "MAE": 2.8945330296127563,
+      "RMSE": 4.552077522371358,
+      "R2": 0.8808996136815381
+    },
+    {
+      "model_name": "Baseline_Rolling3",
+      "MAE": 2.547101999493797,
+      "RMSE": 3.786551664617338,
+      "R2": 0.917589671605129
+    }
+  ],
+  "cv_metrics": [
+    {
+      "model_name": "LinearRegression",
+      "cv_MAE_mean": 3.0012800279805127e-13,
+      "cv_RMSE_mean": 4.0810594184598855e-13,
+      "cv_R2_mean": 1.0,
+      "cv_MAE_std": 1.5137716187487048e-13,
+      "cv_RMSE_std": 1.9486510687433151e-13,
+      "cv_R2_std": 0.0
+    },
+    {
+      "model_name": "ExtraTrees",
+      "cv_MAE_mean": 1.1674622711735658,
+      "cv_RMSE_mean": 2.209845695434768,
+      "cv_R2_mean": 0.9693450717453267,
+      "cv_MAE_std": 0.6407014683675023,
+      "cv_RMSE_std": 1.14012151256954,
+      "cv_R2_std": 0.02787634370414066
+    },
+    {
+      "model_name": "XGBoost",
+      "cv_MAE_mean": 1.5027510172579166,
+      "cv_RMSE_mean": 2.771097312168535,
+      "cv_R2_mean": 0.9533494486980716,
+      "cv_MAE_std": 1.2029346432009282,
+      "cv_RMSE_std": 1.5721853999137563,
+      "cv_R2_std": 0.04019587471984339
+    },
+    {
+      "model_name": "RandomForest",
+      "cv_MAE_mean": 1.7770492404101805,
+      "cv_RMSE_mean": 2.957473568797473,
+      "cv_R2_mean": 0.9396513008865819,
+      "cv_MAE_std": 1.769915635820019,
+      "cv_RMSE_std": 1.9718142196034625,
+      "cv_R2_std": 0.06452036713163317
+    }
+  ],
+  "all_test_metrics": [
+    {
+      "MAE": 2.053967109164937e-13,
+      "RMSE": 2.5956014647970217e-13,
+      "R2": 1.0,
+      "model_name": "LinearRegression"
+    },
+    {
+      "MAE": 0.2650267291569885,
+      "RMSE": 0.5085604588718297,
+      "R2": 0.9985134516072782,
+      "model_name": "XGBoost"
+    },
+    {
+      "MAE": 0.2917503416856495,
+      "RMSE": 0.5638353910544425,
+      "R2": 0.9981727476215775,
+      "model_name": "ExtraTrees"
+    },
+    {
+      "MAE": 0.28300272083016953,
+      "RMSE": 0.6212178712714769,
+      "R2": 0.9977818967750318,
+      "model_name": "RandomForest"
+    }
+  ],
+  "generated_at": "2026-04-04T00:21:53.616661+07:00",
+  "data_sources": {
+    "air_quality": "Open-Meteo Air Quality API",
+    "weather_history": "Open-Meteo Archive API",
+    "weather_forecast": "Open-Meteo Forecast API"
+  }
+}
