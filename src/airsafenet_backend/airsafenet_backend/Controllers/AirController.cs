@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace airsafenet_backend.Controllers
+namespace AirSafeNet.Api.Controllers
 {
     [ApiController]
     [Authorize]
@@ -28,7 +28,9 @@ namespace airsafenet_backend.Controllers
         [HttpPost("predict")]
         public async Task<IActionResult> Predict(AiPredictRequest request)
         {
-            var userGroup = string.IsNullOrWhiteSpace(request.UserGroup) ? "normal" : request.UserGroup.Trim().ToLower();
+            var userGroup = string.IsNullOrWhiteSpace(request.UserGroup)
+                ? "normal"
+                : request.UserGroup.Trim().ToLower();
 
             var aiResult = await _aiService.PredictAsync(new AiPredictRequest
             {
@@ -77,7 +79,6 @@ namespace airsafenet_backend.Controllers
             var preferences = await _db.UserPreferences.FirstOrDefaultAsync(x => x.UserId == userId);
             var userGroup = preferences?.UserGroup ?? "normal";
 
-            // 🔥 LẤY DATA THẬT
             var data = await _weatherService.GetCurrentAsync();
 
             var request = new AiPredictRequest
@@ -102,6 +103,62 @@ namespace airsafenet_backend.Controllers
                 UserGroup = userGroup,
                 GeneratedAt = DateTime.UtcNow
             });
+        }
+
+        [HttpGet("forecast")]
+        public async Task<IActionResult> GetForecast24h()
+        {
+            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdValue, out var userId))
+            {
+                return Unauthorized();
+            }
+
+            var preferences = await _db.UserPreferences.FirstOrDefaultAsync(x => x.UserId == userId);
+            var userGroup = preferences?.UserGroup ?? "normal";
+
+            var weatherPoints = await _weatherService.Get24HourForecastAsync();
+
+            var result = new AirForecastResponse
+            {
+                UserGroup = userGroup,
+                GeneratedAt = DateTime.UtcNow,
+                Hours = 24
+            };
+
+            foreach (var point in weatherPoints)
+            {
+                var request = new AiPredictRequest
+                {
+                    UserGroup = userGroup,
+                    Data = new Dictionary<string, double>
+                    {
+                        { "pm2_5", point.Pm25 },
+                        { "temperature_2m", point.Temperature2m },
+                        { "relative_humidity_2m", point.RelativeHumidity2m },
+                        { "wind_speed_10m", point.WindSpeed10m },
+                        { "hour", point.Time.Hour }
+                    }
+                };
+
+                var aiResult = await _aiService.PredictAsync(request);
+                if (aiResult == null)
+                {
+                    continue;
+                }
+
+                result.Forecast.Add(new AirForecastItemResponse
+                {
+                    Time = point.Time,
+                    Pm25 = aiResult.Pm25,
+                    Aqi = aiResult.Aqi,
+                    Risk = aiResult.Risk,
+                    Recommendation = aiResult.Recommendation,
+                    UserGroup = userGroup
+                });
+            }
+
+            return Ok(result);
         }
 
         [HttpGet("history")]
