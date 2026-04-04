@@ -1,35 +1,77 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
+from __future__ import annotations
 
-from app.predict import predict_full
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.predict import get_current_snapshot, forecast_next_24h, load_metadata
+from app.config import MODEL_PATH, FEATURE_COLS_PATH, METADATA_PATH
 
 app = FastAPI(
     title="AirSafeNet AI Server",
-    description="PM2.5 Prediction + AQI + Risk + Recommendation",
-    version="1.0.0"
+    version="2.0.0",
+    description="Time-series AI server giữ nguyên model hiện tại của AirSafeNet",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# ===== INPUT MODEL =====
-class PredictRequest(BaseModel):
-    data: dict
-    user_group: str = "normal"
+VALID_GROUPS = {"normal", "child", "elderly", "respiratory", "pregnant"}
 
 
-# ===== ROOT =====
 @app.get("/")
 def root():
-    return {"message": "AirSafeNet AI Server running"}
+    return {
+        "message": "AirSafeNet AI Server running",
+        "docs": "/docs",
+        "health": "/health",
+        "current": "/forecast/current?user_group=normal",
+        "forecast24h": "/forecast/24h?user_group=normal",
+    }
 
 
-# ===== HEALTH =====
 @app.get("/health")
 def health():
-    return {"status": "OK"}
+    return {
+        "status": "ok",
+        "model_exists": MODEL_PATH.exists(),
+        "feature_cols_exists": FEATURE_COLS_PATH.exists(),
+        "metadata_exists": METADATA_PATH.exists(),
+    }
 
 
-# ===== PREDICT =====
-@app.post("/predict")
-def predict(req: PredictRequest):
-    result = predict_full(req.data, req.user_group)
-    return result
+@app.get("/model/info")
+def model_info():
+    return load_metadata()
+
+
+@app.get("/forecast/current")
+def forecast_current(
+    user_group: str = Query(default="normal", description="normal | child | elderly | respiratory | pregnant")
+):
+    group = (user_group or "normal").strip().lower()
+    if group not in VALID_GROUPS:
+        raise HTTPException(status_code=400, detail="user_group không hợp lệ")
+
+    try:
+        return get_current_snapshot(group)
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=str(ex))
+
+
+@app.get("/forecast/24h")
+def forecast_24h(
+    user_group: str = Query(default="normal", description="normal | child | elderly | respiratory | pregnant")
+):
+    group = (user_group or "normal").strip().lower()
+    if group not in VALID_GROUPS:
+        raise HTTPException(status_code=400, detail="user_group không hợp lệ")
+
+    try:
+        return forecast_next_24h(group)
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=str(ex))
