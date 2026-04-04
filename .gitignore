@@ -461,7 +461,6 @@ ai/models/*
 !ai/models/.gitkeep
 
 # Data outputs
-data/
 *.csv
 *.parquet
 
