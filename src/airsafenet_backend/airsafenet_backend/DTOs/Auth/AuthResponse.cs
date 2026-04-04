@@ -1,6 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-
-namespace airsafenet_backend.DTOs.Auth
+﻿namespace airsafenet_backend.DTOs.Auth
 {
     public class AuthResponse
     {
