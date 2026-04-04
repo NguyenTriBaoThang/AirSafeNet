@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace AirSafeNet.Api.Controllers
+namespace airsafenet_backend.Controllers
 {
     [ApiController]
     [Authorize]
@@ -16,31 +16,26 @@ namespace AirSafeNet.Api.Controllers
     {
         private readonly AppDbContext _db;
         private readonly AiService _aiService;
-        private readonly WeatherService _weatherService;
 
-        public AirController(AppDbContext db, AiService aiService, WeatherService weatherService)
+        public AirController(AppDbContext db, AiService aiService)
         {
             _db = db;
             _aiService = aiService;
-            _weatherService = weatherService;
         }
 
-        [HttpPost("predict")]
-        public async Task<IActionResult> Predict(AiPredictRequest request)
+        [HttpGet("current")]
+        public async Task<IActionResult> GetCurrent()
         {
-            var userGroup = string.IsNullOrWhiteSpace(request.UserGroup)
-                ? "normal"
-                : request.UserGroup.Trim().ToLower();
-
-            var aiResult = await _aiService.PredictAsync(new AiPredictRequest
+            var userGroup = await GetCurrentUserGroupAsync();
+            if (userGroup == null)
             {
-                Data = request.Data,
-                UserGroup = userGroup
-            });
+                return Unauthorized();
+            }
 
+            var aiResult = await _aiService.GetCurrentAsync(userGroup);
             if (aiResult == null)
             {
-                return StatusCode(500, new { message = "Không lấy được dữ liệu từ AI Server." });
+                return StatusCode(500, new { message = "Không lấy được dữ liệu current từ AI Server." });
             }
 
             var log = new AirQualityLog
@@ -62,45 +57,7 @@ namespace AirSafeNet.Api.Controllers
                 Aqi = aiResult.Aqi,
                 Risk = aiResult.Risk,
                 Recommendation = aiResult.Recommendation,
-                UserGroup = userGroup,
-                GeneratedAt = DateTime.UtcNow
-            });
-        }
-
-        [HttpGet("current")]
-        public async Task<IActionResult> GetCurrent()
-        {
-            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdValue, out var userId))
-            {
-                return Unauthorized();
-            }
-
-            var preferences = await _db.UserPreferences.FirstOrDefaultAsync(x => x.UserId == userId);
-            var userGroup = preferences?.UserGroup ?? "normal";
-
-            var data = await _weatherService.GetCurrentAsync();
-
-            var request = new AiPredictRequest
-            {
-                UserGroup = userGroup,
-                Data = data
-            };
-
-            var aiResult = await _aiService.PredictAsync(request);
-
-            if (aiResult == null)
-            {
-                return StatusCode(500, new { message = "AI lỗi." });
-            }
-
-            return Ok(new AirPredictResponse
-            {
-                Pm25 = aiResult.Pm25,
-                Aqi = aiResult.Aqi,
-                Risk = aiResult.Risk,
-                Recommendation = aiResult.Recommendation,
-                UserGroup = userGroup,
+                UserGroup = aiResult.UserGroup,
                 GeneratedAt = DateTime.UtcNow
             });
         }
@@ -108,68 +65,64 @@ namespace AirSafeNet.Api.Controllers
         [HttpGet("forecast")]
         public async Task<IActionResult> GetForecast24h()
         {
-            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdValue, out var userId))
+            var userGroup = await GetCurrentUserGroupAsync();
+            if (userGroup == null)
             {
                 return Unauthorized();
             }
 
-            var preferences = await _db.UserPreferences.FirstOrDefaultAsync(x => x.UserId == userId);
-            var userGroup = preferences?.UserGroup ?? "normal";
-
-            var weatherPoints = await _weatherService.Get24HourForecastAsync();
-
-            var result = new AirForecastResponse
+            var aiForecast = await _aiService.GetForecast24hAsync(userGroup);
+            if (aiForecast == null)
             {
-                UserGroup = userGroup,
-                GeneratedAt = DateTime.UtcNow,
-                Hours = 24
-            };
-
-            foreach (var point in weatherPoints)
-            {
-                var request = new AiPredictRequest
-                {
-                    UserGroup = userGroup,
-                    Data = new Dictionary<string, double>
-                    {
-                        { "pm2_5", point.Pm25 },
-                        { "temperature_2m", point.Temperature2m },
-                        { "relative_humidity_2m", point.RelativeHumidity2m },
-                        { "wind_speed_10m", point.WindSpeed10m },
-                        { "hour", point.Time.Hour }
-                    }
-                };
-
-                var aiResult = await _aiService.PredictAsync(request);
-                if (aiResult == null)
-                {
-                    continue;
-                }
-
-                result.Forecast.Add(new AirForecastItemResponse
-                {
-                    Time = point.Time,
-                    Pm25 = aiResult.Pm25,
-                    Aqi = aiResult.Aqi,
-                    Risk = aiResult.Risk,
-                    Recommendation = aiResult.Recommendation,
-                    UserGroup = userGroup
-                });
+                return StatusCode(500, new { message = "Không lấy được forecast 24h từ AI Server." });
             }
 
-            return Ok(result);
+            var response = new AirForecastResponse
+            {
+                UserGroup = aiForecast.UserGroup,
+                GeneratedAt = DateTime.TryParse(aiForecast.GeneratedAt, out var generatedAt)
+                    ? generatedAt
+                    : DateTime.UtcNow,
+                Hours = aiForecast.Hours,
+                Forecast = aiForecast.Forecast.Select(x => new AirForecastItemResponse
+                {
+                    Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
+                    Pm25 = x.Pm25,
+                    Aqi = x.Aqi,
+                    Risk = x.Risk,
+                    Recommendation = x.Recommendation,
+                    UserGroup = x.UserGroup
+                }).ToList()
+            };
+
+            return Ok(response);
         }
 
         [HttpGet("history")]
         public async Task<IActionResult> GetHistory()
         {
             var logs = await _db.AirQualityLogs
+                .AsNoTracking()
                 .OrderByDescending(x => x.RecordedAt)
                 .Take(20)
                 .ToListAsync();
 
             return Ok(logs);
+        }
+
+        private async Task<string?> GetCurrentUserGroupAsync()
+        {
+            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdValue, out var userId))
+            {
+                return null;
+            }
+
+            var preferences = await _db.UserPreferences
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.UserId == userId);
+
+            return preferences?.UserGroup ?? "normal";
         }
     }
 }

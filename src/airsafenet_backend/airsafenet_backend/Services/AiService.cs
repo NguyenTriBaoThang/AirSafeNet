@@ -14,20 +14,41 @@ namespace airsafenet_backend.Services
             _configuration = configuration;
         }
 
-        public async Task<AiServerResponse?> PredictAsync(AiPredictRequest request)
+        private string GetBaseUrl()
         {
-            var aiBaseUrl = _configuration["AiServer:BaseUrl"] ?? "http://localhost:8000";
-            var url = $"{aiBaseUrl}/predict";
+            return _configuration["AiServer:BaseUrl"] ?? "http://localhost:8000";
+        }
 
-            var response = await _httpClient.PostAsJsonAsync(url, request);
+        public async Task<AiCurrentResponse?> GetCurrentAsync(string userGroup)
+        {
+            var group = string.IsNullOrWhiteSpace(userGroup) ? "normal" : userGroup.Trim().ToLower();
+            var url = $"{GetBaseUrl()}/forecast/current?user_group={group}";
+
+            var response = await _httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorText = await response.Content.ReadAsStringAsync();
-                throw new Exception($"AI Server error: {response.StatusCode} - {errorText}");
+                throw new Exception($"AI Server current error: {response.StatusCode} - {errorText}");
             }
 
-            return await response.Content.ReadFromJsonAsync<AiServerResponse>();
+            return await response.Content.ReadFromJsonAsync<AiCurrentResponse>();
+        }
+
+        public async Task<AiForecast24hResponse?> GetForecast24hAsync(string userGroup)
+        {
+            var group = string.IsNullOrWhiteSpace(userGroup) ? "normal" : userGroup.Trim().ToLower();
+            var url = $"{GetBaseUrl()}/forecast/24h?user_group={group}";
+
+            var response = await _httpClient.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorText = await response.Content.ReadAsStringAsync();
+                throw new Exception($"AI Server forecast error: {response.StatusCode} - {errorText}");
+            }
+
+            return await response.Content.ReadFromJsonAsync<AiForecast24hResponse>();
         }
     }
 }
