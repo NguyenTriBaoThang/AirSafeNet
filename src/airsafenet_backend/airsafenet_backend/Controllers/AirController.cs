@@ -1,13 +1,12 @@
 ﻿using System.Security.Claims;
+using airsafenet_backend.Services;
 using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Air;
-using airsafenet_backend.Models;
-using airsafenet_backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace airsafenet_backend.Controllers
+namespace AirSafeNet.Api.Controllers
 {
     [ApiController]
     [Authorize]
@@ -27,29 +26,11 @@ namespace airsafenet_backend.Controllers
         public async Task<IActionResult> GetCurrent()
         {
             var userGroup = await GetCurrentUserGroupAsync();
-            if (userGroup == null)
-            {
-                return Unauthorized();
-            }
+            if (userGroup == null) return Unauthorized();
 
             var aiResult = await _aiService.GetCurrentAsync(userGroup);
             if (aiResult == null)
-            {
                 return StatusCode(500, new { message = "Không lấy được dữ liệu current từ AI Server." });
-            }
-
-            var log = new AirQualityLog
-            {
-                Pm25 = aiResult.Pm25,
-                Aqi = aiResult.Aqi,
-                Risk = aiResult.Risk,
-                Recommendation = aiResult.Recommendation,
-                UserGroup = userGroup,
-                RecordedAt = DateTime.UtcNow
-            };
-
-            _db.AirQualityLogs.Add(log);
-            await _db.SaveChangesAsync();
 
             return Ok(new AirPredictResponse
             {
@@ -63,60 +44,53 @@ namespace airsafenet_backend.Controllers
         }
 
         [HttpGet("forecast")]
-        public async Task<IActionResult> GetForecast24h()
+        public async Task<IActionResult> GetForecast([FromQuery] int days = 1)
         {
             var userGroup = await GetCurrentUserGroupAsync();
-            if (userGroup == null)
-            {
-                return Unauthorized();
-            }
+            if (userGroup == null) return Unauthorized();
 
-            var aiForecast = await _aiService.GetForecast24hAsync(userGroup);
+            var aiForecast = await _aiService.GetForecastRangeAsync(userGroup, days);
             if (aiForecast == null)
-            {
-                return StatusCode(500, new { message = "Không lấy được forecast 24h từ AI Server." });
-            }
+                return StatusCode(500, new { message = "Không lấy được forecast từ AI Server." });
 
-            var response = new AirForecastResponse
+            var response = new
             {
-                UserGroup = aiForecast.UserGroup,
-                GeneratedAt = DateTime.TryParse(aiForecast.GeneratedAt, out var generatedAt)
-                    ? generatedAt
-                    : DateTime.UtcNow,
-                Hours = aiForecast.Hours,
-                Forecast = aiForecast.Forecast.Select(x => new AirForecastItemResponse
+                userGroup = aiForecast.UserGroup,
+                generatedAt = aiForecast.GeneratedAt,
+                days = aiForecast.Days,
+                hours = aiForecast.Hours,
+                forecast = aiForecast.Forecast.Select(x => new
                 {
-                    Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
-                    Pm25 = x.Pm25,
-                    Aqi = x.Aqi,
-                    Risk = x.Risk,
-                    Recommendation = x.Recommendation,
-                    UserGroup = x.UserGroup
-                }).ToList()
+                    time = x.Time,
+                    pm25 = x.Pm25,
+                    aqi = x.Aqi,
+                    risk = x.Risk,
+                    recommendation = x.Recommendation,
+                    userGroup = x.UserGroup
+                })
             };
 
             return Ok(response);
         }
 
         [HttpGet("history")]
-        public async Task<IActionResult> GetHistory()
+        public async Task<IActionResult> GetHistory([FromQuery] int days = 7)
         {
-            var logs = await _db.AirQualityLogs
-                .AsNoTracking()
-                .OrderByDescending(x => x.RecordedAt)
-                .Take(20)
-                .ToListAsync();
+            var userGroup = await GetCurrentUserGroupAsync();
+            if (userGroup == null) return Unauthorized();
 
-            return Ok(logs);
+            var aiHistory = await _aiService.GetHistoryAsync(userGroup, days);
+            if (aiHistory == null)
+                return StatusCode(500, new { message = "Không lấy được history từ AI Server." });
+
+            return Ok(aiHistory);
         }
 
         private async Task<string?> GetCurrentUserGroupAsync()
         {
             var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!int.TryParse(userIdValue, out var userId))
-            {
                 return null;
-            }
 
             var preferences = await _db.UserPreferences
                 .AsNoTracking()

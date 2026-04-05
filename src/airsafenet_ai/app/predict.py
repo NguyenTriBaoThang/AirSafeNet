@@ -5,8 +5,8 @@ import joblib
 import pandas as pd
 
 from app.aqi import pm25_to_aqi, get_risk_level, get_recommendation
-from app.config import MODEL_PATH, METADATA_PATH, FORECAST_HOURS, HISTORY_HOURS
-from app.data_loader import load_merged_history
+from app.config import MODEL_PATH, METADATA_PATH, HISTORY_HOURS
+from app.data_loader import load_merged_dataset
 from app.features import build_latest_feature_vector
 
 model = joblib.load(MODEL_PATH)
@@ -20,84 +20,118 @@ def load_metadata() -> dict:
         return {}
 
 
-def _safe_float(value) -> float:
-    try:
-        return float(value)
-    except Exception:
-        return 0.0
-
-
-def _predict_one_from_history(history_df: pd.DataFrame, user_group: str = "normal") -> dict:
+def _predict_one(history_df: pd.DataFrame, user_group: str) -> dict:
     X_latest = build_latest_feature_vector(history_df)
     pred_pm25 = float(model.predict(X_latest)[0])
     pred_pm25 = max(0.0, pred_pm25)
 
-    pred_aqi = pm25_to_aqi(pred_pm25)
-    risk = get_risk_level(pred_aqi, user_group)
+    aqi = pm25_to_aqi(pred_pm25)
+    risk = get_risk_level(aqi, user_group)
     recommendation = get_recommendation(risk)
 
     return {
         "pm25": round(pred_pm25, 2),
-        "aqi": int(pred_aqi),
+        "aqi": int(aqi),
         "risk": risk,
         "recommendation": recommendation,
     }
 
 
 def get_current_snapshot(user_group: str = "normal") -> dict:
-    history = load_merged_history(HISTORY_HOURS)
+    df = load_merged_dataset(hours=HISTORY_HOURS, forecast_days=2)
+    history = df[df["time"] <= pd.Timestamp.now().tz_localize(None)].copy()
 
     if history.empty:
-        raise ValueError("Không có dữ liệu history để dự đoán.")
+        raise ValueError("Không có history để dự đoán current.")
 
     last_row = history.iloc[-1]
-
-    prediction = _predict_one_from_history(history, user_group)
+    pred = _predict_one(history, user_group)
 
     return {
         "time": str(pd.Timestamp(last_row["time"]).isoformat()),
-        "observed_pm25": round(_safe_float(last_row.get("pm2_5", 0)), 2),
-        "observed_temp": round(_safe_float(last_row.get("temp", 0)), 2),
-        "observed_humidity": round(_safe_float(last_row.get("humidity", 0)), 2),
-        "observed_wind_speed": round(_safe_float(last_row.get("wind_speed", 0)), 2),
-        **prediction,
+        "observed_pm25": round(float(last_row.get("pm2_5", 0) or 0), 2),
+        "observed_temp": round(float(last_row.get("temp", 0) or 0), 2),
+        "observed_humidity": round(float(last_row.get("humidity", 0) or 0), 2),
+        "observed_wind_speed": round(float(last_row.get("wind_speed", 0) or 0), 2),
+        **pred,
         "user_group": user_group,
     }
 
 
-def forecast_next_24h(user_group: str = "normal") -> dict:
-    history = load_merged_history(HISTORY_HOURS)
+def forecast_range(days: int = 1, user_group: str = "normal") -> dict:
+    days = max(1, min(days, 7))
+
+    df = load_merged_dataset(hours=HISTORY_HOURS, forecast_days=max(days, 2))
+    now = pd.Timestamp.now().tz_localize(None)
+
+    history = df[df["time"] <= now].copy().reset_index(drop=True)
+    future_exog = df[df["time"] > now].copy().reset_index(drop=True)
+
+    target_hours = days * 24
+    future_exog = future_exog.head(target_hours)
 
     if len(history) < 30:
-        raise ValueError("History chưa đủ để build lag/rolling features.")
+        raise ValueError("History chưa đủ để build lag/rolling.")
+    if future_exog.empty:
+        raise ValueError("Không có future exogenous data để forecast.")
 
     rows = []
 
-    for _ in range(FORECAST_HOURS):
-        prediction = _predict_one_from_history(history, user_group)
+    for i in range(len(future_exog)):
+        pred = _predict_one(history, user_group)
 
-        last = history.iloc[-1].copy()
-        next_time = pd.Timestamp(last["time"]) + pd.Timedelta(hours=1)
+        future_row = future_exog.iloc[i].copy()
+        future_row["pm2_5"] = pred["pm25"]
 
-        # Giữ các external predictors gần nhất như một cách recursive forecast đơn giản
-        new_row = last.copy()
-        new_row["time"] = next_time
-        new_row["pm2_5"] = prediction["pm25"]
-
-        history = pd.concat([history, pd.DataFrame([new_row])], ignore_index=True)
+        history = pd.concat([history, pd.DataFrame([future_row])], ignore_index=True)
 
         rows.append({
-            "time": str(next_time.isoformat()),
-            "pm25": prediction["pm25"],
-            "aqi": prediction["aqi"],
-            "risk": prediction["risk"],
-            "recommendation": prediction["recommendation"],
+            "time": str(pd.Timestamp(future_row["time"]).isoformat()),
+            "pm25": pred["pm25"],
+            "aqi": pred["aqi"],
+            "risk": pred["risk"],
+            "recommendation": pred["recommendation"],
             "user_group": user_group,
         })
 
     return {
         "generated_at": pd.Timestamp.utcnow().isoformat(),
-        "hours": FORECAST_HOURS,
+        "days": days,
+        "hours": len(rows),
         "user_group": user_group,
         "forecast": rows,
+    }
+
+
+def history_range(days: int = 7, user_group: str = "normal") -> dict:
+    days = max(1, min(days, 30))
+
+    df = load_merged_dataset(hours=max(days * 24 + 24, HISTORY_HOURS), forecast_days=1)
+    now = pd.Timestamp.now().tz_localize(None)
+
+    hist = df[df["time"] <= now].copy().reset_index(drop=True)
+    hist = hist.tail(days * 24).copy()
+
+    rows = []
+    for _, row in hist.iterrows():
+        observed_pm25 = float(row.get("pm2_5", 0) or 0)
+        aqi = pm25_to_aqi(observed_pm25)
+        risk = get_risk_level(aqi, user_group)
+        recommendation = get_recommendation(risk)
+
+        rows.append({
+            "time": str(pd.Timestamp(row["time"]).isoformat()),
+            "pm25": round(observed_pm25, 2),
+            "aqi": int(aqi),
+            "risk": risk,
+            "recommendation": recommendation,
+            "user_group": user_group,
+        })
+
+    return {
+        "generated_at": pd.Timestamp.utcnow().isoformat(),
+        "days": days,
+        "hours": len(rows),
+        "user_group": user_group,
+        "history": rows,
     }

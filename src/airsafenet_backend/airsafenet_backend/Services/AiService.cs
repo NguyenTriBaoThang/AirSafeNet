@@ -23,7 +23,6 @@ namespace airsafenet_backend.Services
         {
             var group = string.IsNullOrWhiteSpace(userGroup) ? "normal" : userGroup.Trim().ToLower();
             var url = $"{GetBaseUrl()}/forecast/current?user_group={group}";
-
             var response = await _httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)
@@ -35,20 +34,38 @@ namespace airsafenet_backend.Services
             return await response.Content.ReadFromJsonAsync<AiCurrentResponse>();
         }
 
-        public async Task<AiForecast24hResponse?> GetForecast24hAsync(string userGroup)
+        public async Task<AiRangeResponse?> GetForecastRangeAsync(string userGroup, int days)
         {
             var group = string.IsNullOrWhiteSpace(userGroup) ? "normal" : userGroup.Trim().ToLower();
-            var url = $"{GetBaseUrl()}/forecast/24h?user_group={group}";
+            days = Math.Clamp(days, 1, 7);
 
+            var url = $"{GetBaseUrl()}/forecast/range?days={days}&user_group={group}";
             var response = await _httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)
             {
                 var errorText = await response.Content.ReadAsStringAsync();
-                throw new Exception($"AI Server forecast error: {response.StatusCode} - {errorText}");
+                throw new Exception($"AI Server forecast range error: {response.StatusCode} - {errorText}");
             }
 
-            return await response.Content.ReadFromJsonAsync<AiForecast24hResponse>();
+            return await response.Content.ReadFromJsonAsync<AiRangeResponse>();
+        }
+
+        public async Task<AiHistoryResponse?> GetHistoryAsync(string userGroup, int days)
+        {
+            var group = string.IsNullOrWhiteSpace(userGroup) ? "normal" : userGroup.Trim().ToLower();
+            days = Math.Clamp(days, 1, 30);
+
+            var url = $"{GetBaseUrl()}/history?days={days}&user_group={group}";
+            var response = await _httpClient.GetAsync(url);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorText = await response.Content.ReadAsStringAsync();
+                throw new Exception($"AI Server history error: {response.StatusCode} - {errorText}");
+            }
+
+            return await response.Content.ReadFromJsonAsync<AiHistoryResponse>();
         }
     }
 }

@@ -3,13 +3,18 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.predict import get_current_snapshot, forecast_next_24h, load_metadata
+from app.predict import (
+    get_current_snapshot,
+    forecast_range,
+    history_range,
+    load_metadata,
+)
 from app.config import MODEL_PATH, FEATURE_COLS_PATH, METADATA_PATH
 
 app = FastAPI(
     title="AirSafeNet AI Server",
-    version="2.0.0",
-    description="Time-series AI server giữ nguyên model hiện tại của AirSafeNet",
+    version="3.0.0",
+    description="AI server forecast current/range/history cho AirSafeNet",
 )
 
 app.add_middleware(
@@ -23,14 +28,19 @@ app.add_middleware(
 VALID_GROUPS = {"normal", "child", "elderly", "respiratory", "pregnant"}
 
 
+def validate_group(user_group: str) -> str:
+    group = (user_group or "normal").strip().lower()
+    if group not in VALID_GROUPS:
+        raise HTTPException(status_code=400, detail="user_group không hợp lệ")
+    return group
+
+
 @app.get("/")
 def root():
     return {
         "message": "AirSafeNet AI Server running",
         "docs": "/docs",
         "health": "/health",
-        "current": "/forecast/current?user_group=normal",
-        "forecast24h": "/forecast/24h?user_group=normal",
     }
 
 
@@ -50,28 +60,30 @@ def model_info():
 
 
 @app.get("/forecast/current")
-def forecast_current(
-    user_group: str = Query(default="normal", description="normal | child | elderly | respiratory | pregnant")
-):
-    group = (user_group or "normal").strip().lower()
-    if group not in VALID_GROUPS:
-        raise HTTPException(status_code=400, detail="user_group không hợp lệ")
-
+def forecast_current(user_group: str = Query(default="normal")):
     try:
-        return get_current_snapshot(group)
+        return get_current_snapshot(validate_group(user_group))
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))
 
 
-@app.get("/forecast/24h")
-def forecast_24h(
-    user_group: str = Query(default="normal", description="normal | child | elderly | respiratory | pregnant")
+@app.get("/forecast/range")
+def forecast_days(
+    days: int = Query(default=1, ge=1, le=7),
+    user_group: str = Query(default="normal"),
 ):
-    group = (user_group or "normal").strip().lower()
-    if group not in VALID_GROUPS:
-        raise HTTPException(status_code=400, detail="user_group không hợp lệ")
-
     try:
-        return forecast_next_24h(group)
+        return forecast_range(days=days, user_group=validate_group(user_group))
+    except Exception as ex:
+        raise HTTPException(status_code=500, detail=str(ex))
+
+
+@app.get("/history")
+def history(
+    days: int = Query(default=7, ge=1, le=30),
+    user_group: str = Query(default="normal"),
+):
+    try:
+        return history_range(days=days, user_group=validate_group(user_group))
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))

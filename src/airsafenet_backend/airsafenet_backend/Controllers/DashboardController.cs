@@ -23,25 +23,18 @@ namespace airsafenet_backend.Controllers
         }
 
         [HttpGet("summary")]
-        public async Task<IActionResult> GetSummary()
+        public async Task<IActionResult> GetSummary([FromQuery] int days = 1)
         {
             var userGroup = await GetCurrentUserGroupAsync();
-            if (userGroup == null)
-            {
-                return Unauthorized();
-            }
+            if (userGroup == null) return Unauthorized();
 
             var current = await _aiService.GetCurrentAsync(userGroup);
-            var forecast = await _aiService.GetForecast24hAsync(userGroup);
+            var forecast = await _aiService.GetForecastRangeAsync(userGroup, days);
 
             if (current == null || forecast == null)
-            {
-                return StatusCode(500, new { message = "Không lấy được dữ liệu dashboard từ AI Server." });
-            }
+                return StatusCode(500, new { message = "Không lấy được dữ liệu dashboard." });
 
-            var peak = forecast.Forecast
-                .OrderByDescending(x => x.Aqi)
-                .FirstOrDefault();
+            var peak = forecast.Forecast.OrderByDescending(x => x.Aqi).FirstOrDefault();
 
             var warningCount = forecast.Forecast.Count(x =>
                 AirRiskHelper.ToSeverity(x.Risk) >= AirRiskHelper.ToSeverity("UNHEALTHY_SENSITIVE"));
@@ -55,15 +48,12 @@ namespace airsafenet_backend.Controllers
                 CurrentAqi = current.Aqi,
                 CurrentRisk = current.Risk,
                 CurrentRecommendation = current.Recommendation,
-
                 MaxPm25Next24h = peak?.Pm25 ?? current.Pm25,
                 MaxAqiNext24h = peak?.Aqi ?? current.Aqi,
                 PeakRiskNext24h = peak?.Risk ?? current.Risk,
                 PeakTime = DateTime.TryParse(peak?.Time, out var peakTime) ? peakTime : null,
-
                 UserGroup = current.UserGroup,
                 GeneratedAt = DateTime.UtcNow,
-
                 WarningCount = warningCount,
                 DangerCount = dangerCount
             };
@@ -72,66 +62,124 @@ namespace airsafenet_backend.Controllers
         }
 
         [HttpGet("chart")]
-        public async Task<IActionResult> GetChart()
+        public async Task<IActionResult> GetChart([FromQuery] int days = 1, [FromQuery] string mode = "forecast")
         {
             var userGroup = await GetCurrentUserGroupAsync();
-            if (userGroup == null)
-            {
-                return Unauthorized();
-            }
+            if (userGroup == null) return Unauthorized();
 
-            var forecast = await _aiService.GetForecast24hAsync(userGroup);
-            if (forecast == null)
+            if (mode.ToLower() == "history")
             {
-                return StatusCode(500, new { message = "Không lấy được dữ liệu chart từ AI Server." });
-            }
+                var history = await _aiService.GetHistoryAsync(userGroup, days);
+                if (history == null)
+                    return StatusCode(500, new { message = "Không lấy được history chart." });
 
-            var response = new DashboardChartResponse
-            {
-                UserGroup = forecast.UserGroup,
-                GeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var generatedAt)
-                    ? generatedAt
-                    : DateTime.UtcNow,
-                Hours = forecast.Hours,
-                Points = forecast.Forecast.Select(x => new DashboardChartPointResponse
+                var response = new DashboardChartResponse
                 {
-                    Time = DateTime.TryParse(x.Time, out var pointTime) ? pointTime : DateTime.UtcNow,
-                    Pm25 = x.Pm25,
-                    Aqi = x.Aqi,
-                    Risk = x.Risk,
-                    Recommendation = x.Recommendation,
-                    ColorKey = AirRiskHelper.ToColorKey(x.Risk)
-                }).ToList()
-            };
+                    UserGroup = history.UserGroup,
+                    GeneratedAt = DateTime.TryParse(history.GeneratedAt, out var g1) ? g1 : DateTime.UtcNow,
+                    Hours = history.Hours,
+                    Points = history.History.Select(x => new DashboardChartPointResponse
+                    {
+                        Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
+                        Pm25 = x.Pm25,
+                        Aqi = x.Aqi,
+                        Risk = x.Risk,
+                        Recommendation = x.Recommendation,
+                        ColorKey = AirRiskHelper.ToColorKey(x.Risk)
+                    }).ToList()
+                };
 
-            return Ok(response);
+                return Ok(response);
+            }
+            else
+            {
+                var forecast = await _aiService.GetForecastRangeAsync(userGroup, days);
+                if (forecast == null)
+                    return StatusCode(500, new { message = "Không lấy được forecast chart." });
+
+                var response = new DashboardChartResponse
+                {
+                    UserGroup = forecast.UserGroup,
+                    GeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var g2) ? g2 : DateTime.UtcNow,
+                    Hours = forecast.Hours,
+                    Points = forecast.Forecast.Select(x => new DashboardChartPointResponse
+                    {
+                        Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
+                        Pm25 = x.Pm25,
+                        Aqi = x.Aqi,
+                        Risk = x.Risk,
+                        Recommendation = x.Recommendation,
+                        ColorKey = AirRiskHelper.ToColorKey(x.Risk)
+                    }).ToList()
+                };
+
+                return Ok(response);
+            }
         }
 
         [HttpGet("full")]
-        public async Task<IActionResult> GetFull()
+        public async Task<IActionResult> GetFull([FromQuery] int days = 1, [FromQuery] string mode = "forecast")
         {
             var userGroup = await GetCurrentUserGroupAsync();
-            if (userGroup == null)
-            {
-                return Unauthorized();
-            }
+            if (userGroup == null) return Unauthorized();
 
             var current = await _aiService.GetCurrentAsync(userGroup);
-            var forecast = await _aiService.GetForecast24hAsync(userGroup);
+            if (current == null)
+                return StatusCode(500, new { message = "Không lấy được current." });
 
-            if (current == null || forecast == null)
+            DashboardChartResponse chart;
+
+            if (mode.ToLower() == "history")
             {
-                return StatusCode(500, new { message = "Không lấy được dữ liệu dashboard full từ AI Server." });
+                var history = await _aiService.GetHistoryAsync(userGroup, days);
+                if (history == null)
+                    return StatusCode(500, new { message = "Không lấy được history." });
+
+                chart = new DashboardChartResponse
+                {
+                    UserGroup = history.UserGroup,
+                    GeneratedAt = DateTime.TryParse(history.GeneratedAt, out var gh) ? gh : DateTime.UtcNow,
+                    Hours = history.Hours,
+                    Points = history.History.Select(x => new DashboardChartPointResponse
+                    {
+                        Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
+                        Pm25 = x.Pm25,
+                        Aqi = x.Aqi,
+                        Risk = x.Risk,
+                        Recommendation = x.Recommendation,
+                        ColorKey = AirRiskHelper.ToColorKey(x.Risk)
+                    }).ToList()
+                };
+            }
+            else
+            {
+                var forecast = await _aiService.GetForecastRangeAsync(userGroup, days);
+                if (forecast == null)
+                    return StatusCode(500, new { message = "Không lấy được forecast." });
+
+                chart = new DashboardChartResponse
+                {
+                    UserGroup = forecast.UserGroup,
+                    GeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var gf) ? gf : DateTime.UtcNow,
+                    Hours = forecast.Hours,
+                    Points = forecast.Forecast.Select(x => new DashboardChartPointResponse
+                    {
+                        Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
+                        Pm25 = x.Pm25,
+                        Aqi = x.Aqi,
+                        Risk = x.Risk,
+                        Recommendation = x.Recommendation,
+                        ColorKey = AirRiskHelper.ToColorKey(x.Risk)
+                    }).ToList()
+                };
             }
 
-            var peak = forecast.Forecast
-                .OrderByDescending(x => x.Aqi)
-                .FirstOrDefault();
+            var peak = chart.Points.OrderByDescending(x => x.Aqi).FirstOrDefault();
 
-            var warningCount = forecast.Forecast.Count(x =>
+            var warningCount = chart.Points.Count(x =>
                 AirRiskHelper.ToSeverity(x.Risk) >= AirRiskHelper.ToSeverity("UNHEALTHY_SENSITIVE"));
 
-            var dangerCount = forecast.Forecast.Count(x =>
+            var dangerCount = chart.Points.Count(x =>
                 AirRiskHelper.ToSeverity(x.Risk) >= AirRiskHelper.ToSeverity("UNHEALTHY"));
 
             var summary = new DashboardSummaryResponse
@@ -140,53 +188,28 @@ namespace airsafenet_backend.Controllers
                 CurrentAqi = current.Aqi,
                 CurrentRisk = current.Risk,
                 CurrentRecommendation = current.Recommendation,
-
                 MaxPm25Next24h = peak?.Pm25 ?? current.Pm25,
                 MaxAqiNext24h = peak?.Aqi ?? current.Aqi,
                 PeakRiskNext24h = peak?.Risk ?? current.Risk,
-                PeakTime = DateTime.TryParse(peak?.Time, out var peakTime) ? peakTime : null,
-
+                PeakTime = peak?.Time,
                 UserGroup = current.UserGroup,
                 GeneratedAt = DateTime.UtcNow,
-
                 WarningCount = warningCount,
                 DangerCount = dangerCount
             };
 
-            var chart = new DashboardChartResponse
-            {
-                UserGroup = forecast.UserGroup,
-                GeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var generatedAt)
-                    ? generatedAt
-                    : DateTime.UtcNow,
-                Hours = forecast.Hours,
-                Points = forecast.Forecast.Select(x => new DashboardChartPointResponse
-                {
-                    Time = DateTime.TryParse(x.Time, out var pointTime) ? pointTime : DateTime.UtcNow,
-                    Pm25 = x.Pm25,
-                    Aqi = x.Aqi,
-                    Risk = x.Risk,
-                    Recommendation = x.Recommendation,
-                    ColorKey = AirRiskHelper.ToColorKey(x.Risk)
-                }).ToList()
-            };
-
-            var response = new DashboardFullResponse
+            return Ok(new DashboardFullResponse
             {
                 Summary = summary,
                 Chart = chart
-            };
-
-            return Ok(response);
+            });
         }
 
         private async Task<string?> GetCurrentUserGroupAsync()
         {
             var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!int.TryParse(userIdValue, out var userId))
-            {
                 return null;
-            }
 
             var preferences = await _db.UserPreferences
                 .AsNoTracking()
