@@ -1,4 +1,5 @@
 import { http } from "./http";
+import type { DashboardDays } from "../types/dashboard";
 import type {
   AirForecastResponse,
   AirPredictRequest,
@@ -12,8 +13,15 @@ export async function getCurrentAirApi() {
   });
 }
 
-export async function getForecastAirApi() {
-  return http<AirForecastResponse>("/api/air/forecast", {
+export async function getForecastAirApi(days: DashboardDays = 1) {
+  return http<AirForecastResponse>(`/api/air/forecast?days=${days}`, {
+    method: "GET",
+    auth: true,
+  });
+}
+
+export async function getHistoryAirApi(days: number = 7) {
+  return http(`/api/air/history?days=${days}`, {
     method: "GET",
     auth: true,
   });

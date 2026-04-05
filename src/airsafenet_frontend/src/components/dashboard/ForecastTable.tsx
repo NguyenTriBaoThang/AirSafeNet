@@ -3,13 +3,14 @@ import RiskBadge from "./RiskBadge";
 
 type Props = {
   points: DashboardChartPointResponse[];
+  mode: "forecast" | "history";
 };
 
-export default function ForecastTable({ points }: Props) {
+export default function ForecastTable({ points, mode }: Props) {
   return (
     <div className="card">
       <div className="card__header">
-        <h3>Dự báo 24 giờ</h3>
+        <h3>{mode === "forecast" ? "Dự báo chất lượng không khí" : "Lịch sử chất lượng không khí"}</h3>
       </div>
 
       <div className="table-wrap">
@@ -26,7 +27,11 @@ export default function ForecastTable({ points }: Props) {
           <tbody>
             {points.map((item) => (
               <tr key={item.time}>
-                <td>{new Date(item.time).toLocaleString("vi-VN")}</td>
+                <td>
+                  {new Date(item.time).toLocaleString("vi-VN", {
+                    hour12: false,
+                  })}
+                </td>
                 <td>{item.pm25.toFixed(1)}</td>
                 <td>{item.aqi}</td>
                 <td>

@@ -3,12 +3,15 @@ export type DashboardSummaryResponse = {
   currentAqi: number;
   currentRisk: string;
   currentRecommendation: string;
+
   maxPm25Next24h: number;
   maxAqiNext24h: number;
   peakRiskNext24h: string;
   peakTime?: string | null;
+
   userGroup: string;
   generatedAt: string;
+
   warningCount: number;
   dangerCount: number;
 };
@@ -33,3 +36,6 @@ export type DashboardFullResponse = {
   summary: DashboardSummaryResponse;
   chart: DashboardChartResponse;
 };
+
+export type DashboardMode = "forecast" | "history";
+export type DashboardDays = 1 | 3 | 7;

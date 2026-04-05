@@ -1,4 +1,6 @@
-﻿namespace airsafenet_backend.DTOs.Air
+﻿using System.Text.Json.Serialization;
+
+namespace airsafenet_backend.DTOs.Air
 {
     public class AiHistoryItem
     {
