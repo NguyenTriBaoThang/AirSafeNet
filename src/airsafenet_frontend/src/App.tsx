@@ -1,9 +1,9 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
-import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
-import UserPreferences from "./pages/UserPreferences";
+import UserPreferencesPage from "./pages/UserPreferences";
+import AppShell from "./components/layout/AppShell";
 import { getAccessToken } from "./api/http";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -17,13 +17,14 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
 
         <Route
           path="/dashboard"
           element={
             <PrivateRoute>
-              <Dashboard />
+              <AppShell>
+                <Dashboard />
+              </AppShell>
             </PrivateRoute>
           }
         />
@@ -32,7 +33,9 @@ export default function App() {
           path="/preferences"
           element={
             <PrivateRoute>
-              <UserPreferences />
+              <AppShell>
+                <UserPreferencesPage />
+              </AppShell>
             </PrivateRoute>
           }
         />

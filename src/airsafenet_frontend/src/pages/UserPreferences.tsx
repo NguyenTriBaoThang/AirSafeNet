@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import AppShell from "../components/layout/AppShell";
 import {
   getUserPreferencesApi,
   updateUserPreferencesApi,
@@ -9,21 +8,22 @@ import type {
   UserPreferencesResponse,
 } from "../types/preferences";
 
-const GROUP_OPTIONS = [
-  { value: "normal", label: "Người dùng thông thường" },
+const USER_GROUP_OPTIONS = [
+  { value: "normal", label: "Người dùng phổ thông" },
   { value: "child", label: "Trẻ em" },
   { value: "elderly", label: "Người cao tuổi" },
   { value: "respiratory", label: "Người có bệnh hô hấp" },
   { value: "pregnant", label: "Phụ nữ mang thai" },
 ];
 
-export default function UserPreferences() {
+export default function UserPreferencesPage() {
   const [data, setData] = useState<UserPreferencesResponse | null>(null);
   const [form, setForm] = useState<UpdateUserPreferencesRequest>({
     userGroup: "normal",
     preferredLocation: "Ho Chi Minh City",
     notifyEnabled: true,
   });
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -33,6 +33,8 @@ export default function UserPreferences() {
     try {
       setLoading(true);
       setError("");
+      setMessage("");
+
       const result = await getUserPreferencesApi();
       setData(result);
       setForm({
@@ -41,7 +43,7 @@ export default function UserPreferences() {
         notifyEnabled: result.notifyEnabled,
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không tải được dữ liệu");
+      setError(err instanceof Error ? err.message : "Không thể tải cài đặt");
     } finally {
       setLoading(false);
     }
@@ -51,7 +53,7 @@ export default function UserPreferences() {
     loadData();
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSave(e: React.FormEvent) {
     e.preventDefault();
 
     try {
@@ -61,7 +63,7 @@ export default function UserPreferences() {
 
       const result = await updateUserPreferencesApi(form);
       setData(result);
-      setMessage("Cập nhật tùy chỉnh thành công.");
+      setMessage("Đã cập nhật cài đặt người dùng thành công.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cập nhật thất bại");
     } finally {
@@ -69,112 +71,128 @@ export default function UserPreferences() {
     }
   }
 
+  if (loading) {
+    return <div className="page-state">Đang tải cài đặt người dùng...</div>;
+  }
+
   return (
-    <AppShell title="Tùy chỉnh người dùng">
-      <div className="preferences-page">
-        <div className="content-grid">
-          <div className="card">
-            <div className="card__header">
-              <h3>Cài đặt cảnh báo và đối tượng sử dụng</h3>
-              <p className="card__desc">
-                Tùy chỉnh nhóm người dùng để hệ thống đưa ra mức cảnh báo và khuyến nghị phù hợp hơn.
-              </p>
-            </div>
+    <div className="preferences-page">
+      <div className="page-header">
+        <div>
+          <h1>Tùy chỉnh người dùng</h1>
+          <p>
+            Điều chỉnh nhóm người dùng, khu vực ưu tiên và chế độ nhận cảnh báo
+            để phù hợp với nhu cầu sử dụng.
+          </p>
+        </div>
 
-            {loading ? (
-              <div className="page-state">Đang tải cấu hình...</div>
-            ) : (
-              <form className="preferences-form" onSubmit={handleSubmit}>
-                <label>Nhóm người dùng</label>
-                <select
-                  value={form.userGroup}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, userGroup: e.target.value }))
-                  }
-                >
-                  {GROUP_OPTIONS.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
+        <button className="btn btn-secondary" onClick={loadData}>
+          Tải lại
+        </button>
+      </div>
 
-                <label>Khu vực ưu tiên</label>
-                <input
-                  value={form.preferredLocation}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      preferredLocation: e.target.value,
-                    }))
-                  }
-                  placeholder="Ho Chi Minh City"
-                />
-
-                <label className="switch-row">
-                  <span>Bật nhận cảnh báo</span>
-                  <input
-                    type="checkbox"
-                    checked={form.notifyEnabled}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        notifyEnabled: e.target.checked,
-                      }))
-                    }
-                  />
-                </label>
-
-                {message ? <div className="form-success">{message}</div> : null}
-                {error ? <div className="form-error">{error}</div> : null}
-
-                <div className="form-actions">
-                  <button
-                    type="button"
-                    className="btn btn-secondary"
-                    onClick={loadData}
-                  >
-                    Tải lại
-                  </button>
-
-                  <button className="btn btn-primary" disabled={saving}>
-                    {saving ? "Đang lưu..." : "Lưu thay đổi"}
-                  </button>
-                </div>
-              </form>
-            )}
+      <div className="preferences-grid">
+        <form className="card preferences-form" onSubmit={handleSave}>
+          <div className="card__header">
+            <h3>Cấu hình cá nhân</h3>
           </div>
 
-          <div className="card">
-            <div className="card__header">
-              <h3>Thông tin hiện tại</h3>
+          <label>Nhóm người dùng</label>
+          <select
+            value={form.userGroup}
+            onChange={(e) =>
+              setForm((prev) => ({ ...prev, userGroup: e.target.value }))
+            }
+          >
+            {USER_GROUP_OPTIONS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
+
+          <label>Khu vực quan tâm</label>
+          <input
+            type="text"
+            value={form.preferredLocation}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                preferredLocation: e.target.value,
+              }))
+            }
+            placeholder="Ví dụ: Ho Chi Minh City"
+          />
+
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={form.notifyEnabled}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  notifyEnabled: e.target.checked,
+                }))
+              }
+            />
+            <span>Bật cảnh báo chất lượng không khí</span>
+          </label>
+
+          {message ? <div className="form-success">{message}</div> : null}
+          {error ? <div className="form-error">{error}</div> : null}
+
+          <div className="form-actions">
+            <button className="btn btn-primary" disabled={saving}>
+              {saving ? "Đang lưu..." : "Lưu thay đổi"}
+            </button>
+          </div>
+        </form>
+
+        <div className="card preferences-info">
+          <div className="card__header">
+            <h3>Thông tin hiện tại</h3>
+          </div>
+
+          <div className="info-list">
+            <div className="info-item">
+              <span>User ID</span>
+              <strong>{data?.userId ?? "-"}</strong>
             </div>
 
-            {data ? (
-              <div className="info-stack">
-                <div className="info-row">
-                  <span>Nhóm người dùng</span>
-                  <strong>{data.userGroup}</strong>
-                </div>
-                <div className="info-row">
-                  <span>Khu vực</span>
-                  <strong>{data.preferredLocation}</strong>
-                </div>
-                <div className="info-row">
-                  <span>Nhận cảnh báo</span>
-                  <strong>{data.notifyEnabled ? "Bật" : "Tắt"}</strong>
-                </div>
-                <div className="info-row">
-                  <span>Cập nhật lần cuối</span>
-                  <strong>{new Date(data.updatedAt).toLocaleString("vi-VN")}</strong>
-                </div>
-              </div>
-            ) : (
-              <div className="page-state">Chưa có dữ liệu.</div>
-            )}
+            <div className="info-item">
+              <span>Nhóm người dùng</span>
+              <strong>{data?.userGroup ?? "-"}</strong>
+            </div>
+
+            <div className="info-item">
+              <span>Khu vực ưu tiên</span>
+              <strong>{data?.preferredLocation ?? "-"}</strong>
+            </div>
+
+            <div className="info-item">
+              <span>Nhận cảnh báo</span>
+              <strong>{data?.notifyEnabled ? "Bật" : "Tắt"}</strong>
+            </div>
+
+            <div className="info-item">
+              <span>Cập nhật lần cuối</span>
+              <strong>
+                {data?.updatedAt
+                  ? new Date(data.updatedAt).toLocaleString("vi-VN")
+                  : "-"}
+              </strong>
+            </div>
+          </div>
+
+          <div className="preferences-help">
+            <h4>Gợi ý sử dụng</h4>
+            <p>
+              Chọn đúng nhóm người dùng sẽ giúp hệ thống đưa ra đánh giá mức độ
+              rủi ro và khuyến nghị phù hợp hơn.
+            </p>
           </div>
         </div>
       </div>
-    </AppShell>
+    </div>
   );
 }
