@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { loginApi } from "../api/auth";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 export default function Login() {
   const navigate = useNavigate();
@@ -11,6 +11,7 @@ export default function Login() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
     try {
       setLoading(true);
       setError("");
@@ -25,31 +26,44 @@ export default function Login() {
 
   return (
     <div className="auth-page">
-      <form className="auth-card" onSubmit={handleSubmit}>
-        <h1>Đăng nhập AirSafeNet</h1>
+      <div className="auth-layout">
+        <div className="auth-hero">
+          <div className="auth-hero__badge">AirSafeNet</div>
+          <h1>Đăng nhập để theo dõi chất lượng không khí thông minh</h1>
+          <p>
+            Truy cập dashboard dự báo AQI, PM2.5, cảnh báo sức khỏe và tùy chỉnh theo nhóm người dùng.
+          </p>
+          <Link to="/" className="btn btn-secondary">
+            Về trang chủ
+          </Link>
+        </div>
 
-        <label>Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@example.com"
-        />
+        <form className="auth-card" onSubmit={handleSubmit}>
+          <h2>Đăng nhập</h2>
 
-        <label>Mật khẩu</label>
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••"
-        />
+          <label>Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+          />
 
-        {error ? <div className="form-error">{error}</div> : null}
+          <label>Mật khẩu</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+          />
 
-        <button className="btn btn-primary" disabled={loading}>
-          {loading ? "Đang đăng nhập..." : "Đăng nhập"}
-        </button>
-      </form>
+          {error ? <div className="form-error">{error}</div> : null}
+
+          <button className="btn btn-primary" disabled={loading}>
+            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

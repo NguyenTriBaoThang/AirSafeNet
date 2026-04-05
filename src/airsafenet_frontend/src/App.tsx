@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import UserPreferences from "./pages/UserPreferences";
 import { getAccessToken } from "./api/http";
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -15,11 +16,21 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
+
         <Route
           path="/dashboard"
           element={
             <PrivateRoute>
               <Dashboard />
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/preferences"
+          element={
+            <PrivateRoute>
+              <UserPreferences />
             </PrivateRoute>
           }
         />

@@ -349,3 +349,283 @@ a {
     font-size: 38px;
   }
 }
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 20px;
+  padding: 16px 28px;
+  backdrop-filter: blur(20px);
+  background: rgba(8, 15, 30, 0.72);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.app-header__left,
+.app-header__center,
+.app-header__right {
+  display: flex;
+  align-items: center;
+}
+
+.app-header__center {
+  justify-content: center;
+}
+
+.app-header__right {
+  justify-content: flex-end;
+  gap: 16px;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand__logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  font-weight: 800;
+  color: white;
+}
+
+.brand__text {
+  display: flex;
+  flex-direction: column;
+}
+
+.brand__text span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.header-page-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.top-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.top-nav__link {
+  padding: 10px 14px;
+  border-radius: 12px;
+  color: #cbd5e1;
+}
+
+.top-nav__link.active,
+.top-nav__link:hover {
+  background: rgba(255,255,255,0.08);
+  color: white;
+}
+
+.app-shell__body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.sidebar-nav {
+  height: fit-content;
+  position: sticky;
+  top: 92px;
+  padding: 20px;
+  border-radius: 24px;
+  backdrop-filter: blur(18px);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.sidebar-nav__section + .sidebar-nav__section {
+  margin-top: 24px;
+}
+
+.sidebar-nav__label {
+  color: #94a3b8;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.sidebar-nav__items {
+  display: grid;
+  gap: 8px;
+}
+
+.sidebar-nav__item {
+  padding: 12px 14px;
+  border-radius: 14px;
+  color: #e2e8f0;
+  transition: 0.2s ease;
+}
+
+.sidebar-nav__item:hover,
+.sidebar-nav__item.active {
+  background: rgba(255,255,255,0.10);
+}
+
+.sidebar-note {
+  color: #cbd5e1;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.app-shell__content {
+  min-width: 0;
+}
+
+.dashboard-page-inner,
+.preferences-page {
+  display: grid;
+  gap: 24px;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 20px;
+}
+
+.card__desc {
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin: 8px 0 0;
+}
+
+.preferences-form {
+  display: grid;
+  gap: 14px;
+}
+
+.preferences-form input,
+.preferences-form select {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.08);
+  color: white;
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.form-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.info-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.info-row span {
+  color: #cbd5e1;
+}
+
+.form-success {
+  color: #86efac;
+}
+
+.auth-layout {
+  width: 100%;
+  max-width: 1200px;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 24px;
+  align-items: center;
+}
+
+.auth-hero {
+  padding: 24px;
+}
+
+.auth-hero__badge {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.auth-hero h1 {
+  font-size: 44px;
+  line-height: 1.1;
+  margin: 0 0 16px;
+}
+
+.auth-hero p {
+  color: #cbd5e1;
+  line-height: 1.7;
+  margin-bottom: 24px;
+}
+
+.auth-card h2 {
+  margin: 0 0 8px;
+}
+
+@media (max-width: 1100px) {
+  .app-shell__body,
+  .content-grid,
+  .auth-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar-nav {
+    position: static;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-header {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .app-header__center,
+  .app-header__right {
+    justify-content: flex-start;
+  }
+
+  .top-nav {
+    flex-wrap: wrap;
+  }
+}
