@@ -13,6 +13,9 @@ import DashboardFilters from "../components/dashboard/DashboardFilters";
 import DashboardSkeleton from "../components/common/DashboardSkeleton";
 import EmptyState from "../components/common/EmptyState";
 import { useToast } from "../components/common/useToast";
+import SectionHeader from "../components/common/SectionHeader";
+import StatusChip from "../components/common/StatusChip";
+import AppIcon from "../components/common/AppIcon";
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardFullResponse | null>(null);
@@ -48,9 +51,7 @@ export default function Dashboard() {
     loadData(days, mode);
   }, [days, mode]);
 
-  if (loading) {
-    return <DashboardSkeleton />;
-  }
+  if (loading) return <DashboardSkeleton />;
 
   if (error) {
     return (
@@ -75,23 +76,37 @@ export default function Dashboard() {
   const periodLabel =
     days === 1 ? "1 ngày" : days === 3 ? "3 ngày" : "7 ngày";
 
+  const currentVariant =
+    summary.currentRisk === "GOOD"
+      ? "success"
+      : summary.currentRisk === "MODERATE"
+      ? "warning"
+      : "danger";
+
   return (
     <div className="dashboard-page">
-      <div className="page-header">
-        <div>
-          <h1>Dashboard chất lượng không khí</h1>
-          <p>
-            Cập nhật lúc {new Date(summary.generatedAt).toLocaleString("vi-VN")} •
-            Nhóm người dùng: <strong>{summary.userGroup}</strong>
-          </p>
-        </div>
+      <SectionHeader
+        eyebrow="Dashboard thông minh"
+        title="Tổng quan chất lượng không khí"
+        description={`Cập nhật lúc ${new Date(summary.generatedAt).toLocaleString(
+          "vi-VN"
+        )} • Nhóm người dùng: ${summary.userGroup}`}
+        rightSlot={
+          <button
+            className="btn btn-primary"
+            onClick={() => loadData(days, mode, true)}
+          >
+            Làm mới dữ liệu
+          </button>
+        }
+      />
 
-        <button
-          className="btn btn-primary"
-          onClick={() => loadData(days, mode, true)}
-        >
-          Làm mới dữ liệu
-        </button>
+      <div className="section-toolbar">
+        <StatusChip
+          label={mode === "forecast" ? "Chế độ Forecast" : "Chế độ History"}
+          variant={mode === "forecast" ? "info" : "purple"}
+        />
+        <StatusChip label={`Khoảng thời gian: ${periodLabel}`} variant="neutral" />
       </div>
 
       <DashboardFilters
@@ -106,11 +121,15 @@ export default function Dashboard() {
           title="AQI hiện tại"
           value={summary.currentAqi}
           subtext={`Mức độ: ${summary.currentRisk}`}
+          icon={<AppIcon name="aqi" />}
+          tone="primary"
         />
         <SummaryCard
           title="PM2.5 hiện tại"
           value={summary.currentPm25.toFixed(1)}
           subtext="µg/m³"
+          icon={<AppIcon name="air" />}
+          tone="default"
         />
         <SummaryCard
           title={mode === "forecast" ? `AQI cao nhất ${periodLabel}` : `AQI cao nhất lịch sử ${periodLabel}`}
@@ -120,24 +139,43 @@ export default function Dashboard() {
               ? `Đỉnh lúc ${new Date(summary.peakTime).toLocaleString("vi-VN")}`
               : undefined
           }
+          icon={<AppIcon name="trend" />}
+          tone="warning"
         />
         <SummaryCard
           title={mode === "forecast" ? "Giờ nguy cơ" : "Giờ nguy cơ đã ghi nhận"}
           value={summary.dangerCount}
           subtext={`Số giờ cảnh báo: ${summary.warningCount}`}
+          icon={<AppIcon name="alert" />}
+          tone="danger"
         />
       </div>
 
       <div className="dashboard-two-col">
         <ForecastChart points={chart.points} mode={mode} />
 
-        <div className="card recommendation-card">
-          <div className="card__header">
-            <h3>{mode === "forecast" ? "Khuyến nghị hiện tại" : "Tổng quan lịch sử"}</h3>
+        <div className="card recommendation-card interactive-card">
+          <div className="card__header card__header--with-icon">
+            <div className="card__header-icon">
+              <AppIcon name={mode === "forecast" ? "forecast" : "history"} />
+            </div>
+            <div>
+              <h3>{mode === "forecast" ? "Khuyến nghị hiện tại" : "Tổng quan lịch sử"}</h3>
+              <p className="card__header-desc">
+                Gợi ý hành động và mức độ rủi ro đáng chú ý
+              </p>
+            </div>
           </div>
 
           <div className="recommendation-content">
-            <RiskBadge risk={summary.currentRisk} />
+            <div className="recommendation-topline">
+              <RiskBadge risk={summary.currentRisk} />
+              <StatusChip
+                label={`Ngưỡng hiện tại: ${summary.currentRisk}`}
+                variant={currentVariant}
+              />
+            </div>
+
             <p>{summary.currentRecommendation}</p>
 
             <div className="peak-box">

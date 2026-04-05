@@ -10,6 +10,9 @@ import type {
 import PreferencesSkeleton from "../components/common/PreferencesSkeleton";
 import EmptyState from "../components/common/EmptyState";
 import { useToast } from "../components/common/useToast";
+import SectionHeader from "../components/common/SectionHeader";
+import StatusChip from "../components/common/StatusChip";
+import AppIcon from "../components/common/AppIcon";
 
 const USER_GROUP_OPTIONS = [
   { value: "normal", label: "Người dùng phổ thông" },
@@ -82,9 +85,7 @@ export default function UserPreferencesPage() {
     }
   }
 
-  if (loading) {
-    return <PreferencesSkeleton />;
-  }
+  if (loading) return <PreferencesSkeleton />;
 
   if (error && !data) {
     return (
@@ -97,24 +98,37 @@ export default function UserPreferencesPage() {
 
   return (
     <div className="preferences-page">
-      <div className="page-header">
-        <div>
-          <h1>Tùy chỉnh người dùng</h1>
-          <p>
-            Điều chỉnh nhóm người dùng, khu vực ưu tiên và chế độ nhận cảnh báo
-            để phù hợp với nhu cầu sử dụng.
-          </p>
-        </div>
+      <SectionHeader
+        eyebrow="Cài đặt cá nhân"
+        title="Tùy chỉnh trải nghiệm người dùng"
+        description="Thiết lập nhóm người dùng, khu vực quan tâm và chế độ nhận cảnh báo phù hợp với nhu cầu sử dụng."
+        rightSlot={
+          <button className="btn btn-secondary" onClick={() => loadData(true)}>
+            Tải lại
+          </button>
+        }
+      />
 
-        <button className="btn btn-secondary" onClick={() => loadData(true)}>
-          Tải lại
-        </button>
+      <div className="section-toolbar">
+        <StatusChip label={`Nhóm hiện tại: ${form.userGroup}`} variant="info" />
+        <StatusChip
+          label={form.notifyEnabled ? "Cảnh báo đang bật" : "Cảnh báo đang tắt"}
+          variant={form.notifyEnabled ? "success" : "neutral"}
+        />
       </div>
 
       <div className="preferences-grid">
-        <form className="card preferences-form" onSubmit={handleSave}>
-          <div className="card__header">
-            <h3>Cấu hình cá nhân</h3>
+        <form className="card preferences-form interactive-card" onSubmit={handleSave}>
+          <div className="card__header card__header--with-icon">
+            <div className="card__header-icon">
+              <AppIcon name="settings" />
+            </div>
+            <div>
+              <h3>Cấu hình cá nhân</h3>
+              <p className="card__header-desc">
+                Chọn đúng thiết lập để hệ thống cảnh báo phù hợp hơn.
+              </p>
+            </div>
           </div>
 
           <label>Nhóm người dùng</label>
@@ -167,9 +181,17 @@ export default function UserPreferencesPage() {
           </div>
         </form>
 
-        <div className="card preferences-info">
-          <div className="card__header">
-            <h3>Thông tin hiện tại</h3>
+        <div className="card preferences-info interactive-card">
+          <div className="card__header card__header--with-icon">
+            <div className="card__header-icon">
+              <AppIcon name="user" />
+            </div>
+            <div>
+              <h3>Thông tin hiện tại</h3>
+              <p className="card__header-desc">
+                Trạng thái cấu hình đang áp dụng trên hệ thống
+              </p>
+            </div>
           </div>
 
           <div className="info-list">
@@ -206,8 +228,8 @@ export default function UserPreferencesPage() {
           <div className="preferences-help">
             <h4>Gợi ý sử dụng</h4>
             <p>
-              Chọn đúng nhóm người dùng sẽ giúp hệ thống đưa ra đánh giá mức độ
-              rủi ro và khuyến nghị phù hợp hơn.
+              Nhóm nhạy cảm như trẻ em, người cao tuổi và người có bệnh hô hấp
+              nên chọn đúng hồ sơ để hệ thống đưa ra mức rủi ro phù hợp hơn.
             </p>
           </div>
         </div>

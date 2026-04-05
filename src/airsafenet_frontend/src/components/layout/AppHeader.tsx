@@ -2,6 +2,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { logoutApi } from "../../api/auth";
 import { useEffect, useState } from "react";
 import { meApi } from "../../api/auth";
+import AppIcon from "../common/AppIcon";
 
 type MeState = {
   fullName: string;
@@ -68,7 +69,7 @@ export default function AppHeader({ title }: Props) {
       </div>
 
       <div className="app-header__center">
-        <div className="header-page-title">{title ?? "Dashboard"}</div>
+        <div className="app-header__title">{title ?? "Không khí sạch, quyết định thông minh"}</div>
       </div>
 
       <div className="app-header__right">
@@ -77,13 +78,13 @@ export default function AppHeader({ title }: Props) {
             to="/dashboard"
             className={location.pathname === "/dashboard" ? "top-nav__link active" : "top-nav__link"}
           >
-            Dashboard
+            <AppIcon name="air" /> Dashboard
           </Link>
           <Link
             to="/preferences"
             className={location.pathname === "/preferences" ? "top-nav__link active" : "top-nav__link"}
           >
-            Tùy chỉnh
+            <AppIcon name="settings" /> Tùy chỉnh
           </Link>
         </nav>
 
