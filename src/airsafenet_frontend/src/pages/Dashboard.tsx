@@ -6,21 +6,29 @@ import ForecastChart from "../components/dashboard/ForecastChart";
 import ForecastTable from "../components/dashboard/ForecastTable";
 import RiskBadge from "../components/dashboard/RiskBadge";
 import AppShell from "../components/layout/AppShell";
+import DashboardSkeleton from "../components/dashboard/DashboardSkeleton";
+import { useToast } from "../components/common/useToast";
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardFullResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const { showToast } = useToast();
 
-  async function loadData() {
+  async function loadData(showSuccessToast = false) {
     try {
       setLoading(true);
       setError("");
       const result = await getDashboardFullApi();
       setData(result);
+
+      if (showSuccessToast) {
+        showToast("Đã cập nhật dữ liệu dashboard.", "success");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Có lỗi xảy ra";
       setError(message);
+      showToast(message, "error");
     } finally {
       setLoading(false);
     }
@@ -31,11 +39,7 @@ export default function Dashboard() {
   }, []);
 
   if (loading) {
-    return (
-      <AppShell title="Dashboard tổng quan">
-        <div className="page-state">Đang tải dữ liệu dashboard...</div>
-      </AppShell>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error || !data) {
@@ -60,7 +64,7 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <button className="btn btn-primary" onClick={loadData}>
+          <button className="btn btn-primary" onClick={() => loadData(true)}>
             Làm mới dữ liệu
           </button>
         </div>
