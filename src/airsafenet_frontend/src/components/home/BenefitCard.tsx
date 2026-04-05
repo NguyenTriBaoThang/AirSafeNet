@@ -5,7 +5,7 @@ type Props = {
 
 export default function BenefitCard({ title, description }: Props) {
   return (
-    <div className="benefit-card">
+    <div className="benefit-card card-hover">
       <div className="benefit-card__icon">✦</div>
       <h3>{title}</h3>
       <p>{description}</p>

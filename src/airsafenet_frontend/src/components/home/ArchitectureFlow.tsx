@@ -21,7 +21,7 @@ export default function ArchitectureFlow() {
   return (
     <div className="architecture-flow">
       {blocks.map((block, index) => (
-        <div className="architecture-flow__item" key={block.title}>
+        <div className="architecture-flow__item card-hover" key={block.title}>
           <div className="architecture-flow__index">0{index + 1}</div>
           <h3>{block.title}</h3>
           <p>{block.desc}</p>

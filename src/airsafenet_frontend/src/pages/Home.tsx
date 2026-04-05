@@ -3,11 +3,14 @@ import HeroStats from "../components/home/HeroStats";
 import ArchitectureFlow from "../components/home/ArchitectureFlow";
 import BenefitCard from "../components/home/BenefitCard";
 import AppFooter from "../components/home/AppFooter";
+import AboutProjectSection from "../components/home/AboutProjectSection";
+import FaqSection from "../components/home/FaqSection";
+import ContactTeamSection from "../components/home/ContactTeamSection";
 
 export default function Home() {
   return (
     <div className="premium-home">
-      <section className="premium-hero">
+      <section className="premium-hero fade-in-up">
         <div className="premium-hero__content">
           <div className="premium-badge">
             AirSafeNet • AI & Big Data for Clean Air
@@ -40,8 +43,8 @@ export default function Home() {
           <HeroStats />
         </div>
 
-        <div className="premium-hero__visual">
-          <div className="hero-visual-card hero-visual-card--main">
+        <div className="premium-hero__visual fade-in-up delay-1">
+          <div className="hero-visual-card hero-visual-card--main card-hover">
             <div className="hero-visual-card__top">
               <span>AQI hiện tại</span>
               <span className="status-dot"></span>
@@ -51,25 +54,25 @@ export default function Home() {
           </div>
 
           <div className="hero-floating-grid">
-            <div className="hero-visual-card">
+            <div className="hero-visual-card card-hover">
               <span>PM2.5</span>
               <strong>31.2</strong>
               <p>µg/m³</p>
             </div>
 
-            <div className="hero-visual-card">
+            <div className="hero-visual-card card-hover">
               <span>Dự báo 24h</span>
               <strong>151</strong>
               <p>Đỉnh AQI dự kiến</p>
             </div>
 
-            <div className="hero-visual-card">
+            <div className="hero-visual-card card-hover">
               <span>Nhóm người dùng</span>
               <strong>Child</strong>
               <p>Cảnh báo nhạy hơn</p>
             </div>
 
-            <div className="hero-visual-card">
+            <div className="hero-visual-card card-hover">
               <span>Khuyến nghị</span>
               <strong>Hạn chế</strong>
               <p>Hoạt động ngoài trời</p>
@@ -78,7 +81,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="premium-section">
+      <section className="premium-section fade-in-up">
         <div className="section-heading">
           <div className="section-heading__eyebrow">TỔNG QUAN HỆ THỐNG</div>
           <h2>Kiến trúc kết hợp dữ liệu thời gian thực, AI Server và dashboard</h2>
@@ -91,7 +94,7 @@ export default function Home() {
         <ArchitectureFlow />
       </section>
 
-      <section className="premium-section">
+      <section className="premium-section fade-in-up">
         <div className="section-heading">
           <div className="section-heading__eyebrow">GIÁ TRỊ MANG LẠI</div>
           <h2>Lợi ích rõ ràng cho người dùng, nhà trường và cộng đồng</h2>
@@ -129,8 +132,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="premium-section premium-section--highlight">
-        <div className="highlight-panel">
+      <AboutProjectSection />
+
+      <section className="premium-section premium-section--highlight fade-in-up">
+        <div className="highlight-panel card-hover">
           <div className="highlight-panel__left">
             <div className="section-heading__eyebrow">TẠI SAO LÀ AIRSAFENET?</div>
             <h2>Một sản phẩm không chỉ để xem số liệu, mà để hành động đúng lúc</h2>
@@ -158,6 +163,8 @@ export default function Home() {
         </div>
       </section>
 
+      <FaqSection />
+      <ContactTeamSection />
       <AppFooter />
     </div>
   );
