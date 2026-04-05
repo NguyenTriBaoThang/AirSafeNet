@@ -10,6 +10,9 @@ import ForecastChart from "../components/dashboard/ForecastChart";
 import ForecastTable from "../components/dashboard/ForecastTable";
 import RiskBadge from "../components/dashboard/RiskBadge";
 import DashboardFilters from "../components/dashboard/DashboardFilters";
+import DashboardSkeleton from "../components/common/DashboardSkeleton";
+import EmptyState from "../components/common/EmptyState";
+import { useToast } from "../components/common/useToast";
 
 export default function Dashboard() {
   const [data, setData] = useState<DashboardFullResponse | null>(null);
@@ -19,16 +22,23 @@ export default function Dashboard() {
   const [days, setDays] = useState<DashboardDays>(1);
   const [mode, setMode] = useState<DashboardMode>("forecast");
 
-  async function loadData(selectedDays = days, selectedMode = mode) {
+  const { showToast } = useToast();
+
+  async function loadData(selectedDays = days, selectedMode = mode, silent = false) {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
 
       const result = await getDashboardFullApi(selectedDays, selectedMode);
       setData(result);
+
+      if (silent) {
+        showToast("Đã làm mới dữ liệu dashboard", "success");
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Có lỗi xảy ra";
       setError(message);
+      showToast(message, "error");
     } finally {
       setLoading(false);
     }
@@ -39,11 +49,25 @@ export default function Dashboard() {
   }, [days, mode]);
 
   if (loading) {
-    return <div className="page-state">Đang tải dữ liệu dashboard...</div>;
+    return <DashboardSkeleton />;
   }
 
-  if (error || !data) {
-    return <div className="page-state error">Lỗi: {error || "Không có dữ liệu"}</div>;
+  if (error) {
+    return (
+      <EmptyState
+        title="Không tải được dữ liệu dashboard"
+        description={error}
+      />
+    );
+  }
+
+  if (!data || data.chart.points.length === 0) {
+    return (
+      <EmptyState
+        title="Chưa có dữ liệu hiển thị"
+        description="Hiện chưa có điểm dữ liệu phù hợp cho khoảng thời gian bạn chọn."
+      />
+    );
   }
 
   const { summary, chart } = data;
@@ -62,7 +86,10 @@ export default function Dashboard() {
           </p>
         </div>
 
-        <button className="btn btn-primary" onClick={() => loadData()}>
+        <button
+          className="btn btn-primary"
+          onClick={() => loadData(days, mode, true)}
+        >
           Làm mới dữ liệu
         </button>
       </div>

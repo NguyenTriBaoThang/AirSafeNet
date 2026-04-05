@@ -7,6 +7,9 @@ import type {
   UpdateUserPreferencesRequest,
   UserPreferencesResponse,
 } from "../types/preferences";
+import PreferencesSkeleton from "../components/common/PreferencesSkeleton";
+import EmptyState from "../components/common/EmptyState";
+import { useToast } from "../components/common/useToast";
 
 const USER_GROUP_OPTIONS = [
   { value: "normal", label: "Người dùng phổ thông" },
@@ -26,14 +29,14 @@ export default function UserPreferencesPage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  async function loadData() {
+  const { showToast } = useToast();
+
+  async function loadData(silent = false) {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError("");
-      setMessage("");
 
       const result = await getUserPreferencesApi();
       setData(result);
@@ -42,8 +45,14 @@ export default function UserPreferencesPage() {
         preferredLocation: result.preferredLocation,
         notifyEnabled: result.notifyEnabled,
       });
+
+      if (silent) {
+        showToast("Đã tải lại cài đặt người dùng", "success");
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Không thể tải cài đặt");
+      const message = err instanceof Error ? err.message : "Không thể tải cài đặt";
+      setError(message);
+      showToast(message, "error");
     } finally {
       setLoading(false);
     }
@@ -59,20 +68,31 @@ export default function UserPreferencesPage() {
     try {
       setSaving(true);
       setError("");
-      setMessage("");
 
       const result = await updateUserPreferencesApi(form);
       setData(result);
-      setMessage("Đã cập nhật cài đặt người dùng thành công.");
+
+      showToast("Đã cập nhật cài đặt người dùng thành công", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Cập nhật thất bại");
+      const message = err instanceof Error ? err.message : "Cập nhật thất bại";
+      setError(message);
+      showToast(message, "error");
     } finally {
       setSaving(false);
     }
   }
 
   if (loading) {
-    return <div className="page-state">Đang tải cài đặt người dùng...</div>;
+    return <PreferencesSkeleton />;
+  }
+
+  if (error && !data) {
+    return (
+      <EmptyState
+        title="Không tải được cài đặt người dùng"
+        description={error}
+      />
+    );
   }
 
   return (
@@ -86,7 +106,7 @@ export default function UserPreferencesPage() {
           </p>
         </div>
 
-        <button className="btn btn-secondary" onClick={loadData}>
+        <button className="btn btn-secondary" onClick={() => loadData(true)}>
           Tải lại
         </button>
       </div>
@@ -138,7 +158,6 @@ export default function UserPreferencesPage() {
             <span>Bật cảnh báo chất lượng không khí</span>
           </label>
 
-          {message ? <div className="form-success">{message}</div> : null}
           {error ? <div className="form-error">{error}</div> : null}
 
           <div className="form-actions">
