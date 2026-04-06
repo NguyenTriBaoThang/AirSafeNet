@@ -16,16 +16,11 @@ function buildQuery(days: DashboardDays, mode: DashboardMode) {
   return `?${params.toString()}`;
 }
 
-export async function getDashboardSummaryApi(
-  days: DashboardDays = 1
-) {
-  return http<DashboardSummaryResponse>(
-    `/api/dashboard/summary?days=${days}`,
-    {
-      method: "GET",
-      auth: true,
-    }
-  );
+export async function getDashboardSummaryApi(days: DashboardDays = 1) {
+  return http<DashboardSummaryResponse>(`/api/dashboard/summary?days=${days}`, {
+    method: "GET",
+    auth: true,
+  });
 }
 
 export async function getDashboardChartApi(

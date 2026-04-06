@@ -1,8 +1,3 @@
-export type AirPredictRequest = {
-  data: Record<string, number>;
-  userGroup: string;
-};
-
 export type AirPredictResponse = {
   pm25: number;
   aqi: number;

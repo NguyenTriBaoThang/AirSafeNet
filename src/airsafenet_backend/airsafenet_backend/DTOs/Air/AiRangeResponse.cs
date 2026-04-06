@@ -13,8 +13,8 @@ namespace airsafenet_backend.DTOs.Air
         [JsonPropertyName("hours")]
         public int Hours { get; set; }
 
-        [JsonPropertyName("user_group")]
-        public string UserGroup { get; set; } = "normal";
+        [JsonPropertyName("profile")]
+        public string Profile { get; set; } = "general";
 
         [JsonPropertyName("forecast")]
         public List<AiForecastItem> Forecast { get; set; } = new();

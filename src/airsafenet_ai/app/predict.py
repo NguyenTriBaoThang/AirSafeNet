@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import json
+from typing import Any
+
 import joblib
 import pandas as pd
 
-from app.aqi import pm25_to_aqi, get_risk_level, get_recommendation
+from app.aqi import pm25_to_aqi
 from app.config import MODEL_PATH, METADATA_PATH, HISTORY_HOURS
 from app.data_loader import load_merged_dataset
-from app.features import build_latest_feature_vector
+from app.features import latest_feature_vector
+from app.profiles import aqi_to_category, recommendation_from_aqi, risk_for_profile
 
-model = joblib.load(MODEL_PATH)
+MODEL = joblib.load(MODEL_PATH)
 
 
-def load_metadata() -> dict:
+def load_metadata() -> dict[str, Any]:
     try:
         with open(METADATA_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
@@ -20,118 +23,158 @@ def load_metadata() -> dict:
         return {}
 
 
-def _predict_one(history_df: pd.DataFrame, user_group: str) -> dict:
-    X_latest = build_latest_feature_vector(history_df)
-    pred_pm25 = float(model.predict(X_latest)[0])
-    pred_pm25 = max(0.0, pred_pm25)
-
-    aqi = pm25_to_aqi(pred_pm25)
-    risk = get_risk_level(aqi, user_group)
-    recommendation = get_recommendation(risk)
-
-    return {
-        "pm25": round(pred_pm25, 2),
-        "aqi": int(aqi),
-        "risk": risk,
-        "recommendation": recommendation,
-    }
+def _predict_pm25_from_history(history_df: pd.DataFrame) -> float:
+    X = latest_feature_vector(history_df)
+    pred = float(MODEL.predict(X)[0])
+    return max(0.0, pred)
 
 
-def get_current_snapshot(user_group: str = "normal") -> dict:
-    df = load_merged_dataset(hours=HISTORY_HOURS, forecast_days=2)
-    history = df[df["time"] <= pd.Timestamp.now().tz_localize(None)].copy()
+def _build_profile_columns(forecast_df: pd.DataFrame) -> pd.DataFrame:
+    profiles = ["general", "children", "elderly", "respiratory"]
 
-    if history.empty:
-        raise ValueError("Không có history để dự đoán current.")
+    for profile in profiles:
+        forecast_df[f"risk_{profile}"] = forecast_df["pred_aqi"].apply(
+            lambda x, p=profile: risk_for_profile(int(x), p)
+        )
+        forecast_df[f"recommendation_{profile}"] = forecast_df["pred_aqi"].apply(
+            lambda x, p=profile: recommendation_from_aqi(int(x), p)
+        )
 
-    last_row = history.iloc[-1]
-    pred = _predict_one(history, user_group)
-
-    return {
-        "time": str(pd.Timestamp(last_row["time"]).isoformat()),
-        "observed_pm25": round(float(last_row.get("pm2_5", 0) or 0), 2),
-        "observed_temp": round(float(last_row.get("temp", 0) or 0), 2),
-        "observed_humidity": round(float(last_row.get("humidity", 0) or 0), 2),
-        "observed_wind_speed": round(float(last_row.get("wind_speed", 0) or 0), 2),
-        **pred,
-        "user_group": user_group,
-    }
+    return forecast_df
 
 
-def forecast_range(days: int = 1, user_group: str = "normal") -> dict:
+def build_forecast_df(days: int = 1) -> pd.DataFrame:
     days = max(1, min(days, 7))
+    full_df = load_merged_dataset(past_hours=HISTORY_HOURS, forecast_days=max(days, 2))
 
-    df = load_merged_dataset(hours=HISTORY_HOURS, forecast_days=max(days, 2))
     now = pd.Timestamp.now().tz_localize(None)
 
-    history = df[df["time"] <= now].copy().reset_index(drop=True)
-    future_exog = df[df["time"] > now].copy().reset_index(drop=True)
+    history_df = full_df[full_df["time"] <= now].copy().reset_index(drop=True)
+    future_df = full_df[full_df["time"] > now].copy().reset_index(drop=True).head(days * 24)
 
-    target_hours = days * 24
-    future_exog = future_exog.head(target_hours)
-
-    if len(history) < 30:
-        raise ValueError("History chưa đủ để build lag/rolling.")
-    if future_exog.empty:
-        raise ValueError("Không có future exogenous data để forecast.")
+    if len(history_df) < 30:
+        raise ValueError("History chưa đủ để build feature cho model hiện tại.")
+    if future_df.empty:
+        raise ValueError("Không có future hourly data.")
 
     rows = []
 
-    for i in range(len(future_exog)):
-        pred = _predict_one(history, user_group)
+    working_history = history_df.copy()
 
-        future_row = future_exog.iloc[i].copy()
-        future_row["pm2_5"] = pred["pm25"]
+    for i in range(len(future_df)):
+        future_row = future_df.iloc[i].copy()
 
-        history = pd.concat([history, pd.DataFrame([future_row])], ignore_index=True)
+        pred_pm25 = _predict_pm25_from_history(working_history)
+        pred_aqi = pm25_to_aqi(pred_pm25)
+        aqi_category = aqi_to_category(pred_aqi)
 
         rows.append({
-            "time": str(pd.Timestamp(future_row["time"]).isoformat()),
-            "pm25": pred["pm25"],
-            "aqi": pred["aqi"],
-            "risk": pred["risk"],
-            "recommendation": pred["recommendation"],
-            "user_group": user_group,
+            "time": pd.Timestamp(future_row["time"]),
+            "pred_pm25": round(pred_pm25, 6),
+            "pred_aqi": int(pred_aqi),
+            "aqi_category": aqi_category,
         })
 
+        # dùng future exogenous thật cho từng giờ
+        next_row = future_row.copy()
+        next_row["pm2_5"] = pred_pm25
+
+        working_history = pd.concat(
+            [working_history, pd.DataFrame([next_row])],
+            ignore_index=True,
+        )
+
+    forecast_df = pd.DataFrame(rows)
+    forecast_df = _build_profile_columns(forecast_df)
+    return forecast_df
+
+
+def get_current_snapshot(user_group: str = "general") -> dict[str, Any]:
+    full_df = load_merged_dataset(past_hours=HISTORY_HOURS, forecast_days=2)
+    now = pd.Timestamp.now().tz_localize(None)
+
+    history_df = full_df[full_df["time"] <= now].copy().reset_index(drop=True)
+    if history_df.empty:
+        raise ValueError("Không có current history.")
+
+    pred_pm25 = _predict_pm25_from_history(history_df)
+    pred_aqi = pm25_to_aqi(pred_pm25)
+
+    latest = history_df.iloc[-1]
+
     return {
-        "generated_at": pd.Timestamp.utcnow().isoformat(),
-        "days": days,
-        "hours": len(rows),
+        "time": str(pd.Timestamp(latest["time"]).isoformat()),
+        "observed_pm25": round(float(latest.get("pm2_5", 0) or 0), 2),
+        "observed_temp": round(float(latest.get("temp", 0) or 0), 2),
+        "observed_humidity": round(float(latest.get("humidity", 0) or 0), 2),
+        "observed_wind_speed": round(float(latest.get("wind_speed", 0) or 0), 2),
+        "pred_pm25": round(pred_pm25, 6),
+        "pred_aqi": int(pred_aqi),
+        "aqi_category": aqi_to_category(pred_aqi),
+        "risk_profile": risk_for_profile(pred_aqi, user_group),
+        "recommendation_profile": recommendation_from_aqi(pred_aqi, user_group),
         "user_group": user_group,
-        "forecast": rows,
     }
 
 
-def history_range(days: int = 7, user_group: str = "normal") -> dict:
-    days = max(1, min(days, 30))
+def forecast_range_payload(days: int = 1, profile: str = "general") -> dict[str, Any]:
+    forecast_df = build_forecast_df(days=days)
 
-    df = load_merged_dataset(hours=max(days * 24 + 24, HISTORY_HOURS), forecast_days=1)
-    now = pd.Timestamp.now().tz_localize(None)
+    risk_col = f"risk_{profile}"
+    reco_col = f"recommendation_{profile}"
 
-    hist = df[df["time"] <= now].copy().reset_index(drop=True)
-    hist = hist.tail(days * 24).copy()
+    if risk_col not in forecast_df.columns:
+        risk_col = "risk_general"
+    if reco_col not in forecast_df.columns:
+        reco_col = "recommendation_general"
 
-    rows = []
-    for _, row in hist.iterrows():
-        observed_pm25 = float(row.get("pm2_5", 0) or 0)
-        aqi = pm25_to_aqi(observed_pm25)
-        risk = get_risk_level(aqi, user_group)
-        recommendation = get_recommendation(risk)
-
-        rows.append({
+    items = []
+    for _, row in forecast_df.iterrows():
+        items.append({
             "time": str(pd.Timestamp(row["time"]).isoformat()),
-            "pm25": round(observed_pm25, 2),
-            "aqi": int(aqi),
-            "risk": risk,
-            "recommendation": recommendation,
-            "user_group": user_group,
+            "pred_pm25": round(float(row["pred_pm25"]), 6),
+            "pred_aqi": int(row["pred_aqi"]),
+            "aqi_category": row["aqi_category"],
+            "risk_profile": row[risk_col],
+            "recommendation_profile": row[reco_col],
+            "profile": profile,
         })
 
     return {
-        "generated_at": pd.Timestamp.utcnow().isoformat(),
+        "generated_at": str(pd.Timestamp.utcnow().isoformat()),
         "days": days,
-        "hours": len(rows),
-        "user_group": user_group,
-        "history": rows,
+        "hours": len(items),
+        "profile": profile,
+        "forecast": items,
+    }
+
+
+def history_range_payload(days: int = 7, profile: str = "general") -> dict[str, Any]:
+    days = max(1, min(days, 30))
+    full_df = load_merged_dataset(past_hours=max(HISTORY_HOURS, days * 24 + 24), forecast_days=1)
+    now = pd.Timestamp.now().tz_localize(None)
+
+    hist_df = full_df[full_df["time"] <= now].copy().reset_index(drop=True).tail(days * 24)
+
+    items = []
+    for _, row in hist_df.iterrows():
+        observed_pm25 = float(row.get("pm2_5", 0) or 0)
+        observed_aqi = pm25_to_aqi(observed_pm25)
+
+        items.append({
+            "time": str(pd.Timestamp(row["time"]).isoformat()),
+            "pm25": round(observed_pm25, 6),
+            "aqi": int(observed_aqi),
+            "aqi_category": aqi_to_category(observed_aqi),
+            "risk_profile": risk_for_profile(observed_aqi, profile),
+            "recommendation_profile": recommendation_from_aqi(observed_aqi, profile),
+            "profile": profile,
+        })
+
+    return {
+        "generated_at": str(pd.Timestamp.utcnow().isoformat()),
+        "days": days,
+        "hours": len(items),
+        "profile": profile,
+        "history": items,
     }

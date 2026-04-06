@@ -30,15 +30,17 @@ namespace AirSafeNet.Api.Controllers
 
             var aiResult = await _aiService.GetCurrentAsync(userGroup);
             if (aiResult == null)
+            {
                 return StatusCode(500, new { message = "Không lấy được dữ liệu current từ AI Server." });
+            }
 
             return Ok(new AirPredictResponse
             {
-                Pm25 = aiResult.Pm25,
-                Aqi = aiResult.Aqi,
-                Risk = aiResult.Risk,
-                Recommendation = aiResult.Recommendation,
-                UserGroup = aiResult.UserGroup,
+                Pm25 = aiResult.PredPm25,
+                Aqi = aiResult.PredAqi,
+                Risk = aiResult.RiskProfile,
+                Recommendation = aiResult.RecommendationProfile,
+                UserGroup = userGroup,
                 GeneratedAt = DateTime.UtcNow
             });
         }
@@ -51,23 +53,26 @@ namespace AirSafeNet.Api.Controllers
 
             var aiForecast = await _aiService.GetForecastRangeAsync(userGroup, days);
             if (aiForecast == null)
-                return StatusCode(500, new { message = "Không lấy được forecast từ AI Server." });
-
-            var response = new
             {
-                userGroup = aiForecast.UserGroup,
-                generatedAt = aiForecast.GeneratedAt,
-                days = aiForecast.Days,
-                hours = aiForecast.Hours,
-                forecast = aiForecast.Forecast.Select(x => new
+                return StatusCode(500, new { message = "Không lấy được forecast từ AI Server." });
+            }
+
+            var response = new AirForecastResponse
+            {
+                UserGroup = userGroup,
+                GeneratedAt = DateTime.TryParse(aiForecast.GeneratedAt, out var generatedAt)
+                    ? generatedAt
+                    : DateTime.UtcNow,
+                Hours = aiForecast.Hours,
+                Forecast = aiForecast.Forecast.Select(x => new AirForecastItemResponse
                 {
-                    time = x.Time,
-                    pm25 = x.Pm25,
-                    aqi = x.Aqi,
-                    risk = x.Risk,
-                    recommendation = x.Recommendation,
-                    userGroup = x.UserGroup
-                })
+                    Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
+                    Pm25 = x.PredPm25,
+                    Aqi = x.PredAqi,
+                    Risk = x.RiskProfile,
+                    Recommendation = x.RecommendationProfile,
+                    UserGroup = userGroup
+                }).ToList()
             };
 
             return Ok(response);
@@ -81,9 +86,27 @@ namespace AirSafeNet.Api.Controllers
 
             var aiHistory = await _aiService.GetHistoryAsync(userGroup, days);
             if (aiHistory == null)
+            {
                 return StatusCode(500, new { message = "Không lấy được history từ AI Server." });
+            }
 
-            return Ok(aiHistory);
+            var response = new
+            {
+                generatedAt = aiHistory.GeneratedAt,
+                days = aiHistory.Days,
+                hours = aiHistory.Hours,
+                userGroup,
+                history = aiHistory.History.Select(x => new
+                {
+                    time = x.Time,
+                    pm25 = x.Pm25,
+                    aqi = x.Aqi,
+                    risk = x.RiskProfile,
+                    recommendation = x.RecommendationProfile
+                })
+            };
+
+            return Ok(response);
         }
 
         private async Task<string?> GetCurrentUserGroupAsync()

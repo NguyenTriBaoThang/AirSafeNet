@@ -32,28 +32,33 @@ namespace airsafenet_backend.Controllers
             var forecast = await _aiService.GetForecastRangeAsync(userGroup, days);
 
             if (current == null || forecast == null)
+            {
                 return StatusCode(500, new { message = "Không lấy được dữ liệu dashboard." });
+            }
 
-            var peak = forecast.Forecast.OrderByDescending(x => x.Aqi).FirstOrDefault();
+            var peak = forecast.Forecast.OrderByDescending(x => x.PredAqi).FirstOrDefault();
 
             var warningCount = forecast.Forecast.Count(x =>
-                AirRiskHelper.ToSeverity(x.Risk) >= AirRiskHelper.ToSeverity("UNHEALTHY_SENSITIVE"));
+                AirRiskHelper.ToSeverity(x.RiskProfile) >= AirRiskHelper.ToSeverity("UNHEALTHY_SENSITIVE"));
 
             var dangerCount = forecast.Forecast.Count(x =>
-                AirRiskHelper.ToSeverity(x.Risk) >= AirRiskHelper.ToSeverity("UNHEALTHY"));
+                AirRiskHelper.ToSeverity(x.RiskProfile) >= AirRiskHelper.ToSeverity("UNHEALTHY"));
 
             var response = new DashboardSummaryResponse
             {
-                CurrentPm25 = current.Pm25,
-                CurrentAqi = current.Aqi,
-                CurrentRisk = current.Risk,
-                CurrentRecommendation = current.Recommendation,
-                MaxPm25Next24h = peak?.Pm25 ?? current.Pm25,
-                MaxAqiNext24h = peak?.Aqi ?? current.Aqi,
-                PeakRiskNext24h = peak?.Risk ?? current.Risk,
+                CurrentPm25 = current.PredPm25,
+                CurrentAqi = current.PredAqi,
+                CurrentRisk = current.RiskProfile,
+                CurrentRecommendation = current.RecommendationProfile,
+
+                MaxPm25Next24h = peak?.PredPm25 ?? current.PredPm25,
+                MaxAqiNext24h = peak?.PredAqi ?? current.PredAqi,
+                PeakRiskNext24h = peak?.RiskProfile ?? current.RiskProfile,
                 PeakTime = DateTime.TryParse(peak?.Time, out var peakTime) ? peakTime : null,
-                UserGroup = current.UserGroup,
+
+                UserGroup = userGroup,
                 GeneratedAt = DateTime.UtcNow,
+
                 WarningCount = warningCount,
                 DangerCount = dangerCount
             };
@@ -75,7 +80,7 @@ namespace airsafenet_backend.Controllers
 
                 var response = new DashboardChartResponse
                 {
-                    UserGroup = history.UserGroup,
+                    UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(history.GeneratedAt, out var g1) ? g1 : DateTime.UtcNow,
                     Hours = history.Hours,
                     Points = history.History.Select(x => new DashboardChartPointResponse
@@ -83,9 +88,9 @@ namespace airsafenet_backend.Controllers
                         Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
                         Pm25 = x.Pm25,
                         Aqi = x.Aqi,
-                        Risk = x.Risk,
-                        Recommendation = x.Recommendation,
-                        ColorKey = AirRiskHelper.ToColorKey(x.Risk)
+                        Risk = x.RiskProfile,
+                        Recommendation = x.RecommendationProfile,
+                        ColorKey = AirRiskHelper.ToColorKey(x.RiskProfile)
                     }).ToList()
                 };
 
@@ -99,17 +104,17 @@ namespace airsafenet_backend.Controllers
 
                 var response = new DashboardChartResponse
                 {
-                    UserGroup = forecast.UserGroup,
+                    UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var g2) ? g2 : DateTime.UtcNow,
                     Hours = forecast.Hours,
                     Points = forecast.Forecast.Select(x => new DashboardChartPointResponse
                     {
                         Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
-                        Pm25 = x.Pm25,
-                        Aqi = x.Aqi,
-                        Risk = x.Risk,
-                        Recommendation = x.Recommendation,
-                        ColorKey = AirRiskHelper.ToColorKey(x.Risk)
+                        Pm25 = x.PredPm25,
+                        Aqi = x.PredAqi,
+                        Risk = x.RiskProfile,
+                        Recommendation = x.RecommendationProfile,
+                        ColorKey = AirRiskHelper.ToColorKey(x.RiskProfile)
                     }).ToList()
                 };
 
@@ -137,7 +142,7 @@ namespace airsafenet_backend.Controllers
 
                 chart = new DashboardChartResponse
                 {
-                    UserGroup = history.UserGroup,
+                    UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(history.GeneratedAt, out var gh) ? gh : DateTime.UtcNow,
                     Hours = history.Hours,
                     Points = history.History.Select(x => new DashboardChartPointResponse
@@ -145,9 +150,9 @@ namespace airsafenet_backend.Controllers
                         Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
                         Pm25 = x.Pm25,
                         Aqi = x.Aqi,
-                        Risk = x.Risk,
-                        Recommendation = x.Recommendation,
-                        ColorKey = AirRiskHelper.ToColorKey(x.Risk)
+                        Risk = x.RiskProfile,
+                        Recommendation = x.RecommendationProfile,
+                        ColorKey = AirRiskHelper.ToColorKey(x.RiskProfile)
                     }).ToList()
                 };
             }
@@ -159,17 +164,17 @@ namespace airsafenet_backend.Controllers
 
                 chart = new DashboardChartResponse
                 {
-                    UserGroup = forecast.UserGroup,
+                    UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var gf) ? gf : DateTime.UtcNow,
                     Hours = forecast.Hours,
                     Points = forecast.Forecast.Select(x => new DashboardChartPointResponse
                     {
                         Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
-                        Pm25 = x.Pm25,
-                        Aqi = x.Aqi,
-                        Risk = x.Risk,
-                        Recommendation = x.Recommendation,
-                        ColorKey = AirRiskHelper.ToColorKey(x.Risk)
+                        Pm25 = x.PredPm25,
+                        Aqi = x.PredAqi,
+                        Risk = x.RiskProfile,
+                        Recommendation = x.RecommendationProfile,
+                        ColorKey = AirRiskHelper.ToColorKey(x.RiskProfile)
                     }).ToList()
                 };
             }
@@ -184,16 +189,19 @@ namespace airsafenet_backend.Controllers
 
             var summary = new DashboardSummaryResponse
             {
-                CurrentPm25 = current.Pm25,
-                CurrentAqi = current.Aqi,
-                CurrentRisk = current.Risk,
-                CurrentRecommendation = current.Recommendation,
-                MaxPm25Next24h = peak?.Pm25 ?? current.Pm25,
-                MaxAqiNext24h = peak?.Aqi ?? current.Aqi,
-                PeakRiskNext24h = peak?.Risk ?? current.Risk,
+                CurrentPm25 = current.PredPm25,
+                CurrentAqi = current.PredAqi,
+                CurrentRisk = current.RiskProfile,
+                CurrentRecommendation = current.RecommendationProfile,
+
+                MaxPm25Next24h = peak?.Pm25 ?? current.PredPm25,
+                MaxAqiNext24h = peak?.Aqi ?? current.PredAqi,
+                PeakRiskNext24h = peak?.Risk ?? current.RiskProfile,
                 PeakTime = peak?.Time,
-                UserGroup = current.UserGroup,
+
+                UserGroup = userGroup,
                 GeneratedAt = DateTime.UtcNow,
+
                 WarningCount = warningCount,
                 DangerCount = dangerCount
             };

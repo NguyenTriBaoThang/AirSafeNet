@@ -3,18 +3,18 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import FEATURE_COLS_PATH, METADATA_PATH, MODEL_PATH
 from app.predict import (
+    forecast_range_payload,
     get_current_snapshot,
-    forecast_range,
-    history_range,
+    history_range_payload,
     load_metadata,
 )
-from app.config import MODEL_PATH, FEATURE_COLS_PATH, METADATA_PATH
 
 app = FastAPI(
     title="AirSafeNet AI Server",
-    version="3.0.0",
-    description="AI server forecast current/range/history cho AirSafeNet",
+    version="4.0.0",
+    description="AI server bám sát logic forecast_df trong Colab",
 )
 
 app.add_middleware(
@@ -25,14 +25,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-VALID_GROUPS = {"normal", "child", "elderly", "respiratory", "pregnant"}
+VALID_PROFILES = {"general", "children", "elderly", "respiratory"}
 
 
-def validate_group(user_group: str) -> str:
-    group = (user_group or "normal").strip().lower()
-    if group not in VALID_GROUPS:
-        raise HTTPException(status_code=400, detail="user_group không hợp lệ")
-    return group
+def normalize_profile(profile: str) -> str:
+    p = (profile or "general").strip().lower()
+    if p not in VALID_PROFILES:
+        raise HTTPException(status_code=400, detail=f"profile không hợp lệ. Chọn: {sorted(VALID_PROFILES)}")
+    return p
 
 
 @app.get("/")
@@ -60,20 +60,22 @@ def model_info():
 
 
 @app.get("/forecast/current")
-def forecast_current(user_group: str = Query(default="normal")):
+def forecast_current(
+    profile: str = Query(default="general")
+):
     try:
-        return get_current_snapshot(validate_group(user_group))
+        return get_current_snapshot(user_group=normalize_profile(profile))
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))
 
 
 @app.get("/forecast/range")
-def forecast_days(
+def forecast_range(
     days: int = Query(default=1, ge=1, le=7),
-    user_group: str = Query(default="normal"),
+    profile: str = Query(default="general")
 ):
     try:
-        return forecast_range(days=days, user_group=validate_group(user_group))
+        return forecast_range_payload(days=days, profile=normalize_profile(profile))
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))
 
@@ -81,9 +83,9 @@ def forecast_days(
 @app.get("/history")
 def history(
     days: int = Query(default=7, ge=1, le=30),
-    user_group: str = Query(default="normal"),
+    profile: str = Query(default="general")
 ):
     try:
-        return history_range(days=days, user_group=validate_group(user_group))
+        return history_range_payload(days=days, profile=normalize_profile(profile))
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))

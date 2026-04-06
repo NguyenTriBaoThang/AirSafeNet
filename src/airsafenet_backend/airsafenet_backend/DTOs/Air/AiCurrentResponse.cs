@@ -19,19 +19,22 @@ namespace airsafenet_backend.DTOs.Air
         [JsonPropertyName("observed_wind_speed")]
         public double ObservedWindSpeed { get; set; }
 
-        [JsonPropertyName("pm25")]
-        public double Pm25 { get; set; }
+        [JsonPropertyName("pred_pm25")]
+        public double PredPm25 { get; set; }
 
-        [JsonPropertyName("aqi")]
-        public int Aqi { get; set; }
+        [JsonPropertyName("pred_aqi")]
+        public int PredAqi { get; set; }
 
-        [JsonPropertyName("risk")]
-        public string Risk { get; set; } = string.Empty;
+        [JsonPropertyName("aqi_category")]
+        public string AqiCategory { get; set; } = string.Empty;
 
-        [JsonPropertyName("recommendation")]
-        public string Recommendation { get; set; } = string.Empty;
+        [JsonPropertyName("risk_profile")]
+        public string RiskProfile { get; set; } = string.Empty;
+
+        [JsonPropertyName("recommendation_profile")]
+        public string RecommendationProfile { get; set; } = string.Empty;
 
         [JsonPropertyName("user_group")]
-        public string UserGroup { get; set; } = "normal";
+        public string UserGroup { get; set; } = "general";
     }
 }

@@ -13,13 +13,16 @@ namespace airsafenet_backend.DTOs.Air
         [JsonPropertyName("aqi")]
         public int Aqi { get; set; }
 
-        [JsonPropertyName("risk")]
-        public string Risk { get; set; } = string.Empty;
+        [JsonPropertyName("aqi_category")]
+        public string AqiCategory { get; set; } = string.Empty;
 
-        [JsonPropertyName("recommendation")]
-        public string Recommendation { get; set; } = string.Empty;
+        [JsonPropertyName("risk_profile")]
+        public string RiskProfile { get; set; } = string.Empty;
 
-        [JsonPropertyName("user_group")]
-        public string UserGroup { get; set; } = "normal";
+        [JsonPropertyName("recommendation_profile")]
+        public string RecommendationProfile { get; set; } = string.Empty;
+
+        [JsonPropertyName("profile")]
+        public string Profile { get; set; } = "general";
     }
 }

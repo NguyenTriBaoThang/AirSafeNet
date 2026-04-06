@@ -21,8 +21,9 @@ namespace airsafenet_backend.Services
 
         public async Task<AiCurrentResponse?> GetCurrentAsync(string userGroup)
         {
-            var group = string.IsNullOrWhiteSpace(userGroup) ? "normal" : userGroup.Trim().ToLower();
-            var url = $"{GetBaseUrl()}/forecast/current?user_group={group}";
+            var profile = ProfileMapper.ToAiProfile(userGroup);
+            var url = $"{GetBaseUrl()}/forecast/current?profile={profile}";
+
             var response = await _httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)
@@ -36,10 +37,10 @@ namespace airsafenet_backend.Services
 
         public async Task<AiRangeResponse?> GetForecastRangeAsync(string userGroup, int days)
         {
-            var group = string.IsNullOrWhiteSpace(userGroup) ? "normal" : userGroup.Trim().ToLower();
+            var profile = ProfileMapper.ToAiProfile(userGroup);
             days = Math.Clamp(days, 1, 7);
 
-            var url = $"{GetBaseUrl()}/forecast/range?days={days}&user_group={group}";
+            var url = $"{GetBaseUrl()}/forecast/range?days={days}&profile={profile}";
             var response = await _httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)
@@ -53,10 +54,10 @@ namespace airsafenet_backend.Services
 
         public async Task<AiHistoryResponse?> GetHistoryAsync(string userGroup, int days)
         {
-            var group = string.IsNullOrWhiteSpace(userGroup) ? "normal" : userGroup.Trim().ToLower();
+            var profile = ProfileMapper.ToAiProfile(userGroup);
             days = Math.Clamp(days, 1, 30);
 
-            var url = $"{GetBaseUrl()}/history?days={days}&user_group={group}";
+            var url = $"{GetBaseUrl()}/history?days={days}&profile={profile}";
             var response = await _httpClient.GetAsync(url);
 
             if (!response.IsSuccessStatusCode)

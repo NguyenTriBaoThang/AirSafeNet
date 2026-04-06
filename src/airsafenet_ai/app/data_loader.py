@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import requests
 import pandas as pd
+import requests
 
 from app.config import LAT, LON, TIMEZONE, HISTORY_HOURS
 
@@ -10,7 +10,7 @@ def _days_from_hours(hours: int) -> int:
     return max(3, min(92, int(hours / 24) + 3))
 
 
-def fetch_air_quality(hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.DataFrame:
+def fetch_air_quality(past_hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.DataFrame:
     url = "https://air-quality-api.open-meteo.com/v1/air-quality"
     params = {
         "latitude": LAT,
@@ -26,25 +26,19 @@ def fetch_air_quality(hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.
             "dust",
             "uv_index",
         ]),
-        "past_days": _days_from_hours(hours),
+        "past_days": _days_from_hours(past_hours),
         "forecast_days": forecast_days,
         "timezone": TIMEZONE,
     }
-
-    response = requests.get(url, params=params, timeout=60)
-    response.raise_for_status()
-    data = response.json()
-
-    hourly = data.get("hourly", {})
-    df = pd.DataFrame(hourly)
-    if df.empty:
-        raise ValueError("Không lấy được dữ liệu air quality từ Open-Meteo.")
-
+    resp = requests.get(url, params=params, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()["hourly"]
+    df = pd.DataFrame(data)
     df["time"] = pd.to_datetime(df["time"])
     return df.sort_values("time").reset_index(drop=True)
 
 
-def fetch_weather(hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.DataFrame:
+def fetch_weather(past_hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.DataFrame:
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
         "latitude": LAT,
@@ -60,29 +54,23 @@ def fetch_weather(hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.Data
             "wind_speed_10m",
             "wind_direction_10m",
         ]),
-        "past_days": _days_from_hours(hours),
+        "past_days": _days_from_hours(past_hours),
         "forecast_days": forecast_days,
         "timezone": TIMEZONE,
     }
-
-    response = requests.get(url, params=params, timeout=60)
-    response.raise_for_status()
-    data = response.json()
-
-    hourly = data.get("hourly", {})
-    df = pd.DataFrame(hourly)
-    if df.empty:
-        raise ValueError("Không lấy được dữ liệu weather từ Open-Meteo.")
-
+    resp = requests.get(url, params=params, timeout=60)
+    resp.raise_for_status()
+    data = resp.json()["hourly"]
+    df = pd.DataFrame(data)
     df["time"] = pd.to_datetime(df["time"])
     return df.sort_values("time").reset_index(drop=True)
 
 
-def load_merged_dataset(hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.DataFrame:
-    air_df = fetch_air_quality(hours=hours, forecast_days=forecast_days)
-    weather_df = fetch_weather(hours=hours, forecast_days=forecast_days)
+def load_merged_dataset(past_hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.DataFrame:
+    air = fetch_air_quality(past_hours=past_hours, forecast_days=forecast_days)
+    weather = fetch_weather(past_hours=past_hours, forecast_days=forecast_days)
 
-    df = pd.merge(air_df, weather_df, on="time", how="inner").sort_values("time").reset_index(drop=True)
+    df = pd.merge(air, weather, on="time", how="inner").sort_values("time").reset_index(drop=True)
 
     rename_map = {
         "carbon_monoxide": "co",
@@ -96,7 +84,6 @@ def load_merged_dataset(hours: int = HISTORY_HOURS, forecast_days: int = 7) -> p
         "wind_speed_10m": "wind_speed",
         "wind_direction_10m": "wind_dir",
     }
-
     df = df.rename(columns=rename_map)
     df = df.drop_duplicates(subset=["time"]).sort_values("time").reset_index(drop=True)
     return df
