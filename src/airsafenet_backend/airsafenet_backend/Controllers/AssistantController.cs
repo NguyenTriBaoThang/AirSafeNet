@@ -182,7 +182,14 @@ namespace airsafenet_backend.Controllers
 
                 if (conversation.Title == "Cuộc trò chuyện mới")
                 {
-                    conversation.Title = BuildConversationTitle(request.Message);
+                    try
+                    {
+                        conversation.Title = await _openAiChatService.GenerateConversationTitleAsync(request.Message);
+                    }
+                    catch
+                    {
+                        conversation.Title = BuildConversationTitle(request.Message);
+                    }
                 }
 
                 conversation.UpdatedAt = DateTime.UtcNow;
@@ -274,7 +281,14 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
 
             if (conversation.Title == "Cuộc trò chuyện mới")
             {
-                conversation.Title = BuildConversationTitle(request.Message);
+                try
+                {
+                    conversation.Title = await _openAiChatService.GenerateConversationTitleAsync(request.Message);
+                }
+                catch
+                {
+                    conversation.Title = BuildConversationTitle(request.Message);
+                }
             }
 
             conversation.UpdatedAt = DateTime.UtcNow;
