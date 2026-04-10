@@ -81,6 +81,14 @@ export default function AppHeader({ title }: Props) {
             <AppIcon name="air" /> Dashboard
           </Link>
           <Link
+            to="/assistant"
+            className={`top-nav__link ${
+              location.pathname === "/assistant" ? "active" : ""
+            }`}
+          >
+            <AppIcon name="user" /> Trợ lý ảo
+          </Link>
+          <Link
             to="/preferences"
             className={location.pathname === "/preferences" ? "top-nav__link active" : "top-nav__link"}
           >

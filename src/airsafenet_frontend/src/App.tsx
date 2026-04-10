@@ -3,6 +3,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import UserPreferencesPage from "./pages/UserPreferences";
+import AssistantPage from "./pages/AssistantPage";
 import AppShell from "./components/layout/AppShell";
 import { getAccessToken } from "./api/http";
 
@@ -35,6 +36,17 @@ export default function App() {
             <PrivateRoute>
               <AppShell>
                 <UserPreferencesPage />
+              </AppShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/assistant"
+          element={
+            <PrivateRoute>
+              <AppShell>
+                <AssistantPage />
               </AppShell>
             </PrivateRoute>
           }

@@ -22,6 +22,11 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddHttpClient<AiService>();
 builder.Services.AddHttpClient<WeatherService>();
+builder.Services.AddScoped<AssistantDomainService>();
+builder.Services.AddHttpClient<OpenAiChatService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Missing Jwt:Key in appsettings.json");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "AirSafeNet";
