@@ -1,5 +1,6 @@
 ﻿using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Assistant;
+using airsafenet_backend.Models;
 using airsafenet_backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,71 +18,200 @@ namespace airsafenet_backend.Controllers
         private readonly AiService _aiService;
         private readonly AssistantDomainService _domainService;
         private readonly OpenAiChatService _openAiChatService;
-        private readonly ILogger<AssistantController> _logger;
 
         public AssistantController(
             AppDbContext db,
             AiService aiService,
             AssistantDomainService domainService,
-            OpenAiChatService openAiChatService,
-            ILogger<AssistantController> logger)
+            OpenAiChatService openAiChatService)
         {
             _db = db;
             _aiService = aiService;
             _domainService = domainService;
             _openAiChatService = openAiChatService;
-            _logger = logger;
+        }
+
+        [HttpPost("conversations")]
+        public async Task<IActionResult> CreateConversation()
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var conversation = new ChatConversation
+            {
+                UserId = userId.Value,
+                Title = "Cuộc trò chuyện mới",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _db.ChatConversations.Add(conversation);
+            await _db.SaveChangesAsync();
+
+            return Ok(new CreateConversationResponse
+            {
+                ConversationId = conversation.Id,
+                Title = conversation.Title,
+                CreatedAt = conversation.CreatedAt,
+                UpdatedAt = conversation.UpdatedAt
+            });
+        }
+
+        [HttpGet("conversations")]
+        public async Task<IActionResult> GetConversations()
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var conversations = await _db.ChatConversations
+                .AsNoTracking()
+                .Where(x => x.UserId == userId.Value)
+                .OrderByDescending(x => x.UpdatedAt)
+                .Select(x => new ConversationListItemResponse
+                {
+                    ConversationId = x.Id,
+                    Title = x.Title,
+                    CreatedAt = x.CreatedAt,
+                    UpdatedAt = x.UpdatedAt,
+                    MessageCount = x.Messages.Count
+                })
+                .ToListAsync();
+
+            return Ok(conversations);
+        }
+
+        [HttpGet("conversations/{conversationId:int}")]
+        public async Task<IActionResult> GetConversationDetail(int conversationId)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var conversation = await _db.ChatConversations
+                .AsNoTracking()
+                .Include(x => x.Messages.OrderBy(m => m.CreatedAt))
+                .FirstOrDefaultAsync(x => x.Id == conversationId && x.UserId == userId.Value);
+
+            if (conversation == null)
+            {
+                return NotFound(new { message = "Không tìm thấy hội thoại." });
+            }
+
+            return Ok(new ConversationDetailResponse
+            {
+                ConversationId = conversation.Id,
+                Title = conversation.Title,
+                CreatedAt = conversation.CreatedAt,
+                UpdatedAt = conversation.UpdatedAt,
+                Messages = conversation.Messages
+                    .OrderBy(x => x.CreatedAt)
+                    .Select(x => new ConversationMessageResponse
+                    {
+                        MessageId = x.Id,
+                        Role = x.Role,
+                        Content = x.Content,
+                        UserGroup = x.UserGroup,
+                        CurrentAqi = x.CurrentAqi,
+                        CurrentPm25 = x.CurrentPm25,
+                        CreatedAt = x.CreatedAt
+                    })
+                    .ToList()
+            });
+        }
+
+        [HttpDelete("conversations/{conversationId:int}")]
+        public async Task<IActionResult> DeleteConversation(int conversationId)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var conversation = await _db.ChatConversations
+                .FirstOrDefaultAsync(x => x.Id == conversationId && x.UserId == userId.Value);
+
+            if (conversation == null)
+            {
+                return NotFound(new { message = "Không tìm thấy hội thoại." });
+            }
+
+            _db.ChatConversations.Remove(conversation);
+            await _db.SaveChangesAsync();
+
+            return NoContent();
         }
 
         [HttpPost("chat")]
         public async Task<IActionResult> Chat([FromBody] AssistantChatRequest request)
         {
-            try
+            if (string.IsNullOrWhiteSpace(request.Message))
             {
-                if (request == null || string.IsNullOrWhiteSpace(request.Message))
+                return BadRequest(new { message = "Message không được để trống." });
+            }
+
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var userGroup = await GetCurrentUserGroupAsync(userId.Value);
+            var conversation = await ResolveConversationAsync(userId.Value, request.ConversationId);
+
+            var userMessage = new ChatMessage
+            {
+                ConversationId = conversation.Id,
+                Role = "user",
+                Content = request.Message.Trim(),
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.ChatMessages.Add(userMessage);
+
+            var inDomain = _domainService.IsInDomain(request.Message);
+
+            if (!inDomain)
+            {
+                var blockedAnswer =
+                    "Mình chỉ hỗ trợ các câu hỏi liên quan đến chất lượng không khí, AQI/PM2.5, dự báo và khuyến nghị sức khỏe trong AirSafeNet.";
+
+                var assistantMessageBlocked = new ChatMessage
                 {
-                    return BadRequest(new
-                    {
-                        message = "Message không được để trống."
-                    });
+                    ConversationId = conversation.Id,
+                    Role = "assistant",
+                    Content = blockedAnswer,
+                    UserGroup = userGroup,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _db.ChatMessages.Add(assistantMessageBlocked);
+
+                if (conversation.Title == "Cuộc trò chuyện mới")
+                {
+                    conversation.Title = BuildConversationTitle(request.Message);
                 }
 
-                var userGroup = await GetCurrentUserGroupAsync();
-                if (userGroup == null)
+                conversation.UpdatedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+
+                return Ok(new AssistantChatResponse
                 {
-                    return Unauthorized(new
-                    {
-                        message = "Không xác định được người dùng hiện tại."
-                    });
-                }
+                    InDomain = false,
+                    Answer = blockedAnswer,
+                    ConversationId = conversation.Id
+                });
+            }
 
-                var inDomain = _domainService.IsInDomain(request.Message);
+            var current = await _aiService.GetCurrentAsync(userGroup);
+            var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1);
 
-                if (!inDomain)
+            if (current == null || forecast == null || forecast.Forecast.Count == 0)
+            {
+                return StatusCode(500, new
                 {
-                    return Ok(new AssistantChatResponse
-                    {
-                        InDomain = false,
-                        Answer = "Mình chỉ hỗ trợ các câu hỏi liên quan đến chất lượng không khí, AQI/PM2.5, dự báo và khuyến nghị sức khỏe trong AirSafeNet."
-                    });
-                }
+                    message = "Không lấy được dữ liệu từ AI Server để hỗ trợ trả lời."
+                });
+            }
 
-                var current = await _aiService.GetCurrentAsync(userGroup);
-                var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1);
+            var matched = forecast.Forecast
+                .OrderByDescending(x => x.PredAqi)
+                .First();
 
-                if (current == null || forecast == null || forecast.Forecast == null || forecast.Forecast.Count == 0)
-                {
-                    return StatusCode(500, new
-                    {
-                        message = "Không lấy được dữ liệu từ AI Server để hỗ trợ trả lời."
-                    });
-                }
-
-                var matched = forecast.Forecast
-                    .OrderByDescending(x => x.PredAqi)
-                    .First();
-
-                var systemPrompt = """
+            var systemPrompt = """
 Bạn là trợ lý ảo của AirSafeNet.
 
 Chỉ được trả lời các câu hỏi liên quan đến:
@@ -103,7 +233,7 @@ Khi trả lời:
 - ngắn gọn, thực tế, ưu tiên tính an toàn cho người dùng
 """;
 
-                var userPrompt = $"""
+            var userPrompt = $"""
 Ngữ cảnh hệ thống AirSafeNet:
 - User group: {userGroup}
 - Current AQI: {current.PredAqi}
@@ -124,51 +254,95 @@ Câu hỏi người dùng:
 Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với dữ liệu trên.
 """;
 
-                var answer = await _openAiChatService.GenerateAssistantAnswerAsync(
-                    systemPrompt,
-                    userPrompt
-                );
+            var answer = await _openAiChatService.GenerateAssistantAnswerAsync(
+                systemPrompt,
+                userPrompt
+            );
 
-                return Ok(new AssistantChatResponse
-                {
-                    InDomain = true,
-                    Answer = answer,
-                    Source = new
-                    {
-                        userGroup,
-                        currentAqi = current.PredAqi,
-                        currentPm25 = current.PredPm25,
-                        matchedForecastTime = matched.Time,
-                        matchedForecastAqi = matched.PredAqi,
-                        matchedForecastPm25 = matched.PredPm25
-                    }
-                });
-            }
-            catch (Exception ex)
+            var assistantMessage = new ChatMessage
             {
-                _logger.LogError(ex, "Lỗi khi xử lý /api/assistant/chat");
+                ConversationId = conversation.Id,
+                Role = "assistant",
+                Content = answer,
+                UserGroup = userGroup,
+                CurrentAqi = current.PredAqi,
+                CurrentPm25 = current.PredPm25,
+                CreatedAt = DateTime.UtcNow
+            };
 
-                return StatusCode(500, new
-                {
-                    message = "Đã xảy ra lỗi khi xử lý trợ lý ảo.",
-                    error = ex.Message
-                });
+            _db.ChatMessages.Add(assistantMessage);
+
+            if (conversation.Title == "Cuộc trò chuyện mới")
+            {
+                conversation.Title = BuildConversationTitle(request.Message);
             }
+
+            conversation.UpdatedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+
+            return Ok(new AssistantChatResponse
+            {
+                InDomain = true,
+                Answer = answer,
+                ConversationId = conversation.Id,
+                Source = new
+                {
+                    userGroup,
+                    currentAqi = current.PredAqi,
+                    currentPm25 = current.PredPm25,
+                    matchedForecastTime = matched.Time,
+                    matchedForecastAqi = matched.PredAqi,
+                    matchedForecastPm25 = matched.PredPm25
+                }
+            });
         }
 
-        private async Task<string?> GetCurrentUserGroupAsync()
+        private int? GetCurrentUserId()
         {
             var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdValue, out var userId))
-            {
-                return null;
-            }
+            return int.TryParse(userIdValue, out var userId) ? userId : null;
+        }
 
+        private async Task<string> GetCurrentUserGroupAsync(int userId)
+        {
             var preferences = await _db.UserPreferences
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId);
 
             return preferences?.UserGroup ?? "normal";
+        }
+
+        private async Task<ChatConversation> ResolveConversationAsync(int userId, int? conversationId)
+        {
+            if (conversationId.HasValue)
+            {
+                var existing = await _db.ChatConversations
+                    .FirstOrDefaultAsync(x => x.Id == conversationId.Value && x.UserId == userId);
+
+                if (existing != null)
+                {
+                    return existing;
+                }
+            }
+
+            var conversation = new ChatConversation
+            {
+                UserId = userId,
+                Title = "Cuộc trò chuyện mới",
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            _db.ChatConversations.Add(conversation);
+            await _db.SaveChangesAsync();
+
+            return conversation;
+        }
+
+        private static string BuildConversationTitle(string message)
+        {
+            var text = message.Trim();
+            return text.Length <= 60 ? text : $"{text[..60]}...";
         }
     }
 }

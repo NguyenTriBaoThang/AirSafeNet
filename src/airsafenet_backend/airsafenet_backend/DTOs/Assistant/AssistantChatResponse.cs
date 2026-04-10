@@ -4,6 +4,7 @@
     {
         public bool InDomain { get; set; }
         public string Answer { get; set; } = string.Empty;
+        public int ConversationId { get; set; }
         public object? Source { get; set; }
     }
 }

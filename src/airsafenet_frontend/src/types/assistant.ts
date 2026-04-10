@@ -22,3 +22,11 @@ export type ChatMessage = {
   createdAt: string;
   meta?: AssistantChatResponse["source"];
 };
+
+export type ChatConversation = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatMessage[];
+};

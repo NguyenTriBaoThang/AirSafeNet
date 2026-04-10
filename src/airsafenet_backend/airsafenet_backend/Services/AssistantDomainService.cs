@@ -14,10 +14,7 @@ namespace airsafenet_backend.Services
 
         public bool IsInDomain(string message)
         {
-            if (string.IsNullOrWhiteSpace(message))
-            {
-                return false;
-            }
+            if (string.IsNullOrWhiteSpace(message)) return false;
 
             var text = message.Trim().ToLowerInvariant();
             return Keywords.Any(k => text.Contains(k));
