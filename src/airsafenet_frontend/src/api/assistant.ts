@@ -45,3 +45,15 @@ export async function sendAssistantMessageApi(payload: AssistantChatRequest) {
     body: JSON.stringify(payload),
   });
 }
+
+export async function renameConversationApi( conversationId: number, title: string) {
+  return http<{
+    conversationId: number;
+    title: string;
+    updatedAt: string;
+  }>(`/api/assistant/conversations/${conversationId}/rename`, {
+    method: "PUT",
+    auth: true,
+    body: JSON.stringify({ title }),
+  });
+}

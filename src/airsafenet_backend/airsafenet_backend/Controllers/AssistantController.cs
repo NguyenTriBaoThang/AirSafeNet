@@ -344,5 +344,43 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
             var text = message.Trim();
             return text.Length <= 60 ? text : $"{text[..60]}...";
         }
+
+        [HttpPut("conversations/{conversationId:int}/rename")]
+        public async Task<IActionResult> RenameConversation(int conversationId, [FromBody] RenameConversationRequest request)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var title = request.Title?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return BadRequest(new { message = "Tiêu đề không được để trống." });
+            }
+
+            if (title.Length > 200)
+            {
+                return BadRequest(new { message = "Tiêu đề quá dài." });
+            }
+
+            var conversation = await _db.ChatConversations
+                .FirstOrDefaultAsync(x => x.Id == conversationId && x.UserId == userId.Value);
+
+            if (conversation == null)
+            {
+                return NotFound(new { message = "Không tìm thấy hội thoại." });
+            }
+
+            conversation.Title = title;
+            conversation.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                conversationId = conversation.Id,
+                title = conversation.Title,
+                updatedAt = conversation.UpdatedAt
+            });
+        }
     }
 }

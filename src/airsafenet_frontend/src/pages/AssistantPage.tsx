@@ -4,6 +4,7 @@ import {
   deleteConversationApi,
   getConversationDetailApi,
   getConversationsApi,
+  renameConversationApi,
   sendAssistantMessageApi,
 } from "../api/assistant";
 import type {
@@ -14,6 +15,7 @@ import type {
 import { useToast } from "../components/common/useToast";
 import ConversationList from "../components/assistant/ConversationList";
 import EmptyState from "../components/common/EmptyState";
+import AssistantMarkdown from "../components/assistant/AssistantMarkdown";
 
 function makeTempId() {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -58,6 +60,7 @@ export default function AssistantPage() {
 
   const [input, setInput] = useState("");
   const [pageError, setPageError] = useState("");
+  const [search, setSearch] = useState("");
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -66,6 +69,14 @@ export default function AssistantPage() {
     () => input.trim().length > 0 && !loading && !detailLoading,
     [input, loading, detailLoading]
   );
+
+  const filteredConversations = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    if (!keyword) return conversations;
+    return conversations.filter((c) =>
+      c.title.toLowerCase().includes(keyword)
+    );
+  }, [conversations, search]);
 
   async function loadConversations(selectLatest = true) {
     try {
@@ -117,15 +128,7 @@ export default function AssistantPage() {
       await loadConversations(false);
 
       setActiveConversationId(created.conversationId);
-      setMessages([
-        {
-          id: makeTempId(),
-          role: "assistant",
-          content:
-            "Xin chào, mình là trợ lý ảo AirSafeNet. Bạn muốn hỏi gì về AQI, PM2.5 hoặc dự báo chất lượng không khí?",
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      setMessages([]);
 
       setConversations((prev) => [
         {
@@ -135,7 +138,7 @@ export default function AssistantPage() {
           updatedAt: created.updatedAt,
           messageCount: 0,
         },
-        ...prev,
+        ...prev.filter((x) => x.conversationId !== created.conversationId),
       ]);
 
       showToast("Đã tạo cuộc trò chuyện mới", "success");
@@ -168,6 +171,36 @@ export default function AssistantPage() {
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Không xóa được hội thoại";
+      showToast(message, "error");
+    }
+  }
+
+  async function handleRenameConversation(conversation: ConversationListItemResponse) {
+    const newTitle = window.prompt("Nhập tên mới cho hội thoại", conversation.title);
+
+    if (newTitle == null) return;
+    const trimmed = newTitle.trim();
+
+    if (!trimmed) {
+      showToast("Tên hội thoại không được để trống", "error");
+      return;
+    }
+
+    try {
+      const result = await renameConversationApi(conversation.conversationId, trimmed);
+
+      setConversations((prev) =>
+        prev.map((item) =>
+          item.conversationId === conversation.conversationId
+            ? { ...item, title: result.title, updatedAt: result.updatedAt }
+            : item
+        )
+      );
+
+      showToast("Đã đổi tên hội thoại", "success");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Không đổi được tên hội thoại";
       showToast(message, "error");
     }
   }
@@ -244,7 +277,7 @@ export default function AssistantPage() {
     }
   }, [messages, loading]);
 
-  const onlyEmptyConversation = messages.length === 0;
+  const emptyConversation = messages.length === 0;
 
   return (
     <div className="chatgpt-layout">
@@ -261,6 +294,13 @@ export default function AssistantPage() {
           <button className="chatgpt-newchat-btn" onClick={handleNewChat}>
             + Cuộc trò chuyện mới
           </button>
+
+          <input
+            className="chatgpt-search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Tìm kiếm hội thoại..."
+          />
         </div>
 
         <div className="chatgpt-history">
@@ -270,9 +310,10 @@ export default function AssistantPage() {
             <div className="chatgpt-history__empty">Đang tải hội thoại...</div>
           ) : (
             <ConversationList
-              conversations={conversations}
+              conversations={filteredConversations}
               activeConversationId={activeConversationId}
               onSelect={loadConversationDetail}
+              onRename={handleRenameConversation}
             />
           )}
         </div>
@@ -302,7 +343,7 @@ export default function AssistantPage() {
             />
           ) : detailLoading ? (
             <div className="chatgpt-history__empty">Đang tải nội dung hội thoại...</div>
-          ) : onlyEmptyConversation ? (
+          ) : emptyConversation ? (
             <div className="chatgpt-starters">
               {STARTER_PROMPTS.map((prompt) => (
                 <button
@@ -333,7 +374,13 @@ export default function AssistantPage() {
                         {message.role === "user" ? "Bạn" : "AirSafeNet Assistant"}
                       </div>
 
-                      <div className="chatgpt-message__content">{message.content}</div>
+                      <div className="chatgpt-message__content">
+                        {message.role === "assistant" ? (
+                          <AssistantMarkdown content={message.content} />
+                        ) : (
+                          message.content
+                        )}
+                      </div>
 
                       {message.role === "assistant" && message.meta ? (
                         <div className="chatgpt-message__meta">

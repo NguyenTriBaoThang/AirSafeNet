@@ -2899,3 +2899,93 @@ p {
     max-height: 260px;
   }
 }
+
+.chatgpt-search {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.06);
+  color: white;
+  border-radius: 14px;
+  padding: 11px 13px;
+  outline: none;
+}
+
+.chatgpt-search:focus {
+  border-color: rgba(96, 165, 250, 0.55);
+  background: rgba(255,255,255,0.1);
+}
+
+.chatgpt-history-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: start;
+}
+
+.chatgpt-history__rename {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #cbd5e1;
+  border-radius: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.chatgpt-history__rename:hover {
+  background: rgba(255,255,255,0.08);
+  color: white;
+}
+
+.assistant-markdown p {
+  margin: 0 0 12px;
+}
+
+.assistant-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.assistant-markdown ul,
+.assistant-markdown ol {
+  margin: 0 0 12px 20px;
+  padding: 0;
+}
+
+.assistant-markdown li {
+  margin-bottom: 6px;
+}
+
+.assistant-markdown strong {
+  font-weight: 800;
+}
+
+.assistant-markdown code {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.08);
+  font-size: 0.95em;
+}
+
+.assistant-markdown pre {
+  overflow-x: auto;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.assistant-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.assistant-markdown a {
+  color: #93c5fd;
+  text-decoration: underline;
+}
+
+.assistant-markdown blockquote {
+  margin: 0 0 12px;
+  padding-left: 14px;
+  border-left: 3px solid rgba(147, 197, 253, 0.7);
+  color: #cbd5e1;
+}
