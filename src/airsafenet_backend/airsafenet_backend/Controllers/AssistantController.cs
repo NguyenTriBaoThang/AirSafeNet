@@ -17,18 +17,18 @@ namespace airsafenet_backend.Controllers
         private readonly AppDbContext _db;
         private readonly AiService _aiService;
         private readonly AssistantDomainService _domainService;
-        private readonly OpenAiChatService _openAiChatService;
+        private readonly GeminiChatService _geminiChatService;
 
         public AssistantController(
             AppDbContext db,
             AiService aiService,
             AssistantDomainService domainService,
-            OpenAiChatService openAiChatService)
+            GeminiChatService geminiChatService)
         {
             _db = db;
             _aiService = aiService;
             _domainService = domainService;
-            _openAiChatService = openAiChatService;
+            _geminiChatService = geminiChatService;
         }
 
         [HttpPost("conversations")]
@@ -184,7 +184,7 @@ namespace airsafenet_backend.Controllers
                 {
                     try
                     {
-                        conversation.Title = await _openAiChatService.GenerateConversationTitleAsync(request.Message);
+                        conversation.Title = await _geminiChatService.GenerateConversationTitleAsync(request.Message);
                     }
                     catch
                     {
@@ -261,7 +261,7 @@ Câu hỏi người dùng:
 Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với dữ liệu trên.
 """;
 
-            var answer = await _openAiChatService.GenerateAssistantAnswerAsync(
+            var answer = await _geminiChatService.GenerateAssistantAnswerAsync(
                 systemPrompt,
                 userPrompt
             );
@@ -283,7 +283,7 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
             {
                 try
                 {
-                    conversation.Title = await _openAiChatService.GenerateConversationTitleAsync(request.Message);
+                    conversation.Title = await _geminiChatService.GenerateConversationTitleAsync(request.Message);
                 }
                 catch
                 {
@@ -308,6 +308,44 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
                     matchedForecastAqi = matched.PredAqi,
                     matchedForecastPm25 = matched.PredPm25
                 }
+            });
+        }
+
+        [HttpPut("conversations/{conversationId:int}/rename")]
+        public async Task<IActionResult> RenameConversation(int conversationId, [FromBody] RenameConversationRequest request)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var title = request.Title?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(title))
+            {
+                return BadRequest(new { message = "Tiêu đề không được để trống." });
+            }
+
+            if (title.Length > 200)
+            {
+                return BadRequest(new { message = "Tiêu đề quá dài." });
+            }
+
+            var conversation = await _db.ChatConversations
+                .FirstOrDefaultAsync(x => x.Id == conversationId && x.UserId == userId.Value);
+
+            if (conversation == null)
+            {
+                return NotFound(new { message = "Không tìm thấy hội thoại." });
+            }
+
+            conversation.Title = title;
+            conversation.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                conversationId = conversation.Id,
+                title = conversation.Title,
+                updatedAt = conversation.UpdatedAt
             });
         }
 
@@ -357,44 +395,6 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
         {
             var text = message.Trim();
             return text.Length <= 60 ? text : $"{text[..60]}...";
-        }
-
-        [HttpPut("conversations/{conversationId:int}/rename")]
-        public async Task<IActionResult> RenameConversation(int conversationId, [FromBody] RenameConversationRequest request)
-        {
-            var userId = GetCurrentUserId();
-            if (userId == null) return Unauthorized();
-
-            var title = request.Title?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(title))
-            {
-                return BadRequest(new { message = "Tiêu đề không được để trống." });
-            }
-
-            if (title.Length > 200)
-            {
-                return BadRequest(new { message = "Tiêu đề quá dài." });
-            }
-
-            var conversation = await _db.ChatConversations
-                .FirstOrDefaultAsync(x => x.Id == conversationId && x.UserId == userId.Value);
-
-            if (conversation == null)
-            {
-                return NotFound(new { message = "Không tìm thấy hội thoại." });
-            }
-
-            conversation.Title = title;
-            conversation.UpdatedAt = DateTime.UtcNow;
-
-            await _db.SaveChangesAsync();
-
-            return Ok(new
-            {
-                conversationId = conversation.Id,
-                title = conversation.Title,
-                updatedAt = conversation.UpdatedAt
-            });
         }
     }
 }

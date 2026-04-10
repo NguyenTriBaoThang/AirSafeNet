@@ -27,6 +27,7 @@ builder.Services.AddHttpClient<OpenAiChatService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);
 });
+builder.Services.AddHttpClient<GeminiChatService>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Missing Jwt:Key in appsettings.json");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "AirSafeNet";
