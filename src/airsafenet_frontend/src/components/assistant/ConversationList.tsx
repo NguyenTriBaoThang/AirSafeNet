@@ -1,10 +1,12 @@
 import type { ConversationListItemResponse } from "../../types/assistant";
+import ConversationMenu from "./ConversationMenu";
 
 type Props = {
   conversations: ConversationListItemResponse[];
   activeConversationId: number | null;
   onSelect: (conversationId: number) => void;
   onRename: (conversation: ConversationListItemResponse) => void;
+  onDelete: (conversation: ConversationListItemResponse) => void;
 };
 
 export default function ConversationList({
@@ -12,6 +14,7 @@ export default function ConversationList({
   activeConversationId,
   onSelect,
   onRename,
+  onDelete,
 }: Props) {
   if (conversations.length === 0) {
     return <div className="chatgpt-history__empty">Chưa có hội thoại nào</div>;
@@ -29,6 +32,7 @@ export default function ConversationList({
           <button
             className="chatgpt-history__item"
             onClick={() => onSelect(conversation.conversationId)}
+            type="button"
           >
             <div className="chatgpt-history__item-title">{conversation.title}</div>
             <div className="chatgpt-history__item-time">
@@ -36,13 +40,10 @@ export default function ConversationList({
             </div>
           </button>
 
-          <button
-            className="chatgpt-history__rename"
-            onClick={() => onRename(conversation)}
-            title="Đổi tên hội thoại"
-          >
-            ✎
-          </button>
+          <ConversationMenu
+            onRename={() => onRename(conversation)}
+            onDelete={() => onDelete(conversation)}
+          />
         </div>
       ))}
     </div>

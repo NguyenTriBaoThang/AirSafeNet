@@ -16,6 +16,7 @@ import { useToast } from "../components/common/useToast";
 import ConversationList from "../components/assistant/ConversationList";
 import EmptyState from "../components/common/EmptyState";
 import AssistantMarkdown from "../components/assistant/AssistantMarkdown";
+import MessageActions from "../components/assistant/MessageActions";
 
 function makeTempId() {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -29,7 +30,7 @@ const STARTER_PROMPTS = [
 ];
 
 function mapConversationMessages(detail: ConversationDetailResponse): ChatMessage[] {
-  return detail.messages.map((m) => ({
+  const mapped = detail.messages.map((m) => ({
     id: String(m.messageId),
     role: m.role,
     content: m.content,
@@ -44,7 +45,18 @@ function mapConversationMessages(detail: ConversationDetailResponse): ChatMessag
               typeof m.currentPm25 === "number" ? m.currentPm25 : undefined,
           }
         : undefined,
-  }));
+  })) as ChatMessage[];
+
+  for (let i = 0; i < mapped.length; i++) {
+    if (mapped[i].role === "assistant") {
+      const prevUser = [...mapped.slice(0, i)].reverse().find((x) => x.role === "user");
+      if (prevUser) {
+        mapped[i].sourceMessage = prevUser.content;
+      }
+    }
+  }
+
+  return mapped;
 }
 
 export default function AssistantPage() {
@@ -149,25 +161,26 @@ export default function AssistantPage() {
     }
   }
 
-  async function handleDeleteConversation() {
-    if (!activeConversationId) return;
+  async function handleDeleteConversation(conversation?: ConversationListItemResponse) {
+    const targetId = conversation?.conversationId ?? activeConversationId;
+    if (!targetId) return;
 
     try {
-      await deleteConversationApi(activeConversationId);
+      await deleteConversationApi(targetId);
       showToast("Đã xóa hội thoại", "success");
 
-      const remaining = conversations.filter(
-        (x) => x.conversationId !== activeConversationId
-      );
+      const remaining = conversations.filter((x) => x.conversationId !== targetId);
       setConversations(remaining);
 
-      if (remaining.length > 0) {
-        const nextId = remaining[0].conversationId;
-        setActiveConversationId(nextId);
-        await loadConversationDetail(nextId);
-      } else {
-        setActiveConversationId(null);
-        setMessages([]);
+      if (activeConversationId === targetId) {
+        if (remaining.length > 0) {
+          const nextId = remaining[0].conversationId;
+          setActiveConversationId(nextId);
+          await loadConversationDetail(nextId);
+        } else {
+          setActiveConversationId(null);
+          setMessages([]);
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Không xóa được hội thoại";
@@ -244,10 +257,25 @@ export default function AssistantPage() {
           content:
             "Mình đang gặp sự cố khi xử lý câu hỏi này. Bạn thử lại sau một chút nhé.",
           createdAt: new Date().toISOString(),
+          sourceMessage: finalText,
         },
       ]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleRegenerate(message: ChatMessage) {
+    if (!message.sourceMessage || loading || detailLoading) return;
+    await handleSend(message.sourceMessage);
+  }
+
+  async function handleCopy(content: string) {
+    try {
+      await navigator.clipboard.writeText(content);
+      showToast("Đã copy câu trả lời", "success");
+    } catch {
+      showToast("Không thể copy nội dung", "error");
     }
   }
 
@@ -314,6 +342,7 @@ export default function AssistantPage() {
               activeConversationId={activeConversationId}
               onSelect={loadConversationDetail}
               onRename={handleRenameConversation}
+              onDelete={handleDeleteConversation}
             />
           )}
         </div>
@@ -328,7 +357,7 @@ export default function AssistantPage() {
 
           <button
             className="btn btn-secondary"
-            onClick={handleDeleteConversation}
+            onClick={() => handleDeleteConversation()}
             disabled={!activeConversationId}
           >
             Xóa hội thoại
@@ -380,6 +409,23 @@ export default function AssistantPage() {
                         ) : (
                           message.content
                         )}
+                      </div>
+
+                      <div className="chatgpt-message__footer">
+                        <span className="chatgpt-message__time">
+                          {new Date(message.createdAt).toLocaleString("vi-VN")}
+                        </span>
+
+                        {message.role === "assistant" ? (
+                          <MessageActions
+                            onCopy={() => handleCopy(message.content)}
+                            onRegenerate={
+                              message.sourceMessage
+                                ? () => handleRegenerate(message)
+                                : undefined
+                            }
+                          />
+                        ) : null}
                       </div>
 
                       {message.role === "assistant" && message.meta ? (

@@ -23,6 +23,7 @@ export type ChatMessage = {
   content: string;
   createdAt: string;
   meta?: AssistantChatResponse["source"];
+  sourceMessage?: string;
 };
 
 export type ConversationListItemResponse = {
