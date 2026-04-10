@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { sendAssistantMessageApi } from "../api/assistant";
-import type { ChatConversation, ChatMessage } from "../types/assistant";
+import {
+  createConversationApi,
+  deleteConversationApi,
+  getConversationDetailApi,
+  getConversationsApi,
+  sendAssistantMessageApi,
+} from "../api/assistant";
+import type {
+  ChatMessage,
+  ConversationDetailResponse,
+  ConversationListItemResponse,
+} from "../types/assistant";
 import { useToast } from "../components/common/useToast";
 import ConversationList from "../components/assistant/ConversationList";
-import { loadConversations, saveConversations } from "../utils/assistantStorage";
+import EmptyState from "../components/common/EmptyState";
 
-function makeId() {
-  return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+function makeTempId() {
+  return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 const STARTER_PROMPTS = [
@@ -16,202 +26,196 @@ const STARTER_PROMPTS = [
   "3 ngày tới có thời điểm nào không nên tập thể dục ngoài trời?",
 ];
 
-function createWelcomeMessage(): ChatMessage {
-  return {
-    id: makeId(),
-    role: "assistant",
-    content:
-      "Xin chào, mình là trợ lý ảo AirSafeNet. Mình có thể hỗ trợ giải thích AQI, PM2.5, dự báo chất lượng không khí và khuyến nghị sức khỏe liên quan.",
-    createdAt: new Date().toISOString(),
-  };
-}
-
-function createNewConversation(): ChatConversation {
-  const now = new Date().toISOString();
-  return {
-    id: makeId(),
-    title: "Cuộc trò chuyện mới",
-    createdAt: now,
-    updatedAt: now,
-    messages: [createWelcomeMessage()],
-  };
-}
-
-function getConversationTitle(messages: ChatMessage[]): string {
-  const firstUserMessage = messages.find((m) => m.role === "user");
-  if (!firstUserMessage) return "Cuộc trò chuyện mới";
-
-  const text = firstUserMessage.content.trim();
-  return text.length > 42 ? `${text.slice(0, 42)}...` : text;
+function mapConversationMessages(detail: ConversationDetailResponse): ChatMessage[] {
+  return detail.messages.map((m) => ({
+    id: String(m.messageId),
+    role: m.role,
+    content: m.content,
+    createdAt: m.createdAt,
+    meta:
+      m.role === "assistant"
+        ? {
+            userGroup: m.userGroup ?? undefined,
+            currentAqi:
+              typeof m.currentAqi === "number" ? m.currentAqi : undefined,
+            currentPm25:
+              typeof m.currentPm25 === "number" ? m.currentPm25 : undefined,
+          }
+        : undefined,
+  }));
 }
 
 export default function AssistantPage() {
   const { showToast } = useToast();
+
+  const [conversations, setConversations] = useState<ConversationListItemResponse[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+
+  const [sidebarLoading, setSidebarLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const [input, setInput] = useState("");
+  const [pageError, setPageError] = useState("");
+
   const listRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const [conversations, setConversations] = useState<ChatConversation[]>([]);
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
-
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const activeConversation = useMemo(
-    () => conversations.find((c) => c.id === activeConversationId) ?? null,
-    [conversations, activeConversationId]
+  const canSend = useMemo(
+    () => input.trim().length > 0 && !loading && !detailLoading,
+    [input, loading, detailLoading]
   );
 
-  const messages = activeConversation?.messages ?? [];
+  async function loadConversations(selectLatest = true) {
+    try {
+      setSidebarLoading(true);
+      setPageError("");
 
-  const canSend = useMemo(() => input.trim().length > 0 && !loading, [input, loading]);
+      const list = await getConversationsApi();
+      setConversations(list);
 
-  useEffect(() => {
-    const stored = loadConversations();
+      if (list.length === 0) {
+        setActiveConversationId(null);
+        setMessages([]);
+        return;
+      }
 
-    if (stored.length > 0) {
-      const sorted = [...stored].sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
-      setConversations(sorted);
-      setActiveConversationId(sorted[0].id);
-    } else {
-      const initial = createNewConversation();
-      setConversations([initial]);
-      setActiveConversationId(initial.id);
+      if (selectLatest) {
+        const firstId = list[0].conversationId;
+        setActiveConversationId(firstId);
+        await loadConversationDetail(firstId);
+      }
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Không tải được danh sách hội thoại";
+      setPageError(message);
+      showToast(message, "error");
+    } finally {
+      setSidebarLoading(false);
     }
-  }, []);
+  }
 
-  useEffect(() => {
-    if (conversations.length > 0) {
-      saveConversations(conversations);
+  async function loadConversationDetail(conversationId: number) {
+    try {
+      setDetailLoading(true);
+      const detail = await getConversationDetailApi(conversationId);
+      setActiveConversationId(detail.conversationId);
+      setMessages(mapConversationMessages(detail));
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Không tải được nội dung hội thoại";
+      showToast(message, "error");
+    } finally {
+      setDetailLoading(false);
     }
-  }, [conversations]);
+  }
 
-  useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
+  async function handleNewChat() {
+    try {
+      const created = await createConversationApi();
+      await loadConversations(false);
+
+      setActiveConversationId(created.conversationId);
+      setMessages([
+        {
+          id: makeTempId(),
+          role: "assistant",
+          content:
+            "Xin chào, mình là trợ lý ảo AirSafeNet. Bạn muốn hỏi gì về AQI, PM2.5 hoặc dự báo chất lượng không khí?",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+
+      setConversations((prev) => [
+        {
+          conversationId: created.conversationId,
+          title: created.title,
+          createdAt: created.createdAt,
+          updatedAt: created.updatedAt,
+          messageCount: 0,
+        },
+        ...prev,
+      ]);
+
+      showToast("Đã tạo cuộc trò chuyện mới", "success");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Không tạo được hội thoại mới";
+      showToast(message, "error");
     }
-  }, [messages, loading]);
+  }
 
-  useEffect(() => {
-    if (!textareaRef.current) return;
-    textareaRef.current.style.height = "0px";
-    textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
-  }, [input]);
-
-  function updateActiveConversation(
-    updater: (conversation: ChatConversation) => ChatConversation
-  ) {
+  async function handleDeleteConversation() {
     if (!activeConversationId) return;
 
-    setConversations((prev) => {
-      const updated = prev.map((conversation) =>
-        conversation.id === activeConversationId ? updater(conversation) : conversation
-      );
+    try {
+      await deleteConversationApi(activeConversationId);
+      showToast("Đã xóa hội thoại", "success");
 
-      return [...updated].sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      const remaining = conversations.filter(
+        (x) => x.conversationId !== activeConversationId
       );
-    });
+      setConversations(remaining);
+
+      if (remaining.length > 0) {
+        const nextId = remaining[0].conversationId;
+        setActiveConversationId(nextId);
+        await loadConversationDetail(nextId);
+      } else {
+        setActiveConversationId(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Không xóa được hội thoại";
+      showToast(message, "error");
+    }
   }
 
   async function handleSend(text?: string) {
     const finalText = (text ?? input).trim();
-    if (!finalText || loading || !activeConversationId) return;
+    if (!finalText || loading || detailLoading) return;
 
-    const now = new Date().toISOString();
-
-    const userMessage: ChatMessage = {
-      id: makeId(),
+    const userTempMessage: ChatMessage = {
+      id: makeTempId(),
       role: "user",
       content: finalText,
-      createdAt: now,
+      createdAt: new Date().toISOString(),
     };
 
-    updateActiveConversation((conversation) => {
-      const newMessages = [...conversation.messages, userMessage];
-      return {
-        ...conversation,
-        messages: newMessages,
-        title: getConversationTitle(newMessages),
-        updatedAt: now,
-      };
-    });
-
+    setMessages((prev) => [...prev, userTempMessage]);
     setInput("");
     setLoading(true);
 
     try {
-      const result = await sendAssistantMessageApi({ message: finalText });
-
-      const assistantMessage: ChatMessage = {
-        id: makeId(),
-        role: "assistant",
-        content: result.answer,
-        createdAt: new Date().toISOString(),
-        meta: result.source ?? undefined,
-      };
-
-      updateActiveConversation((conversation) => {
-        const newMessages = [...conversation.messages, assistantMessage];
-        return {
-          ...conversation,
-          messages: newMessages,
-          title: getConversationTitle(newMessages),
-          updatedAt: new Date().toISOString(),
-        };
+      const result = await sendAssistantMessageApi({
+        conversationId: activeConversationId,
+        message: finalText,
       });
+
+      if (!activeConversationId) {
+        setActiveConversationId(result.conversationId);
+      }
+
+      await loadConversations(false);
+      await loadConversationDetail(result.conversationId);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Không thể gửi câu hỏi";
       showToast(message, "error");
 
-      const assistantMessage: ChatMessage = {
-        id: makeId(),
-        role: "assistant",
-        content: "Mình đang gặp sự cố khi xử lý câu hỏi này. Bạn thử lại sau một chút nhé.",
-        createdAt: new Date().toISOString(),
-      };
-
-      updateActiveConversation((conversation) => {
-        const newMessages = [...conversation.messages, assistantMessage];
-        return {
-          ...conversation,
-          messages: newMessages,
-          title: getConversationTitle(newMessages),
-          updatedAt: new Date().toISOString(),
-        };
-      });
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: makeTempId(),
+          role: "assistant",
+          content:
+            "Mình đang gặp sự cố khi xử lý câu hỏi này. Bạn thử lại sau một chút nhé.",
+          createdAt: new Date().toISOString(),
+        },
+      ]);
     } finally {
       setLoading(false);
     }
-  }
-
-  function handleNewChat() {
-    const newConversation = createNewConversation();
-    setConversations((prev) => [newConversation, ...prev]);
-    setActiveConversationId(newConversation.id);
-    setInput("");
-  }
-
-  function handleSelectConversation(conversationId: string) {
-    setActiveConversationId(conversationId);
-  }
-
-  function handleDeleteConversation() {
-    if (!activeConversationId) return;
-
-    const filtered = conversations.filter((c) => c.id !== activeConversationId);
-
-    if (filtered.length === 0) {
-      const newConversation = createNewConversation();
-      setConversations([newConversation]);
-      setActiveConversationId(newConversation.id);
-      return;
-    }
-
-    setConversations(filtered);
-    setActiveConversationId(filtered[0].id);
-    showToast("Đã xóa hội thoại", "success");
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -221,8 +225,26 @@ export default function AssistantPage() {
     }
   }
 
-  const onlyWelcome =
-    messages.length === 1 && messages[0]?.role === "assistant";
+  useEffect(() => {
+    loadConversations(true);
+  }, []);
+
+  useEffect(() => {
+    if (!textareaRef.current) return;
+    textareaRef.current.style.height = "0px";
+    textareaRef.current.style.height = `${Math.min(
+      textareaRef.current.scrollHeight,
+      180
+    )}px`;
+  }, [input]);
+
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [messages, loading]);
+
+  const onlyEmptyConversation = messages.length === 0;
 
   return (
     <div className="chatgpt-layout">
@@ -243,11 +265,16 @@ export default function AssistantPage() {
 
         <div className="chatgpt-history">
           <div className="chatgpt-history__title">Hội thoại gần đây</div>
-          <ConversationList
-            conversations={conversations}
-            activeConversationId={activeConversationId}
-            onSelect={handleSelectConversation}
-          />
+
+          {sidebarLoading ? (
+            <div className="chatgpt-history__empty">Đang tải hội thoại...</div>
+          ) : (
+            <ConversationList
+              conversations={conversations}
+              activeConversationId={activeConversationId}
+              onSelect={loadConversationDetail}
+            />
+          )}
         </div>
       </aside>
 
@@ -258,66 +285,24 @@ export default function AssistantPage() {
             <p>Hỏi đáp tự nhiên về AQI, PM2.5, forecast và khuyến nghị sức khỏe</p>
           </div>
 
-          <button className="btn btn-secondary" onClick={handleDeleteConversation}>
+          <button
+            className="btn btn-secondary"
+            onClick={handleDeleteConversation}
+            disabled={!activeConversationId}
+          >
             Xóa hội thoại
           </button>
         </div>
 
         <div className="chatgpt-messages" ref={listRef}>
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`chatgpt-message-row ${
-                message.role === "user" ? "is-user" : "is-assistant"
-              }`}
-            >
-              <div className="chatgpt-message">
-                <div className="chatgpt-message__avatar">
-                  {message.role === "user" ? "U" : "A"}
-                </div>
-
-                <div className="chatgpt-message__body">
-                  <div className="chatgpt-message__role">
-                    {message.role === "user" ? "Bạn" : "AirSafeNet Assistant"}
-                  </div>
-
-                  <div className="chatgpt-message__content">{message.content}</div>
-
-                  {message.role === "assistant" && message.meta ? (
-                    <div className="chatgpt-message__meta">
-                      {typeof message.meta.currentAqi === "number" ? (
-                        <span>AQI hiện tại: {message.meta.currentAqi}</span>
-                      ) : null}
-                      {typeof message.meta.currentPm25 === "number" ? (
-                        <span>PM2.5: {message.meta.currentPm25}</span>
-                      ) : null}
-                      {message.meta.userGroup ? (
-                        <span>Nhóm: {message.meta.userGroup}</span>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {loading ? (
-            <div className="chatgpt-message-row is-assistant">
-              <div className="chatgpt-message">
-                <div className="chatgpt-message__avatar">A</div>
-                <div className="chatgpt-message__body">
-                  <div className="chatgpt-message__role">AirSafeNet Assistant</div>
-                  <div className="chatgpt-typing">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          {onlyWelcome ? (
+          {pageError ? (
+            <EmptyState
+              title="Không tải được dữ liệu hội thoại"
+              description={pageError}
+            />
+          ) : detailLoading ? (
+            <div className="chatgpt-history__empty">Đang tải nội dung hội thoại...</div>
+          ) : onlyEmptyConversation ? (
             <div className="chatgpt-starters">
               {STARTER_PROMPTS.map((prompt) => (
                 <button
@@ -329,7 +314,62 @@ export default function AssistantPage() {
                 </button>
               ))}
             </div>
-          ) : null}
+          ) : (
+            <>
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`chatgpt-message-row ${
+                    message.role === "user" ? "is-user" : "is-assistant"
+                  }`}
+                >
+                  <div className="chatgpt-message">
+                    <div className="chatgpt-message__avatar">
+                      {message.role === "user" ? "U" : "A"}
+                    </div>
+
+                    <div className="chatgpt-message__body">
+                      <div className="chatgpt-message__role">
+                        {message.role === "user" ? "Bạn" : "AirSafeNet Assistant"}
+                      </div>
+
+                      <div className="chatgpt-message__content">{message.content}</div>
+
+                      {message.role === "assistant" && message.meta ? (
+                        <div className="chatgpt-message__meta">
+                          {typeof message.meta.currentAqi === "number" ? (
+                            <span>AQI hiện tại: {message.meta.currentAqi}</span>
+                          ) : null}
+                          {typeof message.meta.currentPm25 === "number" ? (
+                            <span>PM2.5: {message.meta.currentPm25}</span>
+                          ) : null}
+                          {message.meta.userGroup ? (
+                            <span>Nhóm: {message.meta.userGroup}</span>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {loading ? (
+                <div className="chatgpt-message-row is-assistant">
+                  <div className="chatgpt-message">
+                    <div className="chatgpt-message__avatar">A</div>
+                    <div className="chatgpt-message__body">
+                      <div className="chatgpt-message__role">AirSafeNet Assistant</div>
+                      <div className="chatgpt-typing">
+                        <span />
+                        <span />
+                        <span />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="chatgpt-composer-wrap">

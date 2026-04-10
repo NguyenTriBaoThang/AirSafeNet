@@ -1,9 +1,9 @@
-import type { ChatConversation } from "../../types/assistant";
+import type { ConversationListItemResponse } from "../../types/assistant";
 
 type Props = {
-  conversations: ChatConversation[];
-  activeConversationId: string | null;
-  onSelect: (conversationId: string) => void;
+  conversations: ConversationListItemResponse[];
+  activeConversationId: number | null;
+  onSelect: (conversationId: number) => void;
 };
 
 export default function ConversationList({
@@ -19,11 +19,11 @@ export default function ConversationList({
     <div className="chatgpt-history__list">
       {conversations.map((conversation) => (
         <button
-          key={conversation.id}
+          key={conversation.conversationId}
           className={`chatgpt-history__item ${
-            activeConversationId === conversation.id ? "active" : ""
+            activeConversationId === conversation.conversationId ? "active" : ""
           }`}
-          onClick={() => onSelect(conversation.id)}
+          onClick={() => onSelect(conversation.conversationId)}
         >
           <div className="chatgpt-history__item-title">{conversation.title}</div>
           <div className="chatgpt-history__item-time">
