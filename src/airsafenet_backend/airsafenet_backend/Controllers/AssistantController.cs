@@ -18,17 +18,20 @@ namespace airsafenet_backend.Controllers
         private readonly AiService _aiService;
         private readonly AssistantDomainService _domainService;
         private readonly GeminiChatService _geminiChatService;
+        private readonly AssistantTimeResolverService _timeResolverService;
 
         public AssistantController(
             AppDbContext db,
             AiService aiService,
             AssistantDomainService domainService,
-            GeminiChatService geminiChatService)
+            GeminiChatService geminiChatService,
+            AssistantTimeResolverService timeResolverService)
         {
             _db = db;
             _aiService = aiService;
             _domainService = domainService;
             _geminiChatService = geminiChatService;
+            _timeResolverService = timeResolverService;
         }
 
         [HttpPost("conversations")]
@@ -250,7 +253,15 @@ namespace airsafenet_backend.Controllers
                 });
             }
 
-            var matched = forecast.Forecast
+            var nowLocal = DateTime.Now;
+
+            var forecastMatch = _timeResolverService.MatchForecast(
+                request.Message,
+                forecast.Forecast,
+                nowLocal
+            );
+
+            var matched = forecastMatch.Item ?? forecast.Forecast
                 .OrderByDescending(x => x.PredAqi)
                 .First();
 
@@ -284,7 +295,12 @@ Ngữ cảnh hệ thống AirSafeNet:
 - Current risk: {current.RiskProfile}
 - Current recommendation: {current.RecommendationProfile}
 
-Mốc forecast nổi bật trong 24 giờ tới:
+Phân tích thời gian từ câu hỏi:
+- Matched phrase: {forecastMatch.MatchedPhrase ?? "không xác định rõ"}
+- Target time: {forecastMatch.TargetTime?.ToString("yyyy-MM-dd HH:mm") ?? "không xác định"}
+- Is fallback: {forecastMatch.IsFallback}
+
+Mốc forecast được chọn gần nhất:
 - Time: {matched.Time}
 - AQI: {matched.PredAqi}
 - PM2.5: {matched.PredPm25}
@@ -294,7 +310,10 @@ Mốc forecast nổi bật trong 24 giờ tới:
 Câu hỏi người dùng:
 {request.Message}
 
-Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với dữ liệu trên.
+Yêu cầu trả lời:
+- nếu người dùng hỏi một mốc thời gian cụ thể, hãy trả lời bám sát mốc đó
+- nói rõ nếu hệ thống đang dùng mốc gần nhất do không xác định được thời gian chính xác
+- trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, dễ hiểu
 """;
 
             var answer = await _geminiChatService.GenerateAssistantAnswerAsync(
@@ -344,6 +363,9 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
                     userGroup,
                     currentAqi = current.PredAqi,
                     currentPm25 = current.PredPm25,
+                    matchedPhrase = forecastMatch.MatchedPhrase,
+                    targetTime = forecastMatch.TargetTime,
+                    isFallback = forecastMatch.IsFallback,
                     matchedForecastTime = matched.Time,
                     matchedForecastAqi = matched.PredAqi,
                     matchedForecastPm25 = matched.PredPm25
@@ -582,7 +604,15 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
                 });
             }
 
-            var matched = forecast.Forecast
+            var nowLocal = DateTime.Now;
+
+            var forecastMatch = _timeResolverService.MatchForecast(
+                sourceUserMessage.Content,
+                forecast.Forecast,
+                nowLocal
+            );
+
+            var matched = forecastMatch.Item ?? forecast.Forecast
                 .OrderByDescending(x => x.PredAqi)
                 .First();
 
@@ -616,7 +646,12 @@ Ngữ cảnh hệ thống AirSafeNet:
 - Current risk: {current.RiskProfile}
 - Current recommendation: {current.RecommendationProfile}
 
-Mốc forecast nổi bật trong 24 giờ tới:
+Phân tích thời gian từ câu hỏi:
+- Matched phrase: {forecastMatch.MatchedPhrase ?? "không xác định rõ"}
+- Target time: {forecastMatch.TargetTime?.ToString("yyyy-MM-dd HH:mm") ?? "không xác định"}
+- Is fallback: {forecastMatch.IsFallback}
+
+Mốc forecast được chọn gần nhất:
 - Time: {matched.Time}
 - AQI: {matched.PredAqi}
 - PM2.5: {matched.PredPm25}
@@ -626,7 +661,10 @@ Mốc forecast nổi bật trong 24 giờ tới:
 Câu hỏi người dùng:
 {sourceUserMessage.Content}
 
-Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với dữ liệu trên.
+Yêu cầu trả lời:
+- nếu người dùng hỏi một mốc thời gian cụ thể, hãy trả lời bám sát mốc đó
+- nói rõ nếu hệ thống đang dùng mốc gần nhất do không xác định được thời gian chính xác
+- trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, dễ hiểu
 """;
 
             var answer = await _geminiChatService.GenerateAssistantAnswerAsync(systemPrompt, userPrompt);
@@ -656,6 +694,9 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
                     userGroup,
                     currentAqi = current.PredAqi,
                     currentPm25 = current.PredPm25,
+                    matchedPhrase = forecastMatch.MatchedPhrase,
+                    targetTime = forecastMatch.TargetTime,
+                    isFallback = forecastMatch.IsFallback,
                     matchedForecastTime = matched.Time,
                     matchedForecastAqi = matched.PredAqi,
                     matchedForecastPm25 = matched.PredPm25
