@@ -3124,3 +3124,26 @@ p {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+.chatgpt-history-sections {
+  display: grid;
+  gap: 18px;
+}
+
+.chatgpt-history-group {
+  display: grid;
+  gap: 10px;
+}
+
+.chatgpt-history-group__title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #94a3b8;
+  font-weight: 800;
+  padding: 0 2px;
+}
+
+.chatgpt-history-group .chatgpt-history__list {
+  max-height: unset;
+}
