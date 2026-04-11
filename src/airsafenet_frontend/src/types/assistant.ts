@@ -52,6 +52,9 @@ export type ConversationMessageResponse = {
   currentAqi?: number | null;
   currentPm25?: number | null;
   createdAt: string;
+  updatedAt?: string | null;
+  regeneratedCount?: number;
+  sourceUserMessageId?: number | null;
 };
 
 export type ConversationDetailResponse = {

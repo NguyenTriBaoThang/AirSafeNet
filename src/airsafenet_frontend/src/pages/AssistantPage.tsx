@@ -21,6 +21,7 @@ import ConversationList from "../components/assistant/ConversationList";
 import EmptyState from "../components/common/EmptyState";
 import AssistantMarkdown from "../components/assistant/AssistantMarkdown";
 import MessageActions from "../components/assistant/MessageActions";
+import MessageStatusBadges from "../components/assistant/MessageStatusBadges";
 import StreamingAssistantMessage from "../components/assistant/StreamingAssistantMessage";
 
 function makeTempId() {
@@ -36,10 +37,13 @@ const STARTER_PROMPTS = [
 
 function mapConversationMessages(detail: ConversationDetailResponse): ChatMessage[] {
   const mapped = detail.messages.map((m) => ({
-    id: String(m.messageId),
+    id: m.messageId,
     role: m.role,
     content: m.content,
     createdAt: m.createdAt,
+    updatedAt: m.updatedAt ?? null,
+    regeneratedCount: m.regeneratedCount ?? 0,
+    sourceUserMessageId: m.sourceUserMessageId ?? null,
     isStreaming: false,
     meta:
       m.role === "assistant"
@@ -575,9 +579,18 @@ export default function AssistantPage() {
                       </div>
 
                       <div className="chatgpt-message__footer">
-                        <span className="chatgpt-message__time">
-                          {new Date(message.createdAt).toLocaleString("vi-VN")}
-                        </span>
+                        <div className="chatgpt-message__footer-left">
+                          <span className="chatgpt-message__time">
+                            {new Date(message.createdAt).toLocaleString("vi-VN")}
+                          </span>
+
+                          {message.role === "assistant" ? (
+                            <MessageStatusBadges
+                              updatedAt={message.updatedAt}
+                              regeneratedCount={message.regeneratedCount}
+                            />
+                          ) : null}
+                        </div>
 
                         {message.role === "assistant" && !message.isStreaming ? (
                           <MessageActions
@@ -585,7 +598,7 @@ export default function AssistantPage() {
                             onRegenerate={
                               message.sourceMessage ? () => handleRegenerate(message) : undefined
                             }
-                            disableRegenerate={regeneratingMessageId === message.id}
+                            disableRegenerate={regeneratingMessageId === String(message.id)}
                           />
                         ) : null}
                       </div>
