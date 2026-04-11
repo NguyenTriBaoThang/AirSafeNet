@@ -96,3 +96,31 @@ export async function markConversationAsReadApi(conversationId: number) {
     auth: true,
   });
 }
+
+export async function regenerateAssistantMessageApi(
+  conversationId: number,
+  assistantMessageId: number
+) {
+  return http<{
+    conversationId: number;
+    assistantMessageId: number;
+    answer: string;
+    regeneratedCount: number;
+    updatedAt: string;
+    source?: {
+      userGroup?: string;
+      currentAqi?: number;
+      currentPm25?: number;
+      matchedForecastTime?: string;
+      matchedForecastAqi?: number;
+      matchedForecastPm25?: number;
+    } | null;
+  }>("/api/assistant/regenerate", {
+    method: "POST",
+    auth: true,
+    body: JSON.stringify({
+      conversationId,
+      assistantMessageId,
+    }),
+  });
+}

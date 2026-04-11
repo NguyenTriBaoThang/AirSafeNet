@@ -24,7 +24,13 @@ namespace airsafenet_backend.Models
 
         public double? CurrentPm25 { get; set; }
 
+        public int? SourceUserMessageId { get; set; }
+
+        public int RegeneratedCount { get; set; } = 0;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime? UpdatedAt { get; set; }
 
         public ChatConversation? Conversation { get; set; }
     }

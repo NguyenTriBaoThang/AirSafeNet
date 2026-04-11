@@ -18,7 +18,7 @@ export type AssistantChatResponse = {
 };
 
 export type ChatMessage = {
-  id: string;
+  id: string | number;
   role: "user" | "assistant";
   content: string;
   createdAt: string;
@@ -26,6 +26,9 @@ export type ChatMessage = {
   sourceMessage?: string;
   isStreaming?: boolean;
   streamedContent?: string;
+  regeneratedCount?: number;
+  updatedAt?: string | null;
+  sourceUserMessageId?: number | null;
 };
 
 export type ConversationListItemResponse = {

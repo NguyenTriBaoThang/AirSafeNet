@@ -14,6 +14,7 @@ import type {
 } from "../types/assistant";
 import { pinConversationApi } from "../api/assistant";
 import { markConversationAsReadApi } from "../api/assistant";
+import { regenerateAssistantMessageApi } from "../api/assistant";
 import type { ConversationSort } from "../api/assistant";
 import { useToast } from "../components/common/useToast";
 import ConversationList from "../components/assistant/ConversationList";
@@ -335,13 +336,13 @@ export default function AssistantPage() {
   }
 
   async function handleRegenerate(message: ChatMessage) {
-    if (!message.sourceMessage || loading || detailLoading) return;
+    if (loading || detailLoading) return;
     if (!activeConversationId) return;
+    if (typeof message.id !== "number") return;
 
     try {
-      setRegeneratingMessageId(message.id);
+      setRegeneratingMessageId(String(message.id));
 
-      // đổi message cũ sang trạng thái streaming tạm
       setMessages((prev) =>
         prev.map((item) =>
           item.id === message.id
@@ -354,12 +355,11 @@ export default function AssistantPage() {
         )
       );
 
-      const result = await sendAssistantMessageApi({
-        conversationId: activeConversationId,
-        message: message.sourceMessage,
-      });
+      const result = await regenerateAssistantMessageApi(
+        activeConversationId,
+        message.id
+      );
 
-      // thay đúng message assistant cũ bằng nội dung mới
       setMessages((prev) =>
         prev.map((item) =>
           item.id === message.id
@@ -368,8 +368,8 @@ export default function AssistantPage() {
                 content: result.answer,
                 meta: result.source ?? undefined,
                 isStreaming: true,
-                sourceMessage: message.sourceMessage,
-                createdAt: new Date().toISOString(),
+                regeneratedCount: result.regeneratedCount,
+                updatedAt: result.updatedAt,
               }
             : item
         )

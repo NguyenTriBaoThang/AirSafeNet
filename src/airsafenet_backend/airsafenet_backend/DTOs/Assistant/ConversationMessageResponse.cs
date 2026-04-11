@@ -8,6 +8,9 @@
         public string? UserGroup { get; set; }
         public double? CurrentAqi { get; set; }
         public double? CurrentPm25 { get; set; }
+        public int? SourceUserMessageId { get; set; }
+        public int RegeneratedCount { get; set; }
         public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
     }
 }

@@ -140,7 +140,10 @@ namespace airsafenet_backend.Controllers
                         UserGroup = x.UserGroup,
                         CurrentAqi = x.CurrentAqi,
                         CurrentPm25 = x.CurrentPm25,
-                        CreatedAt = x.CreatedAt
+                        SourceUserMessageId = x.SourceUserMessageId,
+                        RegeneratedCount = x.RegeneratedCount,
+                        CreatedAt = x.CreatedAt,
+                        UpdatedAt = x.UpdatedAt
                     })
                     .ToList()
             });
@@ -189,6 +192,7 @@ namespace airsafenet_backend.Controllers
             };
 
             _db.ChatMessages.Add(userMessage);
+            await _db.SaveChangesAsync();
 
             var inDomain = _domainService.IsInDomain(request.Message);
 
@@ -203,7 +207,10 @@ namespace airsafenet_backend.Controllers
                     Role = "assistant",
                     Content = blockedAnswer,
                     UserGroup = userGroup,
-                    CreatedAt = DateTime.UtcNow
+                    SourceUserMessageId = userMessage.Id,
+                    RegeneratedCount = 0,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = null
                 };
 
                 _db.ChatMessages.Add(assistantMessageBlocked);
@@ -303,7 +310,10 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
                 UserGroup = userGroup,
                 CurrentAqi = current.PredAqi,
                 CurrentPm25 = current.PredPm25,
-                CreatedAt = DateTime.UtcNow
+                SourceUserMessageId = userMessage.Id,
+                RegeneratedCount = 0,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = null
             };
 
             _db.ChatMessages.Add(assistantMessage);
@@ -475,6 +485,181 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
             {
                 conversationId = conversation.Id,
                 hasUnreadAssistantMessage = conversation.HasUnreadAssistantMessage
+            });
+        }
+
+        [HttpPost("regenerate")]
+        public async Task<IActionResult> Regenerate([FromBody] RegenerateAssistantRequest request)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var conversation = await _db.ChatConversations
+                .FirstOrDefaultAsync(x => x.Id == request.ConversationId && x.UserId == userId.Value);
+
+            if (conversation == null)
+            {
+                return NotFound(new { message = "Không tìm thấy hội thoại." });
+            }
+
+            var assistantMessage = await _db.ChatMessages
+                .FirstOrDefaultAsync(x =>
+                    x.Id == request.AssistantMessageId &&
+                    x.ConversationId == request.ConversationId &&
+                    x.Role == "assistant");
+
+            if (assistantMessage == null)
+            {
+                return NotFound(new { message = "Không tìm thấy assistant message." });
+            }
+
+            ChatMessage? sourceUserMessage = null;
+
+            if (assistantMessage.SourceUserMessageId.HasValue)
+            {
+                sourceUserMessage = await _db.ChatMessages.FirstOrDefaultAsync(x =>
+                    x.Id == assistantMessage.SourceUserMessageId.Value &&
+                    x.ConversationId == request.ConversationId &&
+                    x.Role == "user");
+            }
+
+            // fallback cho dữ liệu cũ chưa có SourceUserMessageId
+            if (sourceUserMessage == null)
+            {
+                sourceUserMessage = await _db.ChatMessages
+                    .Where(x =>
+                        x.ConversationId == request.ConversationId &&
+                        x.Role == "user" &&
+                        x.CreatedAt <= assistantMessage.CreatedAt)
+                    .OrderByDescending(x => x.CreatedAt)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (sourceUserMessage == null)
+            {
+                return BadRequest(new { message = "Không xác định được câu hỏi nguồn để regenerate." });
+            }
+
+            var userGroup = await GetCurrentUserGroupAsync(userId.Value);
+
+            var inDomain = _domainService.IsInDomain(sourceUserMessage.Content);
+            if (!inDomain)
+            {
+                var blockedAnswer =
+                    "Mình chỉ hỗ trợ các câu hỏi liên quan đến chất lượng không khí, AQI/PM2.5, dự báo và khuyến nghị sức khỏe trong AirSafeNet.";
+
+                assistantMessage.Content = blockedAnswer;
+                assistantMessage.UserGroup = userGroup;
+                assistantMessage.CurrentAqi = null;
+                assistantMessage.CurrentPm25 = null;
+                assistantMessage.SourceUserMessageId = sourceUserMessage.Id;
+                assistantMessage.RegeneratedCount += 1;
+                assistantMessage.UpdatedAt = DateTime.UtcNow;
+
+                conversation.HasUnreadAssistantMessage = true;
+                conversation.UpdatedAt = DateTime.UtcNow;
+
+                await _db.SaveChangesAsync();
+
+                return Ok(new RegenerateAssistantResponse
+                {
+                    ConversationId = conversation.Id,
+                    AssistantMessageId = assistantMessage.Id,
+                    Answer = assistantMessage.Content,
+                    RegeneratedCount = assistantMessage.RegeneratedCount,
+                    UpdatedAt = assistantMessage.UpdatedAt ?? DateTime.UtcNow
+                });
+            }
+
+            var current = await _aiService.GetCurrentAsync(userGroup);
+            var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1);
+
+            if (current == null || forecast == null || forecast.Forecast.Count == 0)
+            {
+                return StatusCode(500, new
+                {
+                    message = "Không lấy được dữ liệu từ AI Server để hỗ trợ regenerate."
+                });
+            }
+
+            var matched = forecast.Forecast
+                .OrderByDescending(x => x.PredAqi)
+                .First();
+
+            var systemPrompt = """
+Bạn là trợ lý ảo của AirSafeNet.
+
+Chỉ được trả lời các câu hỏi liên quan đến:
+- chất lượng không khí
+- AQI, PM2.5
+- dự báo theo thời gian
+- mức độ rủi ro sức khỏe liên quan ô nhiễm không khí
+- khuyến nghị hoạt động ngoài trời / trong nhà
+- giải thích dữ liệu AirSafeNet
+
+Không được trả lời các câu hỏi ngoài phạm vi trên.
+Nếu câu hỏi ngoài phạm vi, hãy từ chối ngắn gọn và lịch sự.
+
+Khi trả lời:
+- ưu tiên tuyệt đối dữ liệu trong context
+- không tự bịa thêm số liệu
+- nếu dữ liệu chưa đủ, nói rõ là chưa đủ dữ liệu
+- trả lời tự nhiên, dễ hiểu, thân thiện
+- ngắn gọn, thực tế, ưu tiên tính an toàn cho người dùng
+""";
+
+            var userPrompt = $"""
+Ngữ cảnh hệ thống AirSafeNet:
+- User group: {userGroup}
+- Current AQI: {current.PredAqi}
+- Current PM2.5: {current.PredPm25}
+- Current risk: {current.RiskProfile}
+- Current recommendation: {current.RecommendationProfile}
+
+Mốc forecast nổi bật trong 24 giờ tới:
+- Time: {matched.Time}
+- AQI: {matched.PredAqi}
+- PM2.5: {matched.PredPm25}
+- Risk: {matched.RiskProfile}
+- Recommendation: {matched.RecommendationProfile}
+
+Câu hỏi người dùng:
+{sourceUserMessage.Content}
+
+Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với dữ liệu trên.
+""";
+
+            var answer = await _geminiChatService.GenerateAssistantAnswerAsync(systemPrompt, userPrompt);
+
+            assistantMessage.Content = answer;
+            assistantMessage.UserGroup = userGroup;
+            assistantMessage.CurrentAqi = current.PredAqi;
+            assistantMessage.CurrentPm25 = current.PredPm25;
+            assistantMessage.SourceUserMessageId = sourceUserMessage.Id;
+            assistantMessage.RegeneratedCount += 1;
+            assistantMessage.UpdatedAt = DateTime.UtcNow;
+
+            conversation.HasUnreadAssistantMessage = true;
+            conversation.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new RegenerateAssistantResponse
+            {
+                ConversationId = conversation.Id,
+                AssistantMessageId = assistantMessage.Id,
+                Answer = answer,
+                RegeneratedCount = assistantMessage.RegeneratedCount,
+                UpdatedAt = assistantMessage.UpdatedAt ?? DateTime.UtcNow,
+                Source = new
+                {
+                    userGroup,
+                    currentAqi = current.PredAqi,
+                    currentPm25 = current.PredPm25,
+                    matchedForecastTime = matched.Time,
+                    matchedForecastAqi = matched.PredAqi,
+                    matchedForecastPm25 = matched.PredPm25
+                }
             });
         }
     }
