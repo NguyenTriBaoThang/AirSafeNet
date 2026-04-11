@@ -20,6 +20,7 @@ import ConversationList from "../components/assistant/ConversationList";
 import EmptyState from "../components/common/EmptyState";
 import AssistantMarkdown from "../components/assistant/AssistantMarkdown";
 import MessageActions from "../components/assistant/MessageActions";
+import StreamingAssistantMessage from "../components/assistant/StreamingAssistantMessage";
 
 function makeTempId() {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -38,6 +39,7 @@ function mapConversationMessages(detail: ConversationDetailResponse): ChatMessag
     role: m.role,
     content: m.content,
     createdAt: m.createdAt,
+    isStreaming: false,
     meta:
       m.role === "assistant"
         ? {
@@ -291,8 +293,26 @@ export default function AssistantPage() {
         setActiveConversationId(result.conversationId);
       }
 
+      const assistantTempId = makeTempId();
+
+      const assistantStreamingMessage: ChatMessage = {
+        id: assistantTempId,
+        role: "assistant",
+        content: result.answer,
+        createdAt: new Date().toISOString(),
+        meta: result.source ?? undefined,
+        sourceMessage: finalText,
+        isStreaming: true,
+      };
+
+      setMessages((prev) => [...prev, assistantStreamingMessage]);
+
       await loadConversations(false);
-      await loadConversationDetail(result.conversationId);
+
+      // Sau khi hiệu ứng stream xong mới sync lại từ backend
+      window.setTimeout(async () => {
+        await loadConversationDetail(result.conversationId);
+      }, Math.min(Math.max(result.answer.length * 18, 900), 5000));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Không thể gửi câu hỏi";
       showToast(message, "error");
@@ -348,10 +368,15 @@ export default function AssistantPage() {
   }, [input]);
 
   useEffect(() => {
-    if (listRef.current) {
-      listRef.current.scrollTop = listRef.current.scrollHeight;
-    }
-  }, [messages, loading]);
+    if (!listRef.current) return;
+
+    const el = listRef.current;
+    const timer = window.setInterval(() => {
+      el.scrollTop = el.scrollHeight;
+    }, 80);
+
+    return () => window.clearInterval(timer);
+  }, [messages]);
 
   const emptyConversation = messages.length === 0;
 
@@ -469,7 +494,11 @@ export default function AssistantPage() {
 
                       <div className="chatgpt-message__content">
                         {message.role === "assistant" ? (
-                          <AssistantMarkdown content={message.content} />
+                          message.isStreaming ? (
+                            <StreamingAssistantMessage content={message.content} />
+                          ) : (
+                            <AssistantMarkdown content={message.content} />
+                          )
                         ) : (
                           message.content
                         )}
@@ -480,7 +509,7 @@ export default function AssistantPage() {
                           {new Date(message.createdAt).toLocaleString("vi-VN")}
                         </span>
 
-                        {message.role === "assistant" ? (
+                        {message.role === "assistant" && !message.isStreaming ? (
                           <MessageActions
                             onCopy={() => handleCopy(message.content)}
                             onRegenerate={

@@ -24,6 +24,8 @@ export type ChatMessage = {
   createdAt: string;
   meta?: AssistantChatResponse["source"];
   sourceMessage?: string;
+  isStreaming?: boolean;
+  streamedContent?: string;
 };
 
 export type ConversationListItemResponse = {

@@ -3221,3 +3221,27 @@ p {
   background: linear-gradient(135deg, #475569, #64748b);
   color: white;
 }
+
+.streaming-assistant {
+  position: relative;
+}
+
+.streaming-caret {
+  display: inline-block;
+  width: 9px;
+  height: 1.1em;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  border-radius: 2px;
+  background: #93c5fd;
+  animation: blinkCaret 0.9s steps(1) infinite;
+}
+
+@keyframes blinkCaret {
+  0%, 50% {
+    opacity: 1;
+  }
+  50.01%, 100% {
+    opacity: 0;
+  }
+}
