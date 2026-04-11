@@ -3454,3 +3454,28 @@ p {
     Consolas,
     monospace !important;
 }
+
+.assistant-table-block {
+  margin: 12px 0;
+}
+
+.assistant-table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.assistant-table-toolbar__btn {
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.04);
+  color: #dbeafe;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assistant-table-toolbar__btn:hover {
+  background: rgba(255,255,255,0.08);
+}

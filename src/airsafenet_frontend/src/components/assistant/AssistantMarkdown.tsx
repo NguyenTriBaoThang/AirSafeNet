@@ -3,6 +3,7 @@ import remarkGfm from "remark-gfm";
 import { useToast } from "../common/useToast";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Children, isValidElement, type ReactNode } from "react";
 
 type Props = {
   content: string;
@@ -50,7 +51,6 @@ function CodeBlock({
       <SyntaxHighlighter
         language={language}
         style={oneDark}
-        showLineNumbers
         customStyle={{
           margin: 0,
           padding: "14px",
@@ -114,6 +114,73 @@ function ParagraphWithCopy({
   );
 }
 
+function extractText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(extractText).join("");
+
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return extractText(node.props.children);
+  }
+
+  return "";
+}
+
+function tableToTsv(children: ReactNode): string {
+  const rows: string[][] = [];
+
+  Children.forEach(children, (section) => {
+    if (!isValidElement<{ children?: ReactNode }>(section)) return;
+
+    Children.forEach(section.props.children, (row) => {
+      if (!isValidElement<{ children?: ReactNode }>(row)) return;
+
+      const cells: string[] = [];
+      Children.forEach(row.props.children, (cell) => {
+        cells.push(extractText(cell).replace(/\s+/g, " ").trim());
+      });
+
+      if (cells.length > 0) {
+        rows.push(cells);
+      }
+    });
+  });
+
+  return rows.map((r) => r.join("\t")).join("\n");
+}
+
+function MarkdownTable({ children }: { children?: ReactNode }) {
+  const { showToast } = useToast();
+
+  async function handleCopyTable() {
+    try {
+      const tsv = tableToTsv(children);
+      await navigator.clipboard.writeText(tsv);
+      showToast("Đã copy bảng", "success");
+    } catch {
+      showToast("Không thể copy bảng", "error");
+    }
+  }
+
+  return (
+    <div className="assistant-table-block">
+      <div className="assistant-table-toolbar">
+        <button
+          type="button"
+          className="assistant-table-toolbar__btn"
+          onClick={handleCopyTable}
+        >
+          Copy table
+        </button>
+      </div>
+
+      <div className="assistant-table-wrap">
+        <table className="assistant-table">{children}</table>
+      </div>
+    </div>
+  );
+}
+
 export default function AssistantMarkdown({ content }: Props) {
   return (
     <div className="assistant-markdown">
@@ -121,7 +188,7 @@ export default function AssistantMarkdown({ content }: Props) {
         remarkPlugins={[remarkGfm]}
         components={{
           code({ className, children }) {
-            const inline = !className; 
+            const inline = !className;
 
             return (
               <CodeBlock inline={inline} className={className}>
@@ -133,11 +200,7 @@ export default function AssistantMarkdown({ content }: Props) {
             return <ParagraphWithCopy>{children}</ParagraphWithCopy>;
           },
           table({ children }) {
-            return (
-              <div className="assistant-table-wrap">
-                <table className="assistant-table">{children}</table>
-              </div>
-            );
+            return <MarkdownTable>{children}</MarkdownTable>;
           },
         }}
       >

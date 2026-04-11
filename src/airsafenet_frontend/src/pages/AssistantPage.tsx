@@ -417,6 +417,44 @@ export default function AssistantPage() {
     }
   }
 
+  function downloadTextFile(filename: string, content: string, mime: string) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+
+    URL.revokeObjectURL(url);
+  }
+
+  function sanitizeFilename(name: string) {
+    return name
+      .replace(/[\\/:*?"<>|]/g, "")
+      .replace(/\s+/g, "-")
+      .toLowerCase()
+      .slice(0, 50);
+  }
+
+  function handleExportTxt(message: ChatMessage) {
+    const filename = `airsafenet-answer-${sanitizeFilename(
+      String(message.id)
+    )}.txt`;
+
+    downloadTextFile(filename, message.content, "text/plain;charset=utf-8");
+    showToast("Đã export file txt", "success");
+  }
+
+  function handleExportMd(message: ChatMessage) {
+    const filename = `airsafenet-answer-${sanitizeFilename(
+      String(message.id)
+    )}.md`;
+
+    downloadTextFile(filename, message.content, "text/markdown;charset=utf-8");
+    showToast("Đã export file md", "success");
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -595,6 +633,8 @@ export default function AssistantPage() {
                         {message.role === "assistant" && !message.isStreaming ? (
                           <MessageActions
                             onCopy={() => handleCopy(message.content)}
+                            onExportTxt={() => handleExportTxt(message)}
+                            onExportMd={() => handleExportMd(message)}
                             onRegenerate={
                               message.sourceMessage ? () => handleRegenerate(message) : undefined
                             }
