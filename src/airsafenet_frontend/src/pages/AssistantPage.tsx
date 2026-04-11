@@ -69,6 +69,7 @@ export default function AssistantPage() {
 
   const [sort, setSort] = useState<ConversationSort>("recent");
 
+  const [regeneratingMessageId, setRegeneratingMessageId] = useState<string | null>(null);
   const [conversations, setConversations] = useState<ConversationListItemResponse[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -335,7 +336,72 @@ export default function AssistantPage() {
 
   async function handleRegenerate(message: ChatMessage) {
     if (!message.sourceMessage || loading || detailLoading) return;
-    await handleSend(message.sourceMessage);
+    if (!activeConversationId) return;
+
+    try {
+      setRegeneratingMessageId(message.id);
+
+      // đổi message cũ sang trạng thái streaming tạm
+      setMessages((prev) =>
+        prev.map((item) =>
+          item.id === message.id
+            ? {
+                ...item,
+                content: "",
+                isStreaming: true,
+              }
+            : item
+        )
+      );
+
+      const result = await sendAssistantMessageApi({
+        conversationId: activeConversationId,
+        message: message.sourceMessage,
+      });
+
+      // thay đúng message assistant cũ bằng nội dung mới
+      setMessages((prev) =>
+        prev.map((item) =>
+          item.id === message.id
+            ? {
+                ...item,
+                content: result.answer,
+                meta: result.source ?? undefined,
+                isStreaming: true,
+                sourceMessage: message.sourceMessage,
+                createdAt: new Date().toISOString(),
+              }
+            : item
+        )
+      );
+
+      await loadConversations(false);
+
+      window.setTimeout(async () => {
+        await loadConversationDetail(result.conversationId);
+        setRegeneratingMessageId(null);
+      }, Math.min(Math.max(result.answer.length * 18, 900), 5000));
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Không thể regenerate câu trả lời";
+
+      showToast(errorMessage, "error");
+
+      setMessages((prev) =>
+        prev.map((item) =>
+          item.id === message.id
+            ? {
+                ...item,
+                content:
+                  "Mình đang gặp sự cố khi tạo lại câu trả lời này. Bạn thử lại sau một chút nhé.",
+                isStreaming: false,
+              }
+            : item
+        )
+      );
+
+      setRegeneratingMessageId(null);
+    }
   }
 
   async function handleCopy(content: string) {
@@ -489,7 +555,11 @@ export default function AssistantPage() {
 
                     <div className="chatgpt-message__body">
                       <div className="chatgpt-message__role">
-                        {message.role === "user" ? "Bạn" : "AirSafeNet Assistant"}
+                        {message.role === "user"
+                          ? "Bạn"
+                          : regeneratingMessageId === message.id
+                          ? "AirSafeNet Assistant • Đang tạo lại"
+                          : "AirSafeNet Assistant"}
                       </div>
 
                       <div className="chatgpt-message__content">
@@ -513,10 +583,9 @@ export default function AssistantPage() {
                           <MessageActions
                             onCopy={() => handleCopy(message.content)}
                             onRegenerate={
-                              message.sourceMessage
-                                ? () => handleRegenerate(message)
-                                : undefined
+                              message.sourceMessage ? () => handleRegenerate(message) : undefined
                             }
+                            disableRegenerate={regeneratingMessageId === message.id}
                           />
                         ) : null}
                       </div>

@@ -3245,3 +3245,9 @@ p {
     opacity: 0;
   }
 }
+
+
+.message-actions__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
