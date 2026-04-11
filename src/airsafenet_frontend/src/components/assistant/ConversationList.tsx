@@ -7,6 +7,7 @@ type Props = {
   onSelect: (conversationId: number) => void;
   onRename: (conversation: ConversationListItemResponse) => void;
   onDelete: (conversation: ConversationListItemResponse) => void;
+  onPinToggle: (conversation: ConversationListItemResponse) => void;
 };
 
 export default function ConversationList({
@@ -15,6 +16,7 @@ export default function ConversationList({
   onSelect,
   onRename,
   onDelete,
+  onPinToggle,
 }: Props) {
   if (conversations.length === 0) {
     return <div className="chatgpt-history__empty">Chưa có hội thoại nào</div>;
@@ -34,13 +36,25 @@ export default function ConversationList({
             onClick={() => onSelect(conversation.conversationId)}
             type="button"
           >
-            <div className="chatgpt-history__item-title">{conversation.title}</div>
+            <div className="chatgpt-history__item-header">
+              <div className="chatgpt-history__item-title">{conversation.title}</div>
+              {conversation.isPinned ? (
+                <span className="chatgpt-history__pin">📌</span>
+              ) : null}
+            </div>
+
+            <div className="chatgpt-history__item-preview">
+              {conversation.lastMessagePreview || "Chưa có tin nhắn"}
+            </div>
+
             <div className="chatgpt-history__item-time">
-              {new Date(conversation.updatedAt).toLocaleString("vi-VN")}
+              {new Date(conversation.lastMessageAt || conversation.updatedAt).toLocaleString("vi-VN")}
             </div>
           </button>
 
           <ConversationMenu
+            isPinned={conversation.isPinned}
+            onPinToggle={() => onPinToggle(conversation)}
             onRename={() => onRename(conversation)}
             onDelete={() => onDelete(conversation)}
           />

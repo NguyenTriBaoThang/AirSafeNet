@@ -29,6 +29,9 @@ export type ChatMessage = {
 export type ConversationListItemResponse = {
   conversationId: number;
   title: string;
+  isPinned: boolean;
+  lastMessagePreview?: string | null;
+  lastMessageAt?: string | null;
   createdAt: string;
   updatedAt: string;
   messageCount: number;

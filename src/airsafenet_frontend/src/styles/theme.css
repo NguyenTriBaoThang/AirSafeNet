@@ -3086,3 +3086,41 @@ p {
     align-items: flex-start;
   }
 }
+
+.chatgpt-sort {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.06);
+  color: white;
+  border-radius: 14px;
+  padding: 11px 13px;
+  outline: none;
+}
+
+.chatgpt-sort option {
+  color: black;
+}
+
+.chatgpt-history__item-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.chatgpt-history__pin {
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.chatgpt-history__item-preview {
+  margin-top: 6px;
+  color: #cbd5e1;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

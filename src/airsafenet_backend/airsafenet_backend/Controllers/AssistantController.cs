@@ -58,25 +58,48 @@ namespace airsafenet_backend.Controllers
         }
 
         [HttpGet("conversations")]
-        public async Task<IActionResult> GetConversations()
+        public async Task<IActionResult> GetConversations([FromQuery] string sort = "recent")
         {
             var userId = GetCurrentUserId();
             if (userId == null) return Unauthorized();
 
-            var conversations = await _db.ChatConversations
+            var query = _db.ChatConversations
                 .AsNoTracking()
                 .Where(x => x.UserId == userId.Value)
-                .OrderByDescending(x => x.UpdatedAt)
                 .Select(x => new ConversationListItemResponse
                 {
                     ConversationId = x.Id,
                     Title = x.Title,
+                    IsPinned = x.IsPinned,
                     CreatedAt = x.CreatedAt,
                     UpdatedAt = x.UpdatedAt,
-                    MessageCount = x.Messages.Count
-                })
-                .ToListAsync();
+                    MessageCount = x.Messages.Count,
+                    LastMessageAt = x.Messages
+                        .OrderByDescending(m => m.CreatedAt)
+                        .Select(m => (DateTime?)m.CreatedAt)
+                        .FirstOrDefault(),
+                    LastMessagePreview = x.Messages
+                        .OrderByDescending(m => m.CreatedAt)
+                        .Select(m => m.Content.Length > 80 ? m.Content.Substring(0, 80) + "..." : m.Content)
+                        .FirstOrDefault()
+                });
 
+            query = sort?.ToLower() switch
+            {
+                "oldest" => query
+                    .OrderByDescending(x => x.IsPinned)
+                    .ThenBy(x => x.CreatedAt),
+
+                "title" => query
+                    .OrderByDescending(x => x.IsPinned)
+                    .ThenBy(x => x.Title),
+
+                _ => query
+                    .OrderByDescending(x => x.IsPinned)
+                    .ThenByDescending(x => x.LastMessageAt ?? x.UpdatedAt)
+            };
+
+            var conversations = await query.ToListAsync();
             return Ok(conversations);
         }
 
@@ -395,6 +418,33 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
         {
             var text = message.Trim();
             return text.Length <= 60 ? text : $"{text[..60]}...";
+        }
+
+        [HttpPut("conversations/{conversationId:int}/pin")]
+        public async Task<IActionResult> PinConversation(int conversationId, [FromBody] PinConversationRequest request)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var conversation = await _db.ChatConversations
+                .FirstOrDefaultAsync(x => x.Id == conversationId && x.UserId == userId.Value);
+
+            if (conversation == null)
+            {
+                return NotFound(new { message = "Không tìm thấy hội thoại." });
+            }
+
+            conversation.IsPinned = request.IsPinned;
+            conversation.UpdatedAt = DateTime.UtcNow;
+
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                conversationId = conversation.Id,
+                isPinned = conversation.IsPinned,
+                updatedAt = conversation.UpdatedAt
+            });
         }
     }
 }

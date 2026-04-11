@@ -14,12 +14,14 @@ export async function createConversationApi() {
   });
 }
 
+/*
 export async function getConversationsApi() {
   return http<ConversationListItemResponse[]>("/api/assistant/conversations", {
     method: "GET",
     auth: true,
   });
 }
+  */
 
 export async function getConversationDetailApi(conversationId: number) {
   return http<ConversationDetailResponse>(
@@ -55,5 +57,32 @@ export async function renameConversationApi( conversationId: number, title: stri
     method: "PUT",
     auth: true,
     body: JSON.stringify({ title }),
+  });
+}
+
+export type ConversationSort = "recent" | "oldest" | "title";
+
+export async function getConversationsApi(sort: ConversationSort = "recent") {
+  return http<ConversationListItemResponse[]>(
+    `/api/assistant/conversations?sort=${sort}`,
+    {
+      method: "GET",
+      auth: true,
+    }
+  );
+}
+
+export async function pinConversationApi(
+  conversationId: number,
+  isPinned: boolean
+) {
+  return http<{
+    conversationId: number;
+    isPinned: boolean;
+    updatedAt: string;
+  }>(`/api/assistant/conversations/${conversationId}/pin`, {
+    method: "PUT",
+    auth: true,
+    body: JSON.stringify({ isPinned }),
   });
 }

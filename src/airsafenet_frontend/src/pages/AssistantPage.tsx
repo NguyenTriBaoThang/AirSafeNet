@@ -12,6 +12,8 @@ import type {
   ConversationDetailResponse,
   ConversationListItemResponse,
 } from "../types/assistant";
+import { pinConversationApi } from "../api/assistant";
+import type { ConversationSort } from "../api/assistant";
 import { useToast } from "../components/common/useToast";
 import ConversationList from "../components/assistant/ConversationList";
 import EmptyState from "../components/common/EmptyState";
@@ -62,6 +64,8 @@ function mapConversationMessages(detail: ConversationDetailResponse): ChatMessag
 export default function AssistantPage() {
   const { showToast } = useToast();
 
+  const [sort, setSort] = useState<ConversationSort>("recent");
+
   const [conversations, setConversations] = useState<ConversationListItemResponse[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -90,12 +94,12 @@ export default function AssistantPage() {
     );
   }, [conversations, search]);
 
-  async function loadConversations(selectLatest = true) {
+  async function loadConversations(selectLatest = true, sortValue = sort) {
     try {
       setSidebarLoading(true);
       setPageError("");
 
-      const list = await getConversationsApi();
+      const list = await getConversationsApi(sortValue);
       setConversations(list);
 
       if (list.length === 0) {
@@ -118,6 +122,34 @@ export default function AssistantPage() {
       setSidebarLoading(false);
     }
   }
+
+  async function handlePinToggle(conversation: ConversationListItemResponse) {
+  try {
+    const result = await pinConversationApi(
+      conversation.conversationId,
+      !conversation.isPinned
+    );
+
+    setConversations((prev) =>
+      prev.map((item) =>
+        item.conversationId === conversation.conversationId
+          ? { ...item, isPinned: result.isPinned, updatedAt: result.updatedAt }
+          : item
+      )
+    );
+
+    await loadConversations(false, sort);
+
+    showToast(
+      result.isPinned ? "Đã ghim hội thoại" : "Đã bỏ ghim hội thoại",
+      "success"
+    );
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Không cập nhật được trạng thái ghim";
+    showToast(message, "error");
+  }
+}
 
   async function loadConversationDetail(conversationId: number) {
     try {
@@ -149,6 +181,7 @@ export default function AssistantPage() {
           createdAt: created.createdAt,
           updatedAt: created.updatedAt,
           messageCount: 0,
+          isPinned: false,
         },
         ...prev.filter((x) => x.conversationId !== created.conversationId),
       ]);
@@ -329,6 +362,21 @@ export default function AssistantPage() {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Tìm kiếm hội thoại..."
           />
+
+          <select
+            className="chatgpt-sort"
+            value={sort}
+            onChange={(e) => {
+              const nextSort = e.target.value as ConversationSort;
+              setSort(nextSort);
+              loadConversations(false, nextSort);
+            }}
+          >
+            <option value="recent">Mới nhất</option>
+            <option value="oldest">Cũ nhất</option>
+            <option value="title">Theo tên</option>
+          </select>
+
         </div>
 
         <div className="chatgpt-history">
@@ -343,6 +391,7 @@ export default function AssistantPage() {
               onSelect={loadConversationDetail}
               onRename={handleRenameConversation}
               onDelete={handleDeleteConversation}
+              onPinToggle={handlePinToggle}
             />
           )}
         </div>

@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 
 type Props = {
+  isPinned: boolean;
+  onPinToggle: () => void;
   onRename: () => void;
   onDelete: () => void;
 };
 
-export default function ConversationMenu({ onRename, onDelete }: Props) {
+export default function ConversationMenu({
+  isPinned,
+  onPinToggle,
+  onRename,
+  onDelete,
+}: Props) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -38,11 +45,22 @@ export default function ConversationMenu({ onRename, onDelete }: Props) {
             type="button"
             onClick={() => {
               setOpen(false);
+              onPinToggle();
+            }}
+          >
+            {isPinned ? "Bỏ ghim" : "Ghim hội thoại"}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
               onRename();
             }}
           >
             Đổi tên
           </button>
+
           <button
             type="button"
             className="danger"
