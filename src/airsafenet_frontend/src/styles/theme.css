@@ -3431,3 +3431,26 @@ p {
     opacity: 1;
   }
 }
+.assistant-codeblock {
+  margin: 12px 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.assistant-codeblock pre {
+  margin: 0 !important;
+  background: transparent !important;
+  overflow-x: auto;
+}
+
+.assistant-codeblock code {
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    monospace !important;
+}

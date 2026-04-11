@@ -1,6 +1,8 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useToast } from "../common/useToast";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 type Props = {
   content: string;
@@ -45,9 +47,28 @@ function CodeBlock({
         </button>
       </div>
 
-      <pre>
-        <code className={className}>{raw}</code>
-      </pre>
+      <SyntaxHighlighter
+        language={language}
+        style={oneDark}
+        showLineNumbers
+        customStyle={{
+          margin: 0,
+          padding: "14px",
+          background: "transparent",
+          fontSize: "13px",
+          lineHeight: "1.75",
+          borderRadius: 0,
+        }}
+        codeTagProps={{
+          style: {
+            fontFamily:
+              "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+          },
+        }}
+        wrapLongLines
+      >
+        {raw}
+      </SyntaxHighlighter>
     </div>
   );
 }
@@ -99,9 +120,8 @@ export default function AssistantMarkdown({ content }: Props) {
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code(props) {
-            const { children, className } = props;
-            const inline = !className;
+          code({ className, children }) {
+            const inline = !className; 
 
             return (
               <CodeBlock inline={inline} className={className}>
