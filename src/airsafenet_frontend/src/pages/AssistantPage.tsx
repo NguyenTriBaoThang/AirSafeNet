@@ -90,6 +90,8 @@ export default function AssistantPage() {
   const listRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const activeConversationTitle = conversations.find((x) => x.conversationId === activeConversationId)?.title || "air-safenet-conversation";
+
   const canSend = useMemo(
     () => input.trim().length > 0 && !loading && !detailLoading,
     [input, loading, detailLoading]
@@ -339,6 +341,26 @@ export default function AssistantPage() {
     }
   }
 
+  async function handleShareAnswer(message: ChatMessage) {
+    const shareText = message.content.trim();
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: "AirSafeNet Answer",
+          text: shareText,
+        });
+        showToast("Đã mở chia sẻ", "success");
+        return;
+      }
+
+      await navigator.clipboard.writeText(shareText);
+      showToast("Thiết bị không hỗ trợ share. Đã copy nội dung vào clipboard", "info");
+    } catch {
+      showToast("Không thể chia sẻ nội dung", "error");
+    }
+  }
+
   async function handleRegenerate(message: ChatMessage) {
     if (loading || detailLoading) return;
     if (!activeConversationId) return;
@@ -415,6 +437,166 @@ export default function AssistantPage() {
     } catch {
       showToast("Không thể copy nội dung", "error");
     }
+  }
+
+  function handleExportConversationPdf() {
+    if (!messages.length) {
+      showToast("Hội thoại đang trống", "error");
+      return;
+    }
+
+    const html = buildConversationHtml(messages, activeConversationTitle);
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+
+    if (!printWindow) {
+      showToast("Không mở được cửa sổ in PDF", "error");
+      return;
+    }
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+
+    printWindow.focus();
+    printWindow.print();
+  }
+
+  function escapeHtml(value: string) {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function buildConversationHtml(messages: ChatMessage[], conversationTitle: string) {
+    const items = messages
+      .map((message) => {
+        const role = message.role === "user" ? "Bạn" : "AirSafeNet Assistant";
+        const time = new Date(message.createdAt).toLocaleString("vi-VN");
+        const content = escapeHtml(message.content).replace(/\n/g, "<br/>");
+
+        return `
+          <section class="msg">
+            <div class="msg-role">${role}</div>
+            <div class="msg-time">${time}</div>
+            <div class="msg-content">${content}</div>
+            ${
+              message.role === "assistant" && message.regeneratedCount && message.regeneratedCount > 0
+                ? `<div class="msg-badge">Regenerated ${message.regeneratedCount}x</div>`
+                : ""
+            }
+          </section>
+        `;
+      })
+      .join("");
+
+    return `
+      <!doctype html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>${escapeHtml(conversationTitle)}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 28px;
+              color: #111827;
+              line-height: 1.6;
+            }
+            h1 {
+              margin-bottom: 8px;
+              font-size: 24px;
+            }
+            .sub {
+              color: #6b7280;
+              margin-bottom: 24px;
+            }
+            .msg {
+              border: 1px solid #e5e7eb;
+              border-radius: 14px;
+              padding: 16px;
+              margin-bottom: 16px;
+            }
+            .msg-role {
+              font-weight: 700;
+              margin-bottom: 4px;
+            }
+            .msg-time {
+              font-size: 12px;
+              color: #6b7280;
+              margin-bottom: 10px;
+            }
+            .msg-content {
+              white-space: normal;
+            }
+            .msg-badge {
+              margin-top: 10px;
+              display: inline-block;
+              padding: 4px 10px;
+              border-radius: 999px;
+              background: #eff6ff;
+              color: #1d4ed8;
+              font-size: 12px;
+              font-weight: 700;
+            }
+            @media print {
+              body {
+                padding: 0;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${escapeHtml(conversationTitle)}</h1>
+          <div class="sub">Exported from AirSafeNet</div>
+          ${items}
+        </body>
+      </html>
+    `;
+  }
+
+  function handleExportConversationMarkdown() {
+    if (!messages.length) {
+      showToast("Hội thoại đang trống", "error");
+      return;
+    }
+
+    const content = buildConversationMarkdown(messages, activeConversationTitle);
+    const filename = `conversation-${sanitizeFilename(activeConversationTitle)}.md`;
+
+    downloadTextFile(filename, content, "text/markdown;charset=utf-8");
+    showToast("Đã export conversation dạng markdown", "success");
+  }
+
+  function buildConversationMarkdown(
+    messages: ChatMessage[],
+    conversationTitle: string
+  ) {
+    const lines: string[] = [];
+
+    lines.push(`# ${conversationTitle}`);
+    lines.push("");
+    lines.push(`Exported from AirSafeNet`);
+    lines.push("");
+
+    for (const message of messages) {
+      const role = message.role === "user" ? "Bạn" : "AirSafeNet Assistant";
+      const time = new Date(message.createdAt).toLocaleString("vi-VN");
+
+      lines.push(`## ${role}`);
+      lines.push("");
+      lines.push(`> ${time}`);
+      lines.push("");
+      lines.push(message.content);
+      lines.push("");
+
+      if (message.role === "assistant" && message.regeneratedCount && message.regeneratedCount > 0) {
+        lines.push(`_Regenerated ${message.regeneratedCount}x_`);
+        lines.push("");
+      }
+    }
+
+    return lines.join("\n");
   }
 
   function downloadTextFile(filename: string, content: string, mime: string) {
@@ -552,13 +734,31 @@ export default function AssistantPage() {
             <p>Hỏi đáp tự nhiên về AQI, PM2.5, forecast và khuyến nghị sức khỏe</p>
           </div>
 
-          <button
-            className="btn btn-secondary"
-            onClick={() => handleDeleteConversation()}
-            disabled={!activeConversationId}
-          >
-            Xóa hội thoại
-          </button>
+          <div className="assistant-header-actions">
+            <button
+              className="btn btn-secondary"
+              onClick={handleExportConversationMarkdown}
+              disabled={!messages.length}
+            >
+              Export MD
+            </button>
+
+            <button
+              className="btn btn-secondary"
+              onClick={handleExportConversationPdf}
+              disabled={!messages.length}
+            >
+              Export PDF
+            </button>
+
+            <button
+              className="btn btn-secondary"
+              onClick={() => handleDeleteConversation()}
+              disabled={!activeConversationId}
+            >
+              Xóa hội thoại
+            </button>
+          </div>
         </div>
 
         <div className="chatgpt-messages" ref={listRef}>
@@ -633,6 +833,7 @@ export default function AssistantPage() {
                         {message.role === "assistant" && !message.isStreaming ? (
                           <MessageActions
                             onCopy={() => handleCopy(message.content)}
+                            onShare={() => handleShareAnswer(message)}
                             onExportTxt={() => handleExportTxt(message)}
                             onExportMd={() => handleExportMd(message)}
                             onRegenerate={

@@ -3479,3 +3479,16 @@ p {
 .assistant-table-toolbar__btn:hover {
   background: rgba(255,255,255,0.08);
 }
+
+.assistant-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 780px) {
+  .assistant-header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+}

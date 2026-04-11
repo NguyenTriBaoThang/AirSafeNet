@@ -3,6 +3,7 @@ type Props = {
   onRegenerate?: () => void;
   onExportTxt?: () => void;
   onExportMd?: () => void;
+  onShare?: () => void;
   disableCopy?: boolean;
   disableRegenerate?: boolean;
 };
@@ -12,6 +13,7 @@ export default function MessageActions({
   onRegenerate,
   onExportTxt,
   onExportMd,
+  onShare,
   disableCopy = false,
   disableRegenerate = false,
 }: Props) {
@@ -25,6 +27,16 @@ export default function MessageActions({
           disabled={disableCopy}
         >
           Copy
+        </button>
+      ) : null}
+
+      {onShare ? (
+        <button
+          type="button"
+          className="message-actions__btn"
+          onClick={onShare}
+        >
+          Share
         </button>
       ) : null}
 
