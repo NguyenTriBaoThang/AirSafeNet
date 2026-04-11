@@ -30,6 +30,8 @@ export type ConversationListItemResponse = {
   conversationId: number;
   title: string;
   isPinned: boolean;
+  hasUnreadAssistantMessage: boolean;
+  lastMessageRole?: "user" | "assistant" | string | null;
   lastMessagePreview?: string | null;
   lastMessageAt?: string | null;
   createdAt: string;

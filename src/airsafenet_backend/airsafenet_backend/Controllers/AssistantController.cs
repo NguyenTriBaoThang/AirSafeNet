@@ -71,12 +71,17 @@ namespace airsafenet_backend.Controllers
                     ConversationId = x.Id,
                     Title = x.Title,
                     IsPinned = x.IsPinned,
+                    HasUnreadAssistantMessage = x.HasUnreadAssistantMessage,
                     CreatedAt = x.CreatedAt,
                     UpdatedAt = x.UpdatedAt,
                     MessageCount = x.Messages.Count,
                     LastMessageAt = x.Messages
                         .OrderByDescending(m => m.CreatedAt)
                         .Select(m => (DateTime?)m.CreatedAt)
+                        .FirstOrDefault(),
+                    LastMessageRole = x.Messages
+                        .OrderByDescending(m => m.CreatedAt)
+                        .Select(m => m.Role)
                         .FirstOrDefault(),
                     LastMessagePreview = x.Messages
                         .OrderByDescending(m => m.CreatedAt)
@@ -215,6 +220,7 @@ namespace airsafenet_backend.Controllers
                     }
                 }
 
+                conversation.HasUnreadAssistantMessage = true;
                 conversation.UpdatedAt = DateTime.UtcNow;
                 await _db.SaveChangesAsync();
 
@@ -314,6 +320,7 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
                 }
             }
 
+            conversation.HasUnreadAssistantMessage = true;
             conversation.UpdatedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
 
@@ -444,6 +451,30 @@ Hãy trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, đúng với 
                 conversationId = conversation.Id,
                 isPinned = conversation.IsPinned,
                 updatedAt = conversation.UpdatedAt
+            });
+        }
+
+        [HttpPut("conversations/{conversationId:int}/read")]
+        public async Task<IActionResult> MarkConversationAsRead(int conversationId)
+        {
+            var userId = GetCurrentUserId();
+            if (userId == null) return Unauthorized();
+
+            var conversation = await _db.ChatConversations
+                .FirstOrDefaultAsync(x => x.Id == conversationId && x.UserId == userId.Value);
+
+            if (conversation == null)
+            {
+                return NotFound(new { message = "Không tìm thấy hội thoại." });
+            }
+
+            conversation.HasUnreadAssistantMessage = false;
+            await _db.SaveChangesAsync();
+
+            return Ok(new
+            {
+                conversationId = conversation.Id,
+                hasUnreadAssistantMessage = conversation.HasUnreadAssistantMessage
             });
         }
     }

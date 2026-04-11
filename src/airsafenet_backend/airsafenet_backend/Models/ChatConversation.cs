@@ -16,6 +16,8 @@ namespace airsafenet_backend.Models
 
         public bool IsPinned { get; set; } = false;
 
+        public bool HasUnreadAssistantMessage { get; set; } = false;
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

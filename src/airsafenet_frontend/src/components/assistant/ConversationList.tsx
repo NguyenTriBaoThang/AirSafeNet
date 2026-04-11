@@ -36,6 +36,18 @@ function isYesterday(dateString?: string | null) {
   );
 }
 
+function LastRoleIcon({ role }: { role?: string | null }) {
+  if (role === "assistant") {
+    return <span className="chatgpt-history__role-icon assistant">A</span>;
+  }
+
+  if (role === "user") {
+    return <span className="chatgpt-history__role-icon user">U</span>;
+  }
+
+  return null;
+}
+
 function ConversationGroup({
   title,
   conversations,
@@ -65,7 +77,7 @@ function ConversationGroup({
             key={conversation.conversationId}
             className={`chatgpt-history-card ${
               activeConversationId === conversation.conversationId ? "active" : ""
-            }`}
+            } ${conversation.hasUnreadAssistantMessage ? "unread" : ""}`}
           >
             <button
               className="chatgpt-history__item"
@@ -79,6 +91,10 @@ function ConversationGroup({
                   {conversation.isPinned ? (
                     <span className="chatgpt-history__pin">📌</span>
                   ) : null}
+
+                  {conversation.hasUnreadAssistantMessage ? (
+                    <span className="chatgpt-history__unread-dot" title="Có phản hồi mới" />
+                  ) : null}
                 </div>
 
                 <span className="chatgpt-history__count-badge">
@@ -86,8 +102,11 @@ function ConversationGroup({
                 </span>
               </div>
 
-              <div className="chatgpt-history__item-preview">
-                {conversation.lastMessagePreview || "Chưa có tin nhắn"}
+              <div className="chatgpt-history__item-preview-row">
+                <LastRoleIcon role={conversation.lastMessageRole} />
+                <div className="chatgpt-history__item-preview">
+                  {conversation.lastMessagePreview || "Chưa có tin nhắn"}
+                </div>
               </div>
 
               <div className="chatgpt-history__item-time">

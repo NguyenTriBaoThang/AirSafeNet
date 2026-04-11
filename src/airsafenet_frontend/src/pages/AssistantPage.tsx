@@ -13,6 +13,7 @@ import type {
   ConversationListItemResponse,
 } from "../types/assistant";
 import { pinConversationApi } from "../api/assistant";
+import { markConversationAsReadApi } from "../api/assistant";
 import type { ConversationSort } from "../api/assistant";
 import { useToast } from "../components/common/useToast";
 import ConversationList from "../components/assistant/ConversationList";
@@ -157,6 +158,19 @@ export default function AssistantPage() {
       const detail = await getConversationDetailApi(conversationId);
       setActiveConversationId(detail.conversationId);
       setMessages(mapConversationMessages(detail));
+
+      try {
+        await markConversationAsReadApi(conversationId);
+        setConversations((prev) =>
+          prev.map((item) =>
+            item.conversationId === conversationId
+              ? { ...item, hasUnreadAssistantMessage: false }
+              : item
+          )
+        );
+      } catch {
+        // bỏ qua lỗi mark as read
+      }
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Không tải được nội dung hội thoại";
@@ -182,6 +196,7 @@ export default function AssistantPage() {
           updatedAt: created.updatedAt,
           messageCount: 0,
           isPinned: false,
+          hasUnreadAssistantMessage: false, // 👈 FIX
         },
         ...prev.filter((x) => x.conversationId !== created.conversationId),
       ]);

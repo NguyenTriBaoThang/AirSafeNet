@@ -86,3 +86,13 @@ export async function pinConversationApi(
     body: JSON.stringify({ isPinned }),
   });
 }
+
+export async function markConversationAsReadApi(conversationId: number) {
+  return http<{
+    conversationId: number;
+    hasUnreadAssistantMessage: boolean;
+  }>(`/api/assistant/conversations/${conversationId}/read`, {
+    method: "PUT",
+    auth: true,
+  });
+}
