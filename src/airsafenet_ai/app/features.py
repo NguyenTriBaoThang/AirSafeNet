@@ -18,6 +18,10 @@ def _cyclical(series: pd.Series, period: int):
 
 
 def build_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Build full feature frame từ merged dataframe (history + appended future rows).
+    Không thay đổi so với bản gốc — giữ nguyên để tương thích với model đã train.
+    """
     data = df.copy().sort_values("time").reset_index(drop=True)
 
     data["hour"] = data["time"].dt.hour
@@ -58,9 +62,61 @@ def build_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def latest_feature_vector(df: pd.DataFrame) -> pd.DataFrame:
+    """Lấy feature vector của row cuối cùng trong df."""
     feature_cols = load_feature_columns()
     feat_df = build_feature_frame(df)
     latest = feat_df.iloc[[-1]].copy()
+
+    for col in feature_cols:
+        if col not in latest.columns:
+            latest[col] = 0.0
+
+    latest = latest[feature_cols].copy()
+    latest = latest.fillna(0.0)
+    return latest
+
+
+def build_feature_vector_for_step(
+    working_history: pd.DataFrame,
+    future_row: pd.Series,
+    step_index: int,
+) -> pd.DataFrame:
+    """
+    Build feature vector cho 1 bước forecast cụ thể.
+    
+    Khác với latest_feature_vector():
+    - Append future_row (với exogenous weather thật) vào working_history TRƯỚC
+      khi tính features → lag/rolling của pm2_5 dùng predicted values đúng,
+      nhưng weather features (temp, humidity, wind...) dùng giá trị thật từ API.
+    - Thêm 'forecast_horizon' feature nếu có trong feature_cols.
+    
+    Args:
+        working_history: DataFrame lịch sử đã bao gồm các predicted rows trước đó
+        future_row: Series chứa exogenous features (weather) của timestep cần predict
+        step_index: index bước forecast (0-based), dùng làm horizon indicator
+    """
+    feature_cols = load_feature_columns()
+
+    # Tạo một row tạm để tính features — pm2_5 chưa biết, dùng NaN
+    # nhưng weather features lấy từ future_row thật
+    temp_row = future_row.copy()
+    if "pm2_5" not in temp_row or pd.isna(temp_row.get("pm2_5")):
+        # Dùng giá trị trung bình của 3 giờ gần nhất làm placeholder
+        # để rolling/lag không bị NaN hết — sẽ bị overwrite sau
+        recent_pm25 = working_history["pm2_5"].dropna().tail(3).mean()
+        temp_row["pm2_5"] = recent_pm25 if not pd.isna(recent_pm25) else 0.0
+
+    combined = pd.concat(
+        [working_history, pd.DataFrame([temp_row])],
+        ignore_index=True,
+    )
+
+    feat_df = build_feature_frame(combined)
+    latest = feat_df.iloc[[-1]].copy()
+
+    # Thêm forecast_horizon nếu model được train với feature này
+    if "forecast_horizon" in feature_cols:
+        latest["forecast_horizon"] = step_index
 
     for col in feature_cols:
         if col not in latest.columns:
