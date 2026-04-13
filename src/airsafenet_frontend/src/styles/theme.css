@@ -3759,3 +3759,253 @@ p {
     font-size: 12px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════
+   FORECAST VS ACTUAL CHART
+   ═══════════════════════════════════════════════════════ */
+
+/* ── Card wrapper ────────────────────────────────────── */
+.fva-chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* ── Header icon ─────────────────────────────────────── */
+.fva-header-icon {
+  background: linear-gradient(135deg, rgba(245,158,11,0.2), rgba(245,158,11,0.08));
+  border: 1px solid rgba(245,158,11,0.25);
+  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* ── Model badge ─────────────────────────────────────── */
+.fva-model-badge {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  background: rgba(245,158,11,0.1);
+  border: 1px solid rgba(245,158,11,0.2);
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(245,158,11,0.9);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.fva-model-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+  animation: fvaPulse 2s ease infinite;
+}
+
+@keyframes fvaPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
+/* ── Stats bar ───────────────────────────────────────── */
+.fva-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.fva-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 8px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  text-align: center;
+  transition: background 0.2s;
+}
+
+.fva-stat:hover {
+  background: rgba(255,255,255,0.07);
+}
+
+.fva-stat__label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.fva-stat__value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-text, #f1f5f9);
+  line-height: 1.1;
+}
+
+.fva-stat__sub {
+  font-size: 10px;
+  color: var(--color-text-muted, #64748b);
+}
+
+/* Color variants */
+.fva-stat--good .fva-stat__value  { color: #22c55e; }
+.fva-stat--moderate .fva-stat__value { color: #f59e0b; }
+.fva-stat--poor .fva-stat__value  { color: #ef4444; }
+
+.fva-stat--trend .fva-stat__value {
+  font-size: 26px;
+  color: var(--color-text, #f1f5f9);
+}
+
+/* ── No overlap notice ───────────────────────────────── */
+.fva-no-overlap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  font-size: 12px;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+/* ── Chart area ──────────────────────────────────────── */
+.fva-chart-container {
+  margin: 0 -4px;
+}
+
+/* ── Custom Tooltip ──────────────────────────────────── */
+.fva-tooltip {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 12px 16px;
+  min-width: 190px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  backdrop-filter: blur(8px);
+}
+
+.fva-tooltip__time {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted, #94a3b8);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.fva-tooltip__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 13px;
+  color: var(--color-text, #f1f5f9);
+}
+
+.fva-tooltip__row strong {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+.fva-tooltip__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.fva-tooltip__diff {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 12px;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.fva-tooltip__diff strong {
+  color: #f59e0b;
+}
+
+/* ── Legend note ─────────────────────────────────────── */
+.fva-legend-note {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  font-size: 11px;
+  color: var(--color-text-muted, #94a3b8);
+}
+
+.fva-legend-note__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.fva-legend-note__line {
+  width: 20px;
+  height: 2.5px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.fva-legend-note__line--dashed {
+  background: repeating-linear-gradient(
+    to right,
+    #f59e0b 0px,
+    #f59e0b 5px,
+    transparent 5px,
+    transparent 8px
+  ) !important;
+  background-color: transparent !important;
+}
+
+.fva-legend-note__sep {
+  flex: 1;
+}
+
+.fva-legend-note__meta {
+  font-size: 11px;
+  color: var(--color-text-muted, #64748b);
+  margin-left: auto;
+}
+
+/* ── Responsive ──────────────────────────────────────── */
+@media (max-width: 768px) {
+  .fva-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .fva-model-badge {
+    display: none;
+  }
+
+  .fva-legend-note__meta {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .fva-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
