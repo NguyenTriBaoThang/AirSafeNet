@@ -63,7 +63,6 @@ def _predict_pm25_with_exogenous(
     """
     Dự báo PM2.5 cho 1 bước forecast với đầy đủ weather exogenous features.
 
-    Cải tiến so với bản gốc:
     1. Dùng build_feature_vector_for_step() thay vì latest_feature_vector()
        → Weather features (temp, humidity, wind...) lấy từ future_row thật,
          không phải từ history bị stale.
@@ -115,9 +114,9 @@ def build_forecast_df(days: int = 1) -> pd.DataFrame:
     ┌─────────────────────────────────────────────────────────────────────┐
     │  Bước gốc (bị flat):                                                │
     │    working_history ──► latest_feature_vector ──► pred_pm25          │
-    │         ▲                                              │             │
+    │         ▲                                             │             │
     │         └──── append(next_row, pm2_5=pred_pm25) ◄─────┘             │
-    │    → lag/roll features chỉ thấy pred_pm25 lặp đi lặp lại           │
+    │    → lag/roll features chỉ thấy pred_pm25 lặp đi lặp lại            │
     │                                                                     │
     │  Bước mới (đã fix):                                                 │
     │    working_history ──► build_feature_vector_for_step(               │
@@ -214,7 +213,6 @@ def build_forecast_df(days: int = 1) -> pd.DataFrame:
 def get_current_snapshot(user_group: str = "general") -> dict[str, Any]:
     """
     Snapshot hiện tại: dùng toàn bộ history để predict PM2.5 ngay bây giờ.
-    Không cần fix vì không có feedback loop (chỉ predict 1 bước).
     """
     full_df = load_merged_dataset(past_hours=HISTORY_HOURS, forecast_days=2)
     now = pd.Timestamp.now().tz_localize(None)

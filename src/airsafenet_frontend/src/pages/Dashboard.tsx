@@ -10,6 +10,7 @@ import ForecastChart from "../components/dashboard/ForecastChart";
 import ForecastTable from "../components/dashboard/ForecastTable";
 import RiskBadge from "../components/dashboard/RiskBadge";
 import DashboardFilters from "../components/dashboard/DashboardFilters";
+import GoldenHoursWidget from "../components/dashboard/GoldenHoursWidget";
 import DashboardSkeleton from "../components/common/DashboardSkeleton";
 import EmptyState from "../components/common/EmptyState";
 import { useToast } from "../components/common/useToast";
@@ -27,7 +28,11 @@ export default function Dashboard() {
 
   const { showToast } = useToast();
 
-  async function loadData(selectedDays = days, selectedMode = mode, silent = false) {
+  async function loadData(
+    selectedDays = days,
+    selectedMode = mode,
+    silent = false
+  ) {
     try {
       if (!silent) setLoading(true);
       setError("");
@@ -88,9 +93,9 @@ export default function Dashboard() {
       <SectionHeader
         eyebrow="Dashboard thông minh"
         title="Tổng quan chất lượng không khí"
-        description={`Cập nhật lúc ${new Date(summary.generatedAt).toLocaleString(
-          "vi-VN"
-        )} • Nhóm người dùng: ${summary.userGroup}`}
+        description={`Cập nhật lúc ${new Date(
+          summary.generatedAt
+        ).toLocaleString("vi-VN")} • Nhóm người dùng: ${summary.userGroup}`}
         rightSlot={
           <button
             className="btn btn-primary"
@@ -103,10 +108,15 @@ export default function Dashboard() {
 
       <div className="section-toolbar">
         <StatusChip
-          label={mode === "forecast" ? "Chế độ Forecast" : "Chế độ History"}
+          label={
+            mode === "forecast" ? "Chế độ Forecast" : "Chế độ History"
+          }
           variant={mode === "forecast" ? "info" : "purple"}
         />
-        <StatusChip label={`Khoảng thời gian: ${periodLabel}`} variant="neutral" />
+        <StatusChip
+          label={`Khoảng thời gian: ${periodLabel}`}
+          variant="neutral"
+        />
       </div>
 
       <DashboardFilters
@@ -132,24 +142,38 @@ export default function Dashboard() {
           tone="default"
         />
         <SummaryCard
-          title={mode === "forecast" ? `AQI cao nhất ${periodLabel}` : `AQI cao nhất lịch sử ${periodLabel}`}
+          title={
+            mode === "forecast"
+              ? `AQI cao nhất ${periodLabel}`
+              : `AQI cao nhất lịch sử ${periodLabel}`
+          }
           value={summary.maxAqiNext24h}
           subtext={
             summary.peakTime
-              ? `Đỉnh lúc ${new Date(summary.peakTime).toLocaleString("vi-VN")}`
+              ? `Đỉnh lúc ${new Date(summary.peakTime).toLocaleString(
+                  "vi-VN"
+                )}`
               : undefined
           }
           icon={<AppIcon name="trend" />}
           tone="warning"
         />
         <SummaryCard
-          title={mode === "forecast" ? "Giờ nguy cơ" : "Giờ nguy cơ đã ghi nhận"}
+          title={
+            mode === "forecast"
+              ? "Giờ nguy cơ"
+              : "Giờ nguy cơ đã ghi nhận"
+          }
           value={summary.dangerCount}
           subtext={`Số giờ cảnh báo: ${summary.warningCount}`}
           icon={<AppIcon name="alert" />}
           tone="danger"
         />
       </div>
+
+      {mode === "forecast" && (
+        <GoldenHoursWidget points={chart.points} />
+      )}
 
       <div className="dashboard-two-col">
         <ForecastChart points={chart.points} mode={mode} />
@@ -160,7 +184,11 @@ export default function Dashboard() {
               <AppIcon name={mode === "forecast" ? "forecast" : "history"} />
             </div>
             <div>
-              <h3>{mode === "forecast" ? "Khuyến nghị hiện tại" : "Tổng quan lịch sử"}</h3>
+              <h3>
+                {mode === "forecast"
+                  ? "Khuyến nghị hiện tại"
+                  : "Tổng quan lịch sử"}
+              </h3>
               <p className="card__header-desc">
                 Gợi ý hành động và mức độ rủi ro đáng chú ý
               </p>
@@ -180,7 +208,11 @@ export default function Dashboard() {
 
             <div className="peak-box">
               <div>
-                <span>{mode === "forecast" ? "Đỉnh rủi ro trong giai đoạn chọn" : "Mức rủi ro nổi bật"}</span>
+                <span>
+                  {mode === "forecast"
+                    ? "Đỉnh rủi ro trong giai đoạn chọn"
+                    : "Mức rủi ro nổi bật"}
+                </span>
                 <strong>{summary.peakRiskNext24h}</strong>
               </div>
               <div>

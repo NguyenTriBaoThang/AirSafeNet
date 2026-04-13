@@ -20,7 +20,7 @@ def _cyclical(series: pd.Series, period: int):
 def build_feature_frame(df: pd.DataFrame) -> pd.DataFrame:
     """
     Build full feature frame từ merged dataframe (history + appended future rows).
-    Không thay đổi so với bản gốc — giữ nguyên để tương thích với model đã train.
+    Giữ nguyên để tương thích với model đã train.
     """
     data = df.copy().sort_values("time").reset_index(drop=True)
 
