@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 
 namespace airsafenet_backend.Services
@@ -24,9 +24,13 @@ namespace airsafenet_backend.Services
             var apiKey = _configuration["Gemini:ApiKey"];
             var model = _configuration["Gemini:Model"] ?? "gemini-2.5-flash";
 
-            if (string.IsNullOrWhiteSpace(apiKey))
+            if (string.IsNullOrWhiteSpace(apiKey) || apiKey == "xx")
             {
-                throw new InvalidOperationException("Thiếu cấu hình Gemini:ApiKey.");
+                // Fallback message when API Key is not configured
+                var fallbackAnswer = "Chào bạn! Hiện tại mình đang hoạt động ở chế độ ngoại tuyến (Offline Mode) do chưa có kết nối API. \n\n" +
+                                     "Dựa vào thông tin hệ thống, mình thấy chỉ số AQI hiện tại là rất quan trọng. Bạn nên theo dõi sát sao và đeo khẩu trang khi ra ngoài nếu chỉ số vượt ngưỡng 100 nhé! \n\n" +
+                                     "(Ghi chú: Để kích hoạt trí tuệ nhân tạo thực thụ, vui lòng cập nhật Gemini API Key trong cấu hình).";
+                return fallbackAnswer;
             }
 
             var url =
@@ -70,11 +74,22 @@ namespace airsafenet_backend.Services
             var body = await response.Content.ReadAsStringAsync();
 
             _logger.LogInformation("Gemini status: {StatusCode}", (int)response.StatusCode);
-            _logger.LogInformation("Gemini raw body: {Body}", body);
 
             if (!response.IsSuccessStatusCode)
             {
-                throw new Exception($"Gemini error: {(int)response.StatusCode} - {body}");
+                _logger.LogError("Gemini error body: {Body}", body);
+                
+                if ((int)response.StatusCode == 429)
+                {
+                    return "Hệ thống AI đang nhận được quá nhiều yêu cầu cùng lúc (Rate Limit). Vui lòng thử lại sau vài giây nhé!";
+                }
+                
+                if ((int)response.StatusCode >= 500)
+                {
+                    return "Dịch vụ AI hiện đang gặp sự cố từ phía máy chủ Google. Mình sẽ hoạt động lại ngay khi dịch vụ ổn định.";
+                }
+
+                return $"Hiện mình chưa thể trả lời do lỗi kết nối AI ({(int)response.StatusCode}). Bạn thử lại sau nhé!";
             }
 
             return ExtractTextFromResponse(body);
@@ -85,9 +100,9 @@ namespace airsafenet_backend.Services
             var apiKey = _configuration["Gemini:ApiKey"];
             var model = _configuration["Gemini:Model"] ?? "gemini-2.5-flash";
 
-            if (string.IsNullOrWhiteSpace(apiKey))
+            if (string.IsNullOrWhiteSpace(apiKey) || apiKey == "xx")
             {
-                throw new InvalidOperationException("Thiếu cấu hình Gemini:ApiKey.");
+                return "Trò chuyện ngoại tuyến";
             }
 
             var url =
@@ -151,23 +166,25 @@ Hãy tạo tiêu đề ngắn cho hội thoại.
             var body = await response.Content.ReadAsStringAsync();
 
             _logger.LogInformation("Gemini title status: {StatusCode}", (int)response.StatusCode);
-            _logger.LogInformation("Gemini title raw body: {Body}", body);
 
             if (!response.IsSuccessStatusCode)
             {
-                throw new Exception($"Gemini title error: {(int)response.StatusCode} - {body}");
-            }
-
-            var title = ExtractTextFromResponse(body).Trim();
-
-            if (string.IsNullOrWhiteSpace(title))
-            {
+                _logger.LogWarning("Gemini title error: {StatusCode} - {Body}", (int)response.StatusCode, body);
                 return "Cuộc trò chuyện mới";
             }
 
-            title = title.Replace("\"", "").Trim();
-
-            return title.Length <= 200 ? title : title[..200];
+            try
+            {
+                var title = ExtractTextFromResponse(body).Trim();
+                if (string.IsNullOrWhiteSpace(title)) return "Cuộc trò chuyện mới";
+                
+                title = title.Replace("\"", "").Trim();
+                return title.Length <= 200 ? title : title[..200];
+            }
+            catch
+            {
+                return "Cuộc trò chuyện mới";
+            }
         }
 
         private static string ExtractTextFromResponse(string body)
@@ -179,16 +196,27 @@ Hãy tạo tiêu đề ngắn cho hội thoại.
                 candidates.ValueKind != JsonValueKind.Array ||
                 candidates.GetArrayLength() == 0)
             {
-                throw new Exception($"Không tìm thấy candidates trong phản hồi Gemini. Raw body: {body}");
+                // Better handling for safety filters or blocked responses
+                if (root.TryGetProperty("promptFeedback", out var feedback))
+                {
+                    return "[Nội dung bị từ chối do chính sách an toàn của Gemini. Vui lòng hỏi câu hỏi khác.]";
+                }
+                return "[Không có phản hồi từ AI. Có thể do giới hạn về an toàn hoặc kỹ thuật.]";
             }
 
             var firstCandidate = candidates[0];
+
+            // Kiểm tra finishReason
+            if (firstCandidate.TryGetProperty("finishReason", out var reason) && reason.GetString() == "SAFETY")
+            {
+                return "[Nội dung bị cắt ngang do vi phạm chính sách an toàn của AI.]";
+            }
 
             if (!firstCandidate.TryGetProperty("content", out var content) ||
                 !content.TryGetProperty("parts", out var parts) ||
                 parts.ValueKind != JsonValueKind.Array)
             {
-                throw new Exception($"Không tìm thấy content.parts trong phản hồi Gemini. Raw body: {body}");
+                return "[AI phản hồi không đúng định dạng. Vui lòng thử lại.]";
             }
 
             var texts = new List<string>();

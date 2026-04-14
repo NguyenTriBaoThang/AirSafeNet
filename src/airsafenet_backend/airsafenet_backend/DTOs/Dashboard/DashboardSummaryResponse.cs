@@ -1,4 +1,4 @@
-﻿namespace airsafenet_backend.DTOs.Dashboard
+namespace airsafenet_backend.DTOs.Dashboard
 {
     public class DashboardSummaryResponse
     {
@@ -6,6 +6,7 @@
         public int Aqi { get; set; }
         public string Risk { get; set; } = string.Empty;
         public string Recommendation { get; set; } = string.Empty;
+        public string PreferredLocation { get; set; } = string.Empty;
         public string UserGroup { get; set; } = "normal";
         public DateTime GeneratedAt { get; set; }
 

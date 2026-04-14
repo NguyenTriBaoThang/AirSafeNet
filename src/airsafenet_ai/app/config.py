@@ -8,8 +8,8 @@ MODEL_PATH = MODELS_DIR / "airsafenet_best_model.pkl"
 FEATURE_COLS_PATH = MODELS_DIR / "feature_cols.json"
 METADATA_PATH = MODELS_DIR / "model_metadata.json"
 
-LAT = 10.8231
-LON = 106.6297
+LAT = 21.0285
+LON = 105.8542
 TIMEZONE = "Asia/Bangkok"
 
 HISTORY_HOURS = 72
