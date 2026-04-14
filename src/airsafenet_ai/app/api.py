@@ -61,16 +61,10 @@ def model_info():
 
 @app.get("/forecast/current")
 def forecast_current(
-    profile: str = Query(default="general"),
-    lat: float | None = Query(default=None),
-    lon: float | None = Query(default=None)
+    profile: str = Query(default="general")
 ):
     try:
-        return get_current_snapshot(
-            user_group=normalize_profile(profile),
-            latitude=lat,
-            longitude=lon
-        )
+        return get_current_snapshot(user_group=normalize_profile(profile))
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))
 
@@ -78,17 +72,10 @@ def forecast_current(
 @app.get("/forecast/range")
 def forecast_range(
     days: int = Query(default=1, ge=1, le=7),
-    profile: str = Query(default="general"),
-    lat: float | None = Query(default=None),
-    lon: float | None = Query(default=None)
+    profile: str = Query(default="general")
 ):
     try:
-        return forecast_range_payload(
-            days=days,
-            profile=normalize_profile(profile),
-            latitude=lat,
-            longitude=lon
-        )
+        return forecast_range_payload(days=days, profile=normalize_profile(profile))
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))
 
@@ -96,16 +83,9 @@ def forecast_range(
 @app.get("/history")
 def history(
     days: int = Query(default=7, ge=1, le=30),
-    profile: str = Query(default="general"),
-    lat: float | None = Query(default=None),
-    lon: float | None = Query(default=None)
+    profile: str = Query(default="general")
 ):
     try:
-        return history_range_payload(
-            days=days,
-            profile=normalize_profile(profile),
-            latitude=lat,
-            longitude=lon
-        )
+        return history_range_payload(days=days, profile=normalize_profile(profile))
     except Exception as ex:
         raise HTTPException(status_code=500, detail=str(ex))

@@ -2,12 +2,9 @@ using System.Security.Claims;
 using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Dashboard;
 using airsafenet_backend.Services;
-using airsafenet_backend.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using airsafenet_backend.Models;
-using airsafenet_backend.DTOs.Air;
 
 namespace airsafenet_backend.Controllers
 {
@@ -28,15 +25,11 @@ namespace airsafenet_backend.Controllers
         [HttpGet("summary")]
         public async Task<IActionResult> GetSummary([FromQuery] int days = 1)
         {
-            var prefs = await GetPreferencesAsync();
-            if (prefs == null) return Unauthorized();
+            var userGroup = await GetCurrentUserGroupAsync();
+            if (userGroup == null) return Unauthorized();
 
-            var coords = LocationMapper.GetCoordinates(prefs.PreferredLocation);
-            double? lat = coords?.Lat;
-            double? lon = coords?.Lon;
-
-            var current = await _aiService.GetCurrentAsync(prefs.UserGroup, lat, lon);
-            var forecast = await _aiService.GetForecastRangeAsync(prefs.UserGroup, days, lat, lon);
+            var current = await _aiService.GetCurrentAsync(userGroup);
+            var forecast = await _aiService.GetForecastRangeAsync(userGroup, days);
 
             if (current == null || forecast == null)
             {
@@ -63,8 +56,7 @@ namespace airsafenet_backend.Controllers
                 PeakRiskNext24h = peak?.RiskProfile ?? current.RiskProfile,
                 PeakTime = DateTime.TryParse(peak?.Time, out var peakTime) ? peakTime : null,
 
-                UserGroup = prefs.UserGroup,
-                PreferredLocation = prefs.PreferredLocation,
+                UserGroup = userGroup,
                 GeneratedAt = DateTime.UtcNow,
 
                 WarningCount = warningCount,
@@ -77,22 +69,18 @@ namespace airsafenet_backend.Controllers
         [HttpGet("chart")]
         public async Task<IActionResult> GetChart([FromQuery] int days = 1, [FromQuery] string mode = "forecast")
         {
-            var prefs = await GetPreferencesAsync();
-            if (prefs == null) return Unauthorized();
-
-            var coords = LocationMapper.GetCoordinates(prefs.PreferredLocation);
-            double? lat = coords?.Lat;
-            double? lon = coords?.Lon;
+            var userGroup = await GetCurrentUserGroupAsync();
+            if (userGroup == null) return Unauthorized();
 
             if (mode.ToLower() == "history")
             {
-                var history = await _aiService.GetHistoryAsync(prefs.UserGroup, days, lat, lon);
+                var history = await _aiService.GetHistoryAsync(userGroup, days);
                 if (history == null)
                     return StatusCode(500, new { message = "Không lấy được history chart." });
 
                 var response = new DashboardChartResponse
                 {
-                    UserGroup = prefs.UserGroup,
+                    UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(history.GeneratedAt, out var g1) ? g1 : DateTime.UtcNow,
                     Hours = history.Hours,
                     Points = history.History.Select(x => new DashboardChartPointResponse
@@ -110,13 +98,13 @@ namespace airsafenet_backend.Controllers
             }
             else
             {
-                var forecast = await _aiService.GetForecastRangeAsync(prefs.UserGroup, days, lat, lon);
+                var forecast = await _aiService.GetForecastRangeAsync(userGroup, days);
                 if (forecast == null)
                     return StatusCode(500, new { message = "Không lấy được forecast chart." });
 
                 var response = new DashboardChartResponse
                 {
-                    UserGroup = prefs.UserGroup,
+                    UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var g2) ? g2 : DateTime.UtcNow,
                     Hours = forecast.Hours,
                     Points = forecast.Forecast.Select(x => new DashboardChartPointResponse
@@ -137,14 +125,10 @@ namespace airsafenet_backend.Controllers
         [HttpGet("full")]
         public async Task<IActionResult> GetFull([FromQuery] int days = 1, [FromQuery] string mode = "forecast")
         {
-            var prefs = await GetPreferencesAsync();
-            if (prefs == null) return Unauthorized();
+            var userGroup = await GetCurrentUserGroupAsync();
+            if (userGroup == null) return Unauthorized();
 
-            var coords = LocationMapper.GetCoordinates(prefs.PreferredLocation);
-            double? lat = coords?.Lat;
-            double? lon = coords?.Lon;
-
-            var current = await _aiService.GetCurrentAsync(prefs.UserGroup, lat, lon);
+            var current = await _aiService.GetCurrentAsync(userGroup);
             if (current == null)
                 return StatusCode(500, new { message = "Không lấy được current." });
 
@@ -152,13 +136,13 @@ namespace airsafenet_backend.Controllers
 
             if (mode.ToLower() == "history")
             {
-                var history = await _aiService.GetHistoryAsync(prefs.UserGroup, days, lat, lon);
+                var history = await _aiService.GetHistoryAsync(userGroup, days);
                 if (history == null)
                     return StatusCode(500, new { message = "Không lấy được history." });
 
                 chart = new DashboardChartResponse
                 {
-                    UserGroup = prefs.UserGroup,
+                    UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(history.GeneratedAt, out var gh) ? gh : DateTime.UtcNow,
                     Hours = history.Hours,
                     Points = history.History.Select(x => new DashboardChartPointResponse
@@ -174,13 +158,13 @@ namespace airsafenet_backend.Controllers
             }
             else
             {
-                var forecast = await _aiService.GetForecastRangeAsync(prefs.UserGroup, days, lat, lon);
+                var forecast = await _aiService.GetForecastRangeAsync(userGroup, days);
                 if (forecast == null)
                     return StatusCode(500, new { message = "Không lấy được forecast." });
 
                 chart = new DashboardChartResponse
                 {
-                    UserGroup = prefs.UserGroup,
+                    UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var gf) ? gf : DateTime.UtcNow,
                     Hours = forecast.Hours,
                     Points = forecast.Forecast.Select(x => new DashboardChartPointResponse
@@ -215,8 +199,7 @@ namespace airsafenet_backend.Controllers
                 PeakRiskNext24h = peak?.Risk ?? current.RiskProfile,
                 PeakTime = peak?.Time,
 
-                UserGroup = prefs.UserGroup,
-                PreferredLocation = prefs.PreferredLocation,
+                UserGroup = userGroup,
                 GeneratedAt = DateTime.UtcNow,
 
                 WarningCount = warningCount,
@@ -230,15 +213,17 @@ namespace airsafenet_backend.Controllers
             });
         }
 
-        private async Task<UserPreferences?> GetPreferencesAsync()
+        private async Task<string?> GetCurrentUserGroupAsync()
         {
             var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!int.TryParse(userIdValue, out var userId))
                 return null;
 
-            return await _db.UserPreferences
+            var preferences = await _db.UserPreferences
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId);
+
+            return preferences?.UserGroup ?? "normal";
         }
     }
 }

@@ -52,8 +52,8 @@ function FactorRow({
 }) {
   const bar = impactBar(impact);
   const barColor = bar.isPositive
-    ? "rgba(239,68,68,0.7)"  
-    : "rgba(34,197,94,0.7)";
+    ? "rgba(239,68,68,0.7)"   // dương = tăng PM2.5 = đỏ
+    : "rgba(34,197,94,0.7)";  // âm = giảm PM2.5 = xanh
 
   return (
     <div className="xai-factor">
@@ -138,7 +138,6 @@ export default function AiExplainPanel() {
   return (
     <div className="xai-panel">
 
-      {/* ── Header ── */}
       <div className="xai-header">
         <div className="xai-header__left">
           <div className="xai-header__eyebrow">
@@ -156,14 +155,12 @@ export default function AiExplainPanel() {
           </p>
         </div>
 
-        {/* Trend badge */}
         <div className={`xai-trend ${trendClass(d.trendDirection)}`}>
           <span className="xai-trend__icon">{trendIcon(d.trendDirection)}</span>
           <span>{d.trendLabel}</span>
         </div>
       </div>
 
-      {/* ── Weather snapshot chips ── */}
       <div className="xai-weather-chips">
         <WeatherChip
           icon="💨"
@@ -199,7 +196,6 @@ export default function AiExplainPanel() {
         />
       </div>
 
-      {/* ── UV visual scale ── */}
       <div className="xai-uv-scale">
         <div className="xai-uv-scale__header">
           <span>☀️ Chỉ số UV hiện tại</span>
@@ -211,7 +207,6 @@ export default function AiExplainPanel() {
           </span>
         </div>
         <div className="xai-uv-scale__bar">
-          {/* Gradient: xanh → vàng → cam → đỏ → tím */}
           <div className="xai-uv-scale__gradient" />
           <div
             className="xai-uv-scale__pointer"
@@ -227,7 +222,6 @@ export default function AiExplainPanel() {
         </div>
       </div>
 
-      {/* ── Impact factors ── */}
       <div className="xai-section-title">
         <span>📊</span>
         <span>Mức độ ảnh hưởng từng yếu tố</span>
@@ -282,13 +276,11 @@ export default function AiExplainPanel() {
         />
       </div>
 
-      {/* ── Top factor highlight ── */}
       <div className="xai-top-factor">
         <span className="xai-top-factor__label">🏆 Yếu tố chi phối nhất</span>
         <strong className="xai-top-factor__value">{d.topFactor}</strong>
       </div>
 
-      {/* ── Footer ── */}
       <div className="xai-footer">
         <span>
           Score Impact: dương (+) = tăng PM2.5, âm (−) = giảm PM2.5.

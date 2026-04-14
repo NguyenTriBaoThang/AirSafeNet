@@ -20,7 +20,7 @@ namespace AirSafeNet.Api.Controllers
         public AirController(
             AppDbContext db,
             AiService aiService,
-            AirExplainService explainService)
+            AirExplainService explainService) 
         {
             _db = db;
             _aiService = aiService;

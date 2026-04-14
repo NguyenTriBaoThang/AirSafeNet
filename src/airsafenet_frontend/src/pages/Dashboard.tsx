@@ -7,7 +7,7 @@ import ForecastTable from "../components/dashboard/ForecastTable";
 import ForecastVsActualChart from "../components/dashboard/ForecastVsActualChart";
 import GoldenHoursWidget from "../components/dashboard/GoldenHoursWidget";
 import ImpactEstimateWidget from "../components/dashboard/ImpactEstimateWidget";
-import AiExplainPanel from "../components/dashboard/AiExplainPanel"; 
+import AiExplainPanel from "../components/dashboard/AiExplainPanel"; // ✅ MỚI
 import RiskBadge from "../components/dashboard/RiskBadge";
 import DashboardFilters from "../components/dashboard/DashboardFilters";
 import DashboardSkeleton from "../components/common/DashboardSkeleton";
@@ -63,7 +63,7 @@ export default function Dashboard() {
       <SectionHeader
         eyebrow="Dashboard thông minh"
         title="Tổng quan chất lượng không khí"
-        description={`Cập nhật lúc ${new Date(summary.generatedAt).toLocaleString("vi-VN")} • Vị trí: ${summary.preferredLocation || "Hà Nội"} • Nhóm đối tượng: ${summary.userGroup}`}
+        description={`Cập nhật lúc ${new Date(summary.generatedAt).toLocaleString("vi-VN")} • Nhóm người dùng: ${summary.userGroup}`}
         rightSlot={<button className="btn btn-primary" onClick={() => loadData(days, mode, true)}>Làm mới dữ liệu</button>}
       />
       <div className="section-toolbar">
@@ -105,7 +105,7 @@ export default function Dashboard() {
       </div>
 
       <ForecastVsActualChart forecastPoints={chart.points} historyPoints={historyPoints} />
-      
+
       <AiExplainPanel />
 
       <ImpactEstimateWidget
@@ -114,7 +114,6 @@ export default function Dashboard() {
         currentPm25={summary.currentPm25}
         warningCount={summary.warningCount}
         days={days}
-        preferredLocation={summary.preferredLocation}
       />
 
       <ForecastTable points={chart.points} mode={mode} />

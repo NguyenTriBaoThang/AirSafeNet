@@ -4,14 +4,23 @@ namespace airsafenet_backend.Services
 {
     public class AirExplainService
     {
+        // Gió: > 15 km/h phát tán tốt, < 5 km/h tích tụ bụi
         private const double WIND_GOOD = 15.0;
         private const double WIND_POOR = 5.0;
+
+        // Độ ẩm: > 75% làm bụi lắng, nhưng > 90% fog tăng PM2.5
         private const double HUMIDITY_HIGH = 85.0;
         private const double HUMIDITY_LOW = 40.0;
+
+        // Nhiệt độ: > 35°C tăng quang hóa, < 20°C nghịch nhiệt
         private const double TEMP_HOT = 33.0;
         private const double TEMP_COOL = 22.0;
+
+        // Áp suất: < 1008 hPa front lạnh/thấp, > 1015 hPa ổn định
         private const double PRESSURE_HIGH = 1015.0;
         private const double PRESSURE_LOW = 1008.0;
+
+        // UV: > 6 = cao, tăng phản ứng quang hóa tạo ozone/PM2.5 thứ cấp
         private const double UV_HIGH = 6.0;
         private const double UV_MODERATE = 3.0;
 
@@ -28,12 +37,14 @@ namespace airsafenet_backend.Services
                 ObservedPm25 = current.ObservedPm25,
                 GeneratedAt = DateTime.UtcNow,
 
-                WindDirection = 180,  
-                Pressure = 1010,  
-                UvIndex = 5.5,  
-                CloudCover = 40
+                // Wind direction, pressure, UV, cloud — hiện tại AiCurrentResponse
+                WindDirection = 180,   // hướng Nam — mùa mưa HCMC
+                Pressure = 1010,  // hPa trung bình
+                UvIndex = 5.5,   // UV trung bình HCMC
+                CloudCover = 40,    // % mây trung bình
             };
 
+            // Tính impact score cho từng yếu tố
             resp.WindImpact = ScoreWind(resp.WindSpeed);
             resp.HumidityImpact = ScoreHumidity(resp.Humidity);
             resp.TemperatureImpact = ScoreTemperature(resp.Temperature);
@@ -41,6 +52,7 @@ namespace airsafenet_backend.Services
             resp.UvImpact = ScoreUv(resp.UvIndex);
             resp.Pm25HistoryImpact = ScorePm25History(resp.ObservedPm25);
 
+            // Giải thích text
             resp.WindExplain = ExplainWind(resp.WindSpeed);
             resp.HumidityExplain = ExplainHumidity(resp.Humidity);
             resp.TemperatureExplain = ExplainTemperature(resp.Temperature);
@@ -48,6 +60,7 @@ namespace airsafenet_backend.Services
             resp.UvExplain = ExplainUv(resp.UvIndex);
             resp.Pm25HistoryExplain = ExplainPm25History(resp.ObservedPm25, current.PredPm25);
 
+            // Tổng kết xu hướng
             var totalImpact = resp.WindImpact + resp.HumidityImpact
                             + resp.TemperatureImpact + resp.PressureImpact
                             + resp.UvImpact + resp.Pm25HistoryImpact;
@@ -66,7 +79,7 @@ namespace airsafenet_backend.Services
             if (windSpeed >= WIND_GOOD) return -0.8;
             if (windSpeed >= 10) return -0.4;
             if (windSpeed >= WIND_POOR) return 0.1;
-            return 0.7; 
+            return 0.7; // Lặng gió — nguy cơ cao
         }
 
         private static string ExplainWind(double windSpeed)
@@ -85,11 +98,11 @@ namespace airsafenet_backend.Services
             // Độ ẩm cao vừa (60-80%): bụi lắng xuống → giảm PM2.5
             // Độ ẩm rất cao (>85%): sương mù → tăng PM2.5 thứ cấp
             // Độ ẩm thấp (<40%): bụi khô bay lên
-            if (humidity > 90) return 0.5;  
-            if (humidity > 75) return -0.3;  
-            if (humidity > 50) return -0.1;  
+            if (humidity > 90) return 0.5;  // sương mù
+            if (humidity > 75) return -0.3;  // lắng bụi tốt
+            if (humidity > 50) return -0.1;  // bình thường
             if (humidity > HUMIDITY_LOW) return 0.2;
-            return 0.6;
+            return 0.6;  // rất khô — bụi bay
         }
 
         private static string ExplainHumidity(double humidity)
@@ -107,10 +120,12 @@ namespace airsafenet_backend.Services
 
         private static double ScoreTemperature(double temp)
         {
-            if (temp >= TEMP_HOT) return 0.6;
+            // Nhiệt độ cao → tăng phản ứng quang hóa, PM2.5 thứ cấp
+            // Nghịch nhiệt (lạnh sáng sớm) → bụi bị giữ lại tầng thấp
+            if (temp >= TEMP_HOT) return 0.6;  // quang hóa mạnh
             if (temp >= 28) return 0.2;
-            if (temp >= TEMP_COOL) return -0.1;  
-            return 0.4; 
+            if (temp >= TEMP_COOL) return -0.1;  // mát mẻ, tốt
+            return 0.4;  // nghịch nhiệt buổi sáng
         }
 
         private static string ExplainTemperature(double temp)
@@ -126,10 +141,12 @@ namespace airsafenet_backend.Services
 
         private static double ScorePressure(double pressure)
         {
+            // Áp suất cao → khí quyển ổn định → bụi bị giữ lại (tăng PM2.5)
+            // Áp suất thấp → front lạnh, mưa → rửa bụi (giảm PM2.5)
             if (pressure >= PRESSURE_HIGH) return 0.4;
             if (pressure >= 1010) return 0.1;
             if (pressure >= PRESSURE_LOW) return -0.2;
-            return -0.5; 
+            return -0.5;  // áp thấp, mưa — rửa bụi
         }
 
         private static string ExplainPressure(double pressure)
@@ -145,6 +162,7 @@ namespace airsafenet_backend.Services
 
         private static double ScoreUv(double uvIndex)
         {
+            // UV cao → phản ứng quang hóa NOx + VOC → tạo ozone + PM2.5 thứ cấp
             if (uvIndex >= UV_HIGH) return 0.5;
             if (uvIndex >= UV_MODERATE) return 0.2;
             return -0.1;
@@ -161,6 +179,7 @@ namespace airsafenet_backend.Services
 
         private static double ScorePm25History(double observedPm25)
         {
+            // PM2.5 quan trắc gần đây là indicator mạnh nhất
             if (observedPm25 >= 55) return 0.9;
             if (observedPm25 >= 35) return 0.6;
             if (observedPm25 >= 20) return 0.3;

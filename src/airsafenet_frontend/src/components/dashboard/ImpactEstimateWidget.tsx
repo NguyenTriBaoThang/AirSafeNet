@@ -3,14 +3,7 @@ import { usePopulationData } from "../../hooks/usePopulationData";
 
 type RiskLevel = "GOOD" | "MODERATE" | "UNHEALTHY_SENSITIVE" | "UNHEALTHY" | "VERY_UNHEALTHY" | "HAZARDOUS";
 type ImpactLevel = "none" | "low" | "medium" | "high" | "critical";
-type Props = { 
-  currentRisk: string; 
-  currentAqi: number; 
-  currentPm25: number; 
-  warningCount: number; 
-  days: number;
-  preferredLocation: string;
-};
+type Props = { currentRisk: string; currentAqi: number; currentPm25: number; warningCount: number; days: number; };
 type GroupImpact = { groupKey: string; group: string; icon: string; population: number; impactLevel: ImpactLevel; impactLabel: string; advice: string; colorClass: string; };
 type ImpactDef = { level: ImpactLevel; label: string; advice: string };
 
@@ -63,8 +56,7 @@ function impactColorClass(level: ImpactLevel) {
   return { none: "impact-group--none", low: "impact-group--low", medium: "impact-group--medium", high: "impact-group--high", critical: "impact-group--critical" }[level];
 }
 
-function formatNumber(n: number | undefined | null) {
-  if (n == null || isNaN(n)) return "0";
+function formatNumber(n: number) {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)} triệu`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(0)} nghìn`;
   return n.toLocaleString("vi-VN");
@@ -81,8 +73,8 @@ const HEADER_CLASS: Record<RiskLevel, string> = {
   VERY_UNHEALTHY: "impact-header--critical", HAZARDOUS: "impact-header--critical",
 };
 
-export default function ImpactEstimateWidget({ currentRisk, currentAqi, currentPm25, warningCount, days, preferredLocation }: Props) {
-  const { population, loading: popLoading, error: popError } = usePopulationData(preferredLocation);
+export default function ImpactEstimateWidget({ currentRisk, currentAqi, currentPm25, warningCount, days }: Props) {
+  const { population, loading: popLoading, error: popError } = usePopulationData();
   const risk = (currentRisk as RiskLevel) || "MODERATE";
   const headerClass = HEADER_CLASS[risk] ?? "impact-header--moderate";
 
@@ -101,17 +93,14 @@ export default function ImpactEstimateWidget({ currentRisk, currentAqi, currentP
   }, [risk, population]);
 
   const totalAffected = useMemo(() => groups.filter(g => ["medium","high","critical"].includes(g.impactLevel)).reduce((s,g) => s + g.population, 0), [groups]);
-  const affectedPct = useMemo(() => {
-    if (!population.total) return "0.0";
-    return ((totalAffected / population.total) * 100).toFixed(1);
-  }, [totalAffected, population.total]);
+  const affectedPct = ((totalAffected / population.hcmcTotal) * 100).toFixed(1);
 
   return (
     <div className="impact-widget">
       <div className={`impact-header ${headerClass}`}>
         <div className="impact-header__left">
           <div className="impact-header__eyebrow">
-            Ước tính tác động — {preferredLocation || population.cityName}
+            Ước tính tác động — TP. Hồ Chí Minh
             {population.isReal
               ? <span className="impact-source-badge impact-source-badge--live">✓ World Bank {population.dataYear}</span>
               : <span className="impact-source-badge impact-source-badge--fallback">⚠ UN 2025 (offline)</span>
@@ -121,7 +110,7 @@ export default function ImpactEstimateWidget({ currentRisk, currentAqi, currentP
             {popLoading ? <span className="impact-skeleton" /> : <>{formatNumber(totalAffected)}<span> người cần chú ý</span></>}
           </h3>
           <p className="impact-header__sub">
-            {affectedPct}% dân số {preferredLocation || population.cityName} ({formatNumber(population.total)} người) với AQI hiện tại <strong>{currentAqi}</strong> — {RISK_LABEL[risk]}
+            {affectedPct}% dân số HCMC ({formatNumber(population.hcmcTotal)} người) với AQI hiện tại <strong>{currentAqi}</strong> — {RISK_LABEL[risk]}
           </p>
           {popError && <p className="impact-api-note">ℹ️ {popError}</p>}
         </div>

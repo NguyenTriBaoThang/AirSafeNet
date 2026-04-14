@@ -46,7 +46,7 @@ export default function AppHeader({ title }: Props) {
 
   function handleLogout() {
     logoutApi();
-    window.location.href = "/login";
+    navigate("/login");
   }
 
   function getInitials(name?: string) {
