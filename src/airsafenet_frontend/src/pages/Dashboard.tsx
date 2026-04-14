@@ -71,7 +71,7 @@ export default function Dashboard() {
       <SectionHeader
         eyebrow="Dashboard thông minh"
         title="Tổng quan chất lượng không khí"
-        description={`Cập nhật lúc ${new Date(summary.generatedAt).toLocaleString("vi-VN")} • Nhóm người dùng: ${summary.userGroup}`}
+        description={`Cập nhật lúc ${new Date(summary.generatedAt).toLocaleString("vi-VN")} • Vị trí: ${summary.preferredLocation || "Hà Nội"} • Nhóm đối tượng: ${summary.userGroup}`}
         rightSlot={<button className="btn btn-primary" onClick={() => loadData(days, mode, true)}>Làm mới dữ liệu</button>}
       />
       <div className="section-toolbar">
@@ -120,6 +120,7 @@ export default function Dashboard() {
         currentPm25={summary.currentPm25}
         warningCount={summary.warningCount}
         days={days}
+        preferredLocation={summary.preferredLocation}
       />
 
       <ForecastTable points={chart.points} mode={mode} />

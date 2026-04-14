@@ -14,6 +14,16 @@ import SectionHeader from "../components/common/SectionHeader";
 import StatusChip from "../components/common/StatusChip";
 import AppIcon from "../components/common/AppIcon";
 
+const LOCATION_OPTIONS = [
+  { value: "Hà Nội", label: "Hà Nội (Thủ đô)" },
+  { value: "TP. Hồ Chí Minh", label: "TP. Hồ Chí Minh" },
+  { value: "Đà Nẵng", label: "Đà Nẵng" },
+  { value: "Hải Phòng", label: "Hải Phòng" },
+  { value: "Cần Thơ", label: "Cần Thơ" },
+  { value: "Huế", label: "Huế" },
+  { value: "Nha Trang", label: "Nha Trang" },
+];
+
 const USER_GROUP_OPTIONS = [
   { value: "normal", label: "Người dùng phổ thông" },
   { value: "child", label: "Trẻ em" },
@@ -146,8 +156,7 @@ export default function UserPreferencesPage() {
           </select>
 
           <label>Khu vực quan tâm</label>
-          <input
-            type="text"
+          <select
             value={form.preferredLocation}
             onChange={(e) =>
               setForm((prev) => ({
@@ -155,8 +164,13 @@ export default function UserPreferencesPage() {
                 preferredLocation: e.target.value,
               }))
             }
-            placeholder="Ví dụ: Ho Chi Minh City"
-          />
+          >
+            {LOCATION_OPTIONS.map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label}
+              </option>
+            ))}
+          </select>
 
           <label className="toggle-row">
             <input
