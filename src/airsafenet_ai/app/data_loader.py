@@ -10,13 +10,19 @@ def _days_from_hours(hours: int) -> int:
     return max(3, min(92, int(hours / 24) + 3))
 
 
-def fetch_air_quality(past_hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.DataFrame:
+def fetch_air_quality(
+    latitude: float | None = None,
+    longitude: float | None = None,
+    past_hours: int = HISTORY_HOURS,
+    forecast_days: int = 7
+) -> pd.DataFrame:
     url = "https://air-quality-api.open-meteo.com/v1/air-quality"
     params = {
-        "latitude": LAT,
-        "longitude": LON,
+        "latitude": latitude if latitude is not None else LAT,
+        "longitude": longitude if longitude is not None else LON,
         "hourly": ",".join([
             "pm2_5",
+            # ... (no changes to the rest of the list)
             "pm10",
             "carbon_monoxide",
             "nitrogen_dioxide",
@@ -38,13 +44,19 @@ def fetch_air_quality(past_hours: int = HISTORY_HOURS, forecast_days: int = 7) -
     return df.sort_values("time").reset_index(drop=True)
 
 
-def fetch_weather(past_hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.DataFrame:
+def fetch_weather(
+    latitude: float | None = None,
+    longitude: float | None = None,
+    past_hours: int = HISTORY_HOURS,
+    forecast_days: int = 7
+) -> pd.DataFrame:
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
-        "latitude": LAT,
-        "longitude": LON,
+        "latitude": latitude if latitude is not None else LAT,
+        "longitude": longitude if longitude is not None else LON,
         "hourly": ",".join([
             "temperature_2m",
+            # ...
             "relative_humidity_2m",
             "apparent_temperature",
             "precipitation",
@@ -66,9 +78,14 @@ def fetch_weather(past_hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd
     return df.sort_values("time").reset_index(drop=True)
 
 
-def load_merged_dataset(past_hours: int = HISTORY_HOURS, forecast_days: int = 7) -> pd.DataFrame:
-    air = fetch_air_quality(past_hours=past_hours, forecast_days=forecast_days)
-    weather = fetch_weather(past_hours=past_hours, forecast_days=forecast_days)
+def load_merged_dataset(
+    latitude: float | None = None,
+    longitude: float | None = None,
+    past_hours: int = HISTORY_HOURS,
+    forecast_days: int = 7
+) -> pd.DataFrame:
+    air = fetch_air_quality(latitude=latitude, longitude=longitude, past_hours=past_hours, forecast_days=forecast_days)
+    weather = fetch_weather(latitude=latitude, longitude=longitude, past_hours=past_hours, forecast_days=forecast_days)
 
     df = pd.merge(air, weather, on="time", how="inner").sort_values("time").reset_index(drop=True)
 

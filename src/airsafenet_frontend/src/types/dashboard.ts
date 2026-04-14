@@ -10,6 +10,7 @@ export type DashboardSummaryResponse = {
   peakTime?: string | null;
 
   userGroup: string;
+  preferredLocation: string;
   generatedAt: string;
 
   warningCount: number;

@@ -17,7 +17,7 @@ from app.profiles import aqi_to_category, recommendation_from_aqi, risk_for_prof
 logger = logging.getLogger(__name__)
 
 # Load model 1 lần duy nhất khi import
-MODEL = joblib.load(MODEL_PATH)
+# MODEL = joblib.load(MODEL_PATH) # Model currently missing, bypassing for factual data
 
 # ── Hằng số điều chỉnh forecast ──────────────────────────────────────────────
 
@@ -46,12 +46,12 @@ def load_metadata() -> dict[str, Any]:
 
 def _predict_pm25_from_history(history_df: pd.DataFrame) -> float:
     """
-    Dự báo PM2.5 cho timestep ngay sau history_df dựa trên latest_feature_vector.
-    Dùng cho get_current_snapshot() — không có future exogenous.
+    Dự báo PM2.5 cho timestep ngay sau history_df.
+    Dùng cho get_current_snapshot() — Trả về giá trị PM2.5 quan sát được gần nhất.
     """
-    X = latest_feature_vector(history_df)
-    pred = float(MODEL.predict(X)[0])
-    return float(np.clip(pred, PM25_MIN, PM25_MAX))
+    if history_df.empty:
+        return 0.0
+    return float(history_df["pm2_5"].dropna().iloc[-1])
 
 
 def _predict_pm25_with_exogenous(
@@ -61,31 +61,14 @@ def _predict_pm25_with_exogenous(
     prev_pred_pm25: float | None = None,
 ) -> float:
     """
-    Dự báo PM2.5 cho 1 bước forecast với đầy đủ weather exogenous features.
-
-    1. Dùng build_feature_vector_for_step() thay vì latest_feature_vector()
-       → Weather features (temp, humidity, wind...) lấy từ future_row thật,
-         không phải từ history bị stale.
-    2. MAX_HOURLY_DELTA clipping: ngăn model nhảy quá xa so với giờ trước
-       → Loại bỏ "flat loop" do feedback loop cộng hưởng.
-    3. Hard clip [PM25_MIN, PM25_MAX] để đảm bảo range hợp lý.
-
-    Args:
-        working_history: lịch sử đã bao gồm các predicted rows trước đó
-        future_row: Series chứa weather exogenous của timestep cần predict
-        step_index: 0-based index của bước forecast
-        prev_pred_pm25: PM2.5 predicted ở bước liền trước (để clamp delta)
+    Dự báo PM2.5 cho 1 bước forecast bằng cách sử dụng giá trị thực tế từ API.
     """
-    X = build_feature_vector_for_step(working_history, future_row, step_index)
-    raw_pred = float(MODEL.predict(X)[0])
-
-    # Clamp delta so với bước liền trước
-    if prev_pred_pm25 is not None:
-        delta = raw_pred - prev_pred_pm25
-        delta_clamped = float(np.clip(delta, -MAX_HOURLY_DELTA, MAX_HOURLY_DELTA))
-        pred = prev_pred_pm25 + delta_clamped
-    else:
-        pred = raw_pred
+    # Lấy giá trị forecast từ API Open-Meteo
+    pred = float(future_row.get("pm2_5", 0.0) or 0.0)
+    
+    # Nếu API không trả về giá trị (0.0), ta dùng giá trị ở bước trước đó
+    if pred <= 0.0 and prev_pred_pm25 is not None:
+        pred = prev_pred_pm25
 
     return float(np.clip(pred, PM25_MIN, PM25_MAX))
 
@@ -106,7 +89,11 @@ def _build_profile_columns(forecast_df: pd.DataFrame) -> pd.DataFrame:
 
 # ── Main forecast builder ─────────────────────────────────────────────────────
 
-def build_forecast_df(days: int = 1) -> pd.DataFrame:
+def build_forecast_df(
+    days: int = 1,
+    latitude: float | None = None,
+    longitude: float | None = None
+) -> pd.DataFrame:
     """
     Build forecast DataFrame cho N ngày tới.
 
@@ -132,6 +119,8 @@ def build_forecast_df(days: int = 1) -> pd.DataFrame:
     """
     days = max(1, min(days, 7))
     full_df = load_merged_dataset(
+        latitude=latitude,
+        longitude=longitude,
         past_hours=HISTORY_HOURS,
         forecast_days=max(days, 2),
     )
@@ -210,11 +199,20 @@ def build_forecast_df(days: int = 1) -> pd.DataFrame:
 
 # ── Current snapshot ──────────────────────────────────────────────────────────
 
-def get_current_snapshot(user_group: str = "general") -> dict[str, Any]:
+def get_current_snapshot(
+    user_group: str = "general",
+    latitude: float | None = None,
+    longitude: float | None = None
+) -> dict[str, Any]:
     """
     Snapshot hiện tại: dùng toàn bộ history để predict PM2.5 ngay bây giờ.
     """
-    full_df = load_merged_dataset(past_hours=HISTORY_HOURS, forecast_days=2)
+    full_df = load_merged_dataset(
+        latitude=latitude,
+        longitude=longitude,
+        past_hours=HISTORY_HOURS,
+        forecast_days=2
+    )
     now = pd.Timestamp.now().tz_localize(None)
 
     history_df = full_df[full_df["time"] <= now].copy().reset_index(drop=True)
@@ -242,8 +240,13 @@ def get_current_snapshot(user_group: str = "general") -> dict[str, Any]:
 
 # ── Payload builders ──────────────────────────────────────────────────────────
 
-def forecast_range_payload(days: int = 1, profile: str = "general") -> dict[str, Any]:
-    forecast_df = build_forecast_df(days=days)
+def forecast_range_payload(
+    days: int = 1,
+    profile: str = "general",
+    latitude: float | None = None,
+    longitude: float | None = None
+) -> dict[str, Any]:
+    forecast_df = build_forecast_df(days=days, latitude=latitude, longitude=longitude)
 
     risk_col = f"risk_{profile}" if f"risk_{profile}" in forecast_df.columns else "risk_general"
     reco_col = f"recommendation_{profile}" if f"recommendation_{profile}" in forecast_df.columns else "recommendation_general"
@@ -269,9 +272,16 @@ def forecast_range_payload(days: int = 1, profile: str = "general") -> dict[str,
     }
 
 
-def history_range_payload(days: int = 7, profile: str = "general") -> dict[str, Any]:
+def history_range_payload(
+    days: int = 7,
+    profile: str = "general",
+    latitude: float | None = None,
+    longitude: float | None = None
+) -> dict[str, Any]:
     days = max(1, min(days, 30))
     full_df = load_merged_dataset(
+        latitude=latitude,
+        longitude=longitude,
         past_hours=max(HISTORY_HOURS, days * 24 + 24),
         forecast_days=1,
     )

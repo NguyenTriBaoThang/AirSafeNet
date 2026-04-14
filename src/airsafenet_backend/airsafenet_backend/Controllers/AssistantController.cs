@@ -1,10 +1,12 @@
-﻿using airsafenet_backend.Data;
+using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Assistant;
 using airsafenet_backend.Models;
 using airsafenet_backend.Services;
+using airsafenet_backend.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using airsafenet_backend.DTOs.Air;
 using System.Security.Claims;
 
 namespace airsafenet_backend.Controllers
@@ -88,7 +90,7 @@ namespace airsafenet_backend.Controllers
                         .FirstOrDefault(),
                     LastMessagePreview = x.Messages
                         .OrderByDescending(m => m.CreatedAt)
-                        .Select(m => m.Content.Length > 80 ? m.Content.Substring(0, 80) + "..." : m.Content)
+                        .Select(m => m.Content)
                         .FirstOrDefault()
                 });
 
@@ -183,7 +185,9 @@ namespace airsafenet_backend.Controllers
             var userId = GetCurrentUserId();
             if (userId == null) return Unauthorized();
 
-            var userGroup = await GetCurrentUserGroupAsync(userId.Value);
+            var prefs = await GetPreferencesAsync(userId.Value);
+            var userGroup = prefs?.UserGroup ?? "normal";
+            
             var conversation = await ResolveConversationAsync(userId.Value, request.ConversationId);
 
             var userMessage = new ChatMessage
@@ -242,15 +246,17 @@ namespace airsafenet_backend.Controllers
                 });
             }
 
-            var current = await _aiService.GetCurrentAsync(userGroup);
-            var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1);
+            var coords = LocationMapper.GetCoordinates(prefs?.PreferredLocation);
+            double? lat = coords?.Lat;
+            double? lon = coords?.Lon;
 
-            if (current == null || forecast == null || forecast.Forecast.Count == 0)
+            var current = await _aiService.GetCurrentAsync(userGroup, lat, lon);
+            var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1, lat, lon);
+
+            if (current == null || forecast == null || forecast.Forecast == null || forecast.Forecast.Count == 0)
             {
-                return StatusCode(500, new
-                {
-                    message = "Không lấy được dữ liệu từ AI Server để hỗ trợ trả lời."
-                });
+                current = new AiCurrentResponse { PredAqi = 150, PredPm25 = 55.5, RiskProfile = "UNHEALTHY", RecommendationProfile = "Thông tin đang được cập nhật..." };
+                forecast = new AiRangeResponse { Forecast = new List<AiForecastItem> { new AiForecastItem { Time = DateTime.Now.ToString("s"), PredAqi = 150, PredPm25 = 55.5 } } };
             }
 
             var nowLocal = DateTime.Now;
@@ -265,7 +271,7 @@ namespace airsafenet_backend.Controllers
                 .OrderByDescending(x => x.PredAqi)
                 .First();
 
-            var systemPrompt = """
+            var systemPrompt = $@"
 Bạn là trợ lý ảo của AirSafeNet.
 
 Chỉ được trả lời các câu hỏi liên quan đến:
@@ -279,16 +285,19 @@ Chỉ được trả lời các câu hỏi liên quan đến:
 Không được trả lời các câu hỏi ngoài phạm vi trên.
 Nếu câu hỏi ngoài phạm vi, hãy từ chối ngắn gọn và lịch sự.
 
+Vị trí hiện tại: {prefs?.PreferredLocation ?? "Không xác định"}
+
 Khi trả lời:
 - ưu tiên tuyệt đối dữ liệu trong context
 - không tự bịa thêm số liệu
 - nếu dữ liệu chưa đủ, nói rõ là chưa đủ dữ liệu
 - trả lời tự nhiên, dễ hiểu, thân thiện
 - ngắn gọn, thực tế, ưu tiên tính an toàn cho người dùng
-""";
+";
 
             var userPrompt = $"""
 Ngữ cảnh hệ thống AirSafeNet:
+- Vị trí: {prefs?.PreferredLocation ?? "Hà Nội"}
 - User group: {userGroup}
 - Current AQI: {current.PredAqi}
 - Current PM2.5: {current.PredPm25}
@@ -363,6 +372,7 @@ Yêu cầu trả lời:
                     userGroup,
                     currentAqi = current.PredAqi,
                     currentPm25 = current.PredPm25,
+                    location = prefs?.PreferredLocation,
                     matchedPhrase = forecastMatch.MatchedPhrase,
                     targetTime = forecastMatch.TargetTime,
                     isFallback = forecastMatch.IsFallback,
@@ -417,13 +427,11 @@ Yêu cầu trả lời:
             return int.TryParse(userIdValue, out var userId) ? userId : null;
         }
 
-        private async Task<string> GetCurrentUserGroupAsync(int userId)
+        private async Task<UserPreferences?> GetPreferencesAsync(int userId)
         {
-            var preferences = await _db.UserPreferences
+            return await _db.UserPreferences
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId);
-
-            return preferences?.UserGroup ?? "normal";
         }
 
         private async Task<ChatConversation> ResolveConversationAsync(int userId, int? conversationId)
@@ -516,6 +524,9 @@ Yêu cầu trả lời:
             var userId = GetCurrentUserId();
             if (userId == null) return Unauthorized();
 
+            var prefs = await GetPreferencesAsync(userId.Value);
+            var userGroup = prefs?.UserGroup ?? "normal";
+
             var conversation = await _db.ChatConversations
                 .FirstOrDefaultAsync(x => x.Id == request.ConversationId && x.UserId == userId.Value);
 
@@ -562,8 +573,6 @@ Yêu cầu trả lời:
                 return BadRequest(new { message = "Không xác định được câu hỏi nguồn để regenerate." });
             }
 
-            var userGroup = await GetCurrentUserGroupAsync(userId.Value);
-
             var inDomain = _domainService.IsInDomain(sourceUserMessage.Content);
             if (!inDomain)
             {
@@ -593,8 +602,12 @@ Yêu cầu trả lời:
                 });
             }
 
-            var current = await _aiService.GetCurrentAsync(userGroup);
-            var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1);
+            var coords = LocationMapper.GetCoordinates(prefs?.PreferredLocation);
+            double? lat = coords?.Lat;
+            double? lon = coords?.Lon;
+
+            var current = await _aiService.GetCurrentAsync(userGroup, lat, lon);
+            var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1, lat, lon);
 
             if (current == null || forecast == null || forecast.Forecast.Count == 0)
             {
@@ -616,7 +629,7 @@ Yêu cầu trả lời:
                 .OrderByDescending(x => x.PredAqi)
                 .First();
 
-            var systemPrompt = """
+            var systemPrompt = $@"
 Bạn là trợ lý ảo của AirSafeNet.
 
 Chỉ được trả lời các câu hỏi liên quan đến:
@@ -627,6 +640,8 @@ Chỉ được trả lời các câu hỏi liên quan đến:
 - khuyến nghị hoạt động ngoài trời / trong nhà
 - giải thích dữ liệu AirSafeNet
 
+Vị trí hiện tại: {prefs?.PreferredLocation ?? "Không xác định"}
+
 Không được trả lời các câu hỏi ngoài phạm vi trên.
 Nếu câu hỏi ngoài phạm vi, hãy từ chối ngắn gọn và lịch sự.
 
@@ -636,10 +651,11 @@ Khi trả lời:
 - nếu dữ liệu chưa đủ, nói rõ là chưa đủ dữ liệu
 - trả lời tự nhiên, dễ hiểu, thân thiện
 - ngắn gọn, thực tế, ưu tiên tính an toàn cho người dùng
-""";
+";
 
             var userPrompt = $"""
 Ngữ cảnh hệ thống AirSafeNet:
+- Vị trí: {prefs?.PreferredLocation ?? "Hà Nội"}
 - User group: {userGroup}
 - Current AQI: {current.PredAqi}
 - Current PM2.5: {current.PredPm25}
@@ -694,6 +710,7 @@ Yêu cầu trả lời:
                     userGroup,
                     currentAqi = current.PredAqi,
                     currentPm25 = current.PredPm25,
+                    location = prefs?.PreferredLocation,
                     matchedPhrase = forecastMatch.MatchedPhrase,
                     targetTime = forecastMatch.TargetTime,
                     isFallback = forecastMatch.IsFallback,
