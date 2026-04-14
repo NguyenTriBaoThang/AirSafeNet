@@ -27,9 +27,6 @@ export function useAiExplain(): UseAiExplainResult {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
+  useEffect(() => { load(); }, [load]);
   return { data, loading, error, refresh: load };
 }

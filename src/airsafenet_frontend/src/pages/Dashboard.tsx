@@ -7,7 +7,7 @@ import ForecastTable from "../components/dashboard/ForecastTable";
 import ForecastVsActualChart from "../components/dashboard/ForecastVsActualChart";
 import GoldenHoursWidget from "../components/dashboard/GoldenHoursWidget";
 import ImpactEstimateWidget from "../components/dashboard/ImpactEstimateWidget";
-import AiExplainPanel from "../components/dashboard/AiExplainPanel"; // ✅ MỚI
+import AiExplainPanel from "../components/dashboard/AiExplainPanel";
 import RiskBadge from "../components/dashboard/RiskBadge";
 import DashboardFilters from "../components/dashboard/DashboardFilters";
 import DashboardSkeleton from "../components/common/DashboardSkeleton";
@@ -77,9 +77,7 @@ export default function Dashboard() {
         <SummaryCard title={mode === "forecast" ? `AQI cao nhất ${periodLabel}` : `AQI cao nhất lịch sử ${periodLabel}`} value={summary.maxAqiNext24h} subtext={summary.peakTime ? `Đỉnh lúc ${new Date(summary.peakTime).toLocaleString("vi-VN")}` : undefined} icon={<AppIcon name="trend" />} tone="warning" />
         <SummaryCard title={mode === "forecast" ? "Giờ nguy cơ" : "Giờ nguy cơ đã ghi nhận"} value={summary.dangerCount} subtext={`Số giờ cảnh báo: ${summary.warningCount}`} icon={<AppIcon name="alert" />} tone="danger" />
       </div>
-
       {mode === "forecast" && <GoldenHoursWidget points={chart.points} />}
-
       <div className="dashboard-two-col">
         <ForecastChart points={chart.points} mode={mode} />
         <div className="card recommendation-card interactive-card">
@@ -103,11 +101,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
       <ForecastVsActualChart forecastPoints={chart.points} historyPoints={historyPoints} />
-
       <AiExplainPanel />
-
       <ImpactEstimateWidget
         currentRisk={summary.currentRisk}
         currentAqi={summary.currentAqi}
@@ -115,7 +110,6 @@ export default function Dashboard() {
         warningCount={summary.warningCount}
         days={days}
       />
-
       <ForecastTable points={chart.points} mode={mode} />
     </div>
   );

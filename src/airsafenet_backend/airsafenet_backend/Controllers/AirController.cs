@@ -15,12 +15,9 @@ namespace AirSafeNet.Api.Controllers
     {
         private readonly AppDbContext _db;
         private readonly AiService _aiService;
-        private readonly AirExplainService _explainService;
+        private readonly AirExplainService _explainService; 
 
-        public AirController(
-            AppDbContext db,
-            AiService aiService,
-            AirExplainService explainService) 
+        public AirController(AppDbContext db, AiService aiService, AirExplainService explainService)
         {
             _db = db;
             _aiService = aiService;
@@ -58,7 +55,7 @@ namespace AirSafeNet.Api.Controllers
             if (aiForecast == null)
                 return StatusCode(500, new { message = "Không lấy được forecast từ AI Server." });
 
-            var response = new AirForecastResponse
+            return Ok(new AirForecastResponse
             {
                 UserGroup = userGroup,
                 GeneratedAt = DateTime.TryParse(aiForecast.GeneratedAt, out var gAt) ? gAt : DateTime.UtcNow,
@@ -72,9 +69,7 @@ namespace AirSafeNet.Api.Controllers
                     Recommendation = x.RecommendationProfile,
                     UserGroup = userGroup
                 }).ToList()
-            };
-
-            return Ok(response);
+            });
         }
 
         [HttpGet("history")]
@@ -112,11 +107,11 @@ namespace AirSafeNet.Api.Controllers
 
             var current = await _aiService.GetCurrentAsync(userGroup);
             if (current == null)
-                return StatusCode(500, new { message = "Không lấy được current data để explain." });
+                return StatusCode(500, new { message = "Không lấy được current AI data." });
 
             try
             {
-                var explanation = _explainService.Explain(current);
+                var explanation = await _explainService.ExplainAsync(current);
                 return Ok(explanation);
             }
             catch (Exception ex)
@@ -128,14 +123,11 @@ namespace AirSafeNet.Api.Controllers
         private async Task<string?> GetCurrentUserGroupAsync()
         {
             var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdValue, out var userId))
-                return null;
+            if (!int.TryParse(userIdValue, out var userId)) return null;
 
-            var preferences = await _db.UserPreferences
-                .AsNoTracking()
+            var prefs = await _db.UserPreferences.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId);
-
-            return preferences?.UserGroup ?? "normal";
+            return prefs?.UserGroup ?? "normal";
         }
     }
 }
