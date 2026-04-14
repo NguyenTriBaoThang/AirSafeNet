@@ -1,17 +1,13 @@
 import { useEffect, useState } from "react";
 import { getDashboardFullApi } from "../api/dashboard";
-import type {
-  DashboardChartPointResponse,
-  DashboardDays,
-  DashboardFullResponse,
-  DashboardMode,
-} from "../types/dashboard";
+import type { DashboardChartPointResponse, DashboardDays, DashboardFullResponse, DashboardMode } from "../types/dashboard";
 import SummaryCard from "../components/dashboard/SummaryCard";
 import ForecastChart from "../components/dashboard/ForecastChart";
 import ForecastTable from "../components/dashboard/ForecastTable";
 import ForecastVsActualChart from "../components/dashboard/ForecastVsActualChart";
 import GoldenHoursWidget from "../components/dashboard/GoldenHoursWidget";
 import ImpactEstimateWidget from "../components/dashboard/ImpactEstimateWidget";
+import AiExplainPanel from "../components/dashboard/AiExplainPanel"; 
 import RiskBadge from "../components/dashboard/RiskBadge";
 import DashboardFilters from "../components/dashboard/DashboardFilters";
 import DashboardSkeleton from "../components/common/DashboardSkeleton";
@@ -30,11 +26,7 @@ export default function Dashboard() {
   const [mode, setMode] = useState<DashboardMode>("forecast");
   const { showToast } = useToast();
 
-  async function loadData(
-    selectedDays: DashboardDays = days,
-    selectedMode: DashboardMode = mode,
-    silent = false
-  ) {
+  async function loadData(selectedDays: DashboardDays = days, selectedMode: DashboardMode = mode, silent = false) {
     try {
       if (!silent) setLoading(true);
       setError("");
@@ -113,6 +105,8 @@ export default function Dashboard() {
       </div>
 
       <ForecastVsActualChart forecastPoints={chart.points} historyPoints={historyPoints} />
+      
+      <AiExplainPanel />
 
       <ImpactEstimateWidget
         currentRisk={summary.currentRisk}

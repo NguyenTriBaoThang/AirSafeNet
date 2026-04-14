@@ -15,11 +15,16 @@ namespace AirSafeNet.Api.Controllers
     {
         private readonly AppDbContext _db;
         private readonly AiService _aiService;
+        private readonly AirExplainService _explainService;
 
-        public AirController(AppDbContext db, AiService aiService)
+        public AirController(
+            AppDbContext db,
+            AiService aiService,
+            AirExplainService explainService)
         {
             _db = db;
             _aiService = aiService;
+            _explainService = explainService;
         }
 
         [HttpGet("current")]
@@ -30,9 +35,7 @@ namespace AirSafeNet.Api.Controllers
 
             var aiResult = await _aiService.GetCurrentAsync(userGroup);
             if (aiResult == null)
-            {
                 return StatusCode(500, new { message = "Không lấy được dữ liệu current từ AI Server." });
-            }
 
             return Ok(new AirPredictResponse
             {
@@ -53,16 +56,12 @@ namespace AirSafeNet.Api.Controllers
 
             var aiForecast = await _aiService.GetForecastRangeAsync(userGroup, days);
             if (aiForecast == null)
-            {
                 return StatusCode(500, new { message = "Không lấy được forecast từ AI Server." });
-            }
 
             var response = new AirForecastResponse
             {
                 UserGroup = userGroup,
-                GeneratedAt = DateTime.TryParse(aiForecast.GeneratedAt, out var generatedAt)
-                    ? generatedAt
-                    : DateTime.UtcNow,
+                GeneratedAt = DateTime.TryParse(aiForecast.GeneratedAt, out var gAt) ? gAt : DateTime.UtcNow,
                 Hours = aiForecast.Hours,
                 Forecast = aiForecast.Forecast.Select(x => new AirForecastItemResponse
                 {
@@ -86,11 +85,9 @@ namespace AirSafeNet.Api.Controllers
 
             var aiHistory = await _aiService.GetHistoryAsync(userGroup, days);
             if (aiHistory == null)
-            {
                 return StatusCode(500, new { message = "Không lấy được history từ AI Server." });
-            }
 
-            var response = new
+            return Ok(new
             {
                 generatedAt = aiHistory.GeneratedAt,
                 days = aiHistory.Days,
@@ -104,9 +101,28 @@ namespace AirSafeNet.Api.Controllers
                     risk = x.RiskProfile,
                     recommendation = x.RecommendationProfile
                 })
-            };
+            });
+        }
 
-            return Ok(response);
+        [HttpGet("explain")]
+        public async Task<IActionResult> GetExplain()
+        {
+            var userGroup = await GetCurrentUserGroupAsync();
+            if (userGroup == null) return Unauthorized();
+
+            var current = await _aiService.GetCurrentAsync(userGroup);
+            if (current == null)
+                return StatusCode(500, new { message = "Không lấy được current data để explain." });
+
+            try
+            {
+                var explanation = _explainService.Explain(current);
+                return Ok(explanation);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = $"Lỗi explain: {ex.Message}" });
+            }
         }
 
         private async Task<string?> GetCurrentUserGroupAsync()

@@ -22,6 +22,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddHttpClient<AiService>();
 builder.Services.AddHttpClient<WeatherService>();
+builder.Services.AddScoped<AirExplainService>();
 builder.Services.AddScoped<AssistantDomainService>();
 builder.Services.AddScoped<AssistantTimeResolverService>();
 builder.Services.AddHttpClient<OpenAiChatService>(client =>
