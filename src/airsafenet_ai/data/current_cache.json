@@ -1,0 +1,54 @@
+{
+  "general": {
+    "time": "2026-04-20T09:00:00",
+    "observed_pm25": 13.3,
+    "observed_temp": 29.8,
+    "observed_humidity": 62.0,
+    "observed_wind_speed": 14.3,
+    "pred_pm25": 13.3,
+    "pred_aqi": 54,
+    "aqi_category": "MODERATE",
+    "risk_profile": "MODERATE",
+    "recommendation_profile": "Chất lượng không khí ở mức chấp nhận được. Người dùng nên theo dõi nếu ở ngoài trời lâu.",
+    "user_group": "general"
+  },
+  "children": {
+    "time": "2026-04-20T09:00:00",
+    "observed_pm25": 13.3,
+    "observed_temp": 29.8,
+    "observed_humidity": 62.0,
+    "observed_wind_speed": 14.3,
+    "pred_pm25": 13.3,
+    "pred_aqi": 54,
+    "aqi_category": "MODERATE",
+    "risk_profile": "UNHEALTHY_SENSITIVE",
+    "recommendation_profile": "Chất lượng không khí ở mức chấp nhận được. Nhóm nhạy cảm như trẻ em nên cân nhắc hạn chế hoạt động ngoài trời kéo dài.",
+    "user_group": "children"
+  },
+  "elderly": {
+    "time": "2026-04-20T09:00:00",
+    "observed_pm25": 13.3,
+    "observed_temp": 29.8,
+    "observed_humidity": 62.0,
+    "observed_wind_speed": 14.3,
+    "pred_pm25": 13.3,
+    "pred_aqi": 54,
+    "aqi_category": "MODERATE",
+    "risk_profile": "UNHEALTHY_SENSITIVE",
+    "recommendation_profile": "Chất lượng không khí ở mức chấp nhận được. Nhóm nhạy cảm như người cao tuổi nên cân nhắc hạn chế hoạt động ngoài trời kéo dài.",
+    "user_group": "elderly"
+  },
+  "respiratory": {
+    "time": "2026-04-20T09:00:00",
+    "observed_pm25": 13.3,
+    "observed_temp": 29.8,
+    "observed_humidity": 62.0,
+    "observed_wind_speed": 14.3,
+    "pred_pm25": 13.3,
+    "pred_aqi": 54,
+    "aqi_category": "MODERATE",
+    "risk_profile": "UNHEALTHY_SENSITIVE",
+    "recommendation_profile": "Chất lượng không khí ở mức chấp nhận được. Nhóm nhạy cảm như người có bệnh hô hấp nên cân nhắc hạn chế hoạt động ngoài trời kéo dài.",
+    "user_group": "respiratory"
+  }
+}

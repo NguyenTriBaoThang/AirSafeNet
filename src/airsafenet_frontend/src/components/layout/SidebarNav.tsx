@@ -1,11 +1,28 @@
 import { Link, useLocation } from "react-router-dom";
+import { getAccessToken } from "../../api/http";
+
+function getRole(): string {
+  const token = getAccessToken();
+  if (!token) return "";
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return (
+      payload["http://schemas.microsoft.com/ws/2008/06/identity/claims/role"]
+      ?? payload["role"]
+      ?? ""
+    );
+  } catch {
+    return "";
+  }
+}
 
 export default function SidebarNav() {
   const location = useLocation();
+  const isAdmin = getRole() === "Admin";
 
   const items = [
-    { to: "/dashboard", label: "Tổng quan" },
-    { to: "/assistant", label: "Trợ lý ảo" },
+    { to: "/dashboard",   label: "Tổng quan" },
+    { to: "/assistant",   label: "Trợ lý ảo" },
     { to: "/preferences", label: "Cài đặt người dùng" },
   ];
 
@@ -28,6 +45,20 @@ export default function SidebarNav() {
               {item.label}
             </Link>
           ))}
+
+          {isAdmin && (
+            <Link
+              to="/admin"
+              className={
+                location.pathname === "/admin"
+                  ? "sidebar-nav__item sidebar-nav__item--admin active"
+                  : "sidebar-nav__item sidebar-nav__item--admin"
+              }
+            >
+              <span className="sidebar-nav__admin-dot" />
+              Quản trị cache
+            </Link>
+          )}
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 ﻿using System.Security.Claims;
-using airsafenet_backend.Services;
 using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Air;
+using airsafenet_backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -14,10 +14,13 @@ namespace AirSafeNet.Api.Controllers
     public class AirController : ControllerBase
     {
         private readonly AppDbContext _db;
-        private readonly AiService _aiService;
-        private readonly AirExplainService _explainService; 
+        private readonly AiCachedService _aiService;     
+        private readonly AirExplainService _explainService;
 
-        public AirController(AppDbContext db, AiService aiService, AirExplainService explainService)
+        public AirController(
+            AppDbContext db,
+            AiCachedService aiService,
+            AirExplainService explainService)
         {
             _db = db;
             _aiService = aiService;
@@ -32,7 +35,7 @@ namespace AirSafeNet.Api.Controllers
 
             var aiResult = await _aiService.GetCurrentAsync(userGroup);
             if (aiResult == null)
-                return StatusCode(500, new { message = "Không lấy được dữ liệu current từ AI Server." });
+                return StatusCode(503, new { message = "Cache chưa sẵn sàng. Vui lòng chờ admin tính toán." });
 
             return Ok(new AirPredictResponse
             {
@@ -41,7 +44,7 @@ namespace AirSafeNet.Api.Controllers
                 Risk = aiResult.RiskProfile,
                 Recommendation = aiResult.RecommendationProfile,
                 UserGroup = userGroup,
-                GeneratedAt = DateTime.UtcNow
+                GeneratedAt = DateTime.UtcNow,
             });
         }
 
@@ -53,7 +56,7 @@ namespace AirSafeNet.Api.Controllers
 
             var aiForecast = await _aiService.GetForecastRangeAsync(userGroup, days);
             if (aiForecast == null)
-                return StatusCode(500, new { message = "Không lấy được forecast từ AI Server." });
+                return StatusCode(503, new { message = "Cache chưa sẵn sàng." });
 
             return Ok(new AirForecastResponse
             {
@@ -67,7 +70,7 @@ namespace AirSafeNet.Api.Controllers
                     Aqi = x.PredAqi,
                     Risk = x.RiskProfile,
                     Recommendation = x.RecommendationProfile,
-                    UserGroup = userGroup
+                    UserGroup = userGroup,
                 }).ToList()
             });
         }
@@ -80,7 +83,7 @@ namespace AirSafeNet.Api.Controllers
 
             var aiHistory = await _aiService.GetHistoryAsync(userGroup, days);
             if (aiHistory == null)
-                return StatusCode(500, new { message = "Không lấy được history từ AI Server." });
+                return StatusCode(503, new { message = "Cache chưa sẵn sàng." });
 
             return Ok(new
             {
@@ -94,7 +97,7 @@ namespace AirSafeNet.Api.Controllers
                     pm25 = x.Pm25,
                     aqi = x.Aqi,
                     risk = x.RiskProfile,
-                    recommendation = x.RecommendationProfile
+                    recommendation = x.RecommendationProfile,
                 })
             });
         }
@@ -107,7 +110,7 @@ namespace AirSafeNet.Api.Controllers
 
             var current = await _aiService.GetCurrentAsync(userGroup);
             if (current == null)
-                return StatusCode(500, new { message = "Không lấy được current AI data." });
+                return StatusCode(503, new { message = "Cache chưa sẵn sàng." });
 
             try
             {
@@ -125,8 +128,10 @@ namespace AirSafeNet.Api.Controllers
             var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (!int.TryParse(userIdValue, out var userId)) return null;
 
-            var prefs = await _db.UserPreferences.AsNoTracking()
+            var prefs = await _db.UserPreferences
+                .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId);
+
             return prefs?.UserGroup ?? "normal";
         }
     }

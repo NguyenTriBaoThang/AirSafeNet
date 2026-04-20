@@ -1,5 +1,6 @@
-using System.Text;
+﻿using System.Text;
 using airsafenet_backend.Data;
+using airsafenet_backend.Models;
 using airsafenet_backend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -7,50 +8,63 @@ using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// ── Database ──────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
         builder.Configuration.GetConnectionString("DefaultConnection")
     )
 );
 
+// ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<JwtService>();
-builder.Services.AddHttpClient<AiService>();
-builder.Services.AddHttpClient<WeatherService>();
-builder.Services.AddScoped<AirExplainService>();
 builder.Services.AddScoped<AssistantDomainService>();
 builder.Services.AddScoped<AssistantTimeResolverService>();
+
+builder.Services.AddHttpClient<AiCachedService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(30); 
+});
+
+builder.Services.AddHttpClient<AirExplainService>();
+
 builder.Services.AddHttpClient<OpenAiChatService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 builder.Services.AddHttpClient<GeminiChatService>();
 
-var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Missing Jwt:Key in appsettings.json");
+// ── JWT Authentication ─────────────────────────────────────────────────────────
+var jwtKey = builder.Configuration["Jwt:Key"]
+    ?? throw new InvalidOperationException("Missing Jwt:Key in appsettings.json");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "AirSafeNet";
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "AirSafeNetUsers";
 
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme).AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
     {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtIssuer,
-        ValidAudience = jwtAudience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
-    };
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+        };
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy =>
+        policy.RequireRole("Admin"));
 });
 
-builder.Services.AddAuthorization();
-
+// ── CORS ──────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
@@ -63,7 +77,6 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -71,12 +84,32 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseCors("AllowFrontend");
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+
+    var adminEmail = "admin@airsafenet.local";
+    var hasAdmin = db.Users.Any(u => u.Email.ToLower() == adminEmail.ToLower());
+
+    if (!hasAdmin)
+    {
+        var admin = new User
+        {
+            Email = adminEmail,
+            FullName = "System Admin",
+            Role = "Admin",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@12345")
+        };
+        db.Users.Add(admin);
+
+        db.SaveChanges();
+    }
+}
 
 app.Run();
