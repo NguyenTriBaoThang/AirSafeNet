@@ -4,6 +4,7 @@ type StatusVariant =
   | "warning"
   | "danger"
   | "info"
+  | "error"
   | "purple";
 
 type Props = {

@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import ImpactPage from "./pages/ImpactPage";
 import UserPreferencesPage from "./pages/UserPreferences";
 import AssistantPage from "./pages/AssistantPage";
 import AdminPage from "./pages/AdminPage";
@@ -110,6 +111,17 @@ export default function App() {
               </AppShell>
             </PrivateRoute>
           }
+        />
+
+        <Route 
+          path="/impact" 
+          element={
+            <PrivateRoute>
+              <AppShell>
+                <ImpactPage />
+              </AppShell>
+            </PrivateRoute>
+          } 
         />
 
         <Route

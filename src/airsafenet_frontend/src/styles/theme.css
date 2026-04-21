@@ -4018,6 +4018,7 @@ p {
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 20px;
+  margin-bottom: 25px;
   overflow: hidden;
 }
 
@@ -6443,4 +6444,81 @@ input.input-error:focus {
   .who-legend__colors {
     gap: 8px;
   }
+}
+
+/* ── Impact teaser card ── */
+
+.impact-teaser-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  border-radius: 16px;
+  background: rgba(37,99,235,0.07);
+  border: 1px solid rgba(37,99,235,0.2);
+  text-decoration: none;
+  transition: background 0.18s, border-color 0.18s, transform 0.18s;
+  margin-top: 4px;
+}
+
+.impact-teaser-card:hover {
+  background: rgba(37,99,235,0.13);
+  border-color: rgba(37,99,235,0.35);
+  transform: translateX(3px);
+}
+
+.impact-teaser-card__left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.impact-teaser-card__icon { font-size: 28px; flex-shrink: 0; }
+
+.impact-teaser-card__left > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.impact-teaser-card__left strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: #93c5fd;
+}
+
+.impact-teaser-card__left span {
+  font-size: 12.5px;
+  color: var(--muted, #64748b);
+  line-height: 1.4;
+}
+
+.impact-teaser-card__arrow {
+  font-size: 20px;
+  color: #3b82f6;
+  flex-shrink: 0;
+  transition: transform 0.18s;
+}
+
+.impact-teaser-card:hover .impact-teaser-card__arrow {
+  transform: translateX(4px);
+}
+
+/* ── Days select trên ImpactPage header ── */
+.impact-days-select {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: var(--text, #e8eefc);
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+.impact-days-select:focus {
+  border-color: rgba(37,99,235,0.5);
 }
