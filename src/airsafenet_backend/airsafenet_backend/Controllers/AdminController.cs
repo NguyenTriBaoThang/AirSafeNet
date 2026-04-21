@@ -3,6 +3,7 @@ using airsafenet_backend.DTOs.Admin;
 using airsafenet_backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace airsafenet_backend.Controllers
 {
@@ -14,21 +15,18 @@ namespace airsafenet_backend.Controllers
         private readonly AiCachedService _aiCachedService;
         private readonly ILogger<AdminController> _logger;
 
-        public AdminController(
-            AiCachedService aiCachedService,
-            ILogger<AdminController> logger)
+        public AdminController(AiCachedService aiCachedService, ILogger<AdminController> logger)
         {
             _aiCachedService = aiCachedService;
             _logger = logger;
         }
 
         [HttpPost("compute")]
-        public async Task<IActionResult> TriggerCompute(
-            [FromQuery] bool force = true)
+        [EnableRateLimiting("admin-compute")]
+        public async Task<IActionResult> TriggerCompute([FromQuery] bool force = true)
         {
-            var adminEmail = User.FindFirstValue(ClaimTypes.Email) ?? "unknown";
-            _logger.LogInformation(
-                "Admin {Email} kích hoạt compute (force={Force})", adminEmail, force);
+            var email = User.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+            _logger.LogInformation("Admin {Email} trigger compute (force={Force})", email, force);
 
             try
             {
@@ -59,9 +57,8 @@ namespace airsafenet_backend.Controllers
         [HttpDelete("cache/clear")]
         public async Task<IActionResult> ClearCache()
         {
-            var adminEmail = User.FindFirstValue(ClaimTypes.Email) ?? "unknown";
-            _logger.LogWarning("Admin {Email} xóa toàn bộ cache", adminEmail);
-
+            var email = User.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+            _logger.LogWarning("Admin {Email} xóa cache", email);
             try
             {
                 var result = await _aiCachedService.ClearCacheAsync();

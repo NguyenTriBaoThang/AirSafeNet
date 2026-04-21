@@ -70,14 +70,23 @@ namespace airsafenet_backend.Services
             var body = await response.Content.ReadAsStringAsync();
 
             _logger.LogInformation("Gemini status: {StatusCode}", (int)response.StatusCode);
-            _logger.LogInformation("Gemini raw body: {Body}", body);
 
             if (!response.IsSuccessStatusCode)
             {
-                throw new Exception($"Gemini error: {(int)response.StatusCode} - {body}");
+                _logger.LogError("Gemini error body: {Body}", body);
+                // Trả về fallback thân thiện thay vì throw → tránh 500 ở controller
+                return "Xin lỗi, mình đang gặp sự cố kết nối. Bạn thử lại sau một chút nhé! 🙏";
             }
 
-            return ExtractTextFromResponse(body);
+            try
+            {
+                return ExtractTextFromResponse(body);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi parse Gemini response. Body: {Body}", body[..Math.Min(500, body.Length)]);
+                return "Xin lỗi, mình chưa thể xử lý câu trả lời lúc này. Bạn thử lại sau nhé!";
+            }
         }
 
         public async Task<string> GenerateConversationTitleAsync(string userMessage)
@@ -175,42 +184,64 @@ Hãy tạo tiêu đề ngắn cho hội thoại.
             using var doc = JsonDocument.Parse(body);
             var root = doc.RootElement;
 
+            // ── Kiểm tra error từ Gemini API ──────────────────────────────────
+            if (root.TryGetProperty("error", out var errorProp))
+            {
+                var errMsg = errorProp.TryGetProperty("message", out var em)
+                    ? em.GetString() : "Unknown Gemini error";
+                throw new Exception($"Gemini API error: {errMsg}");
+            }
+
             if (!root.TryGetProperty("candidates", out var candidates) ||
                 candidates.ValueKind != JsonValueKind.Array ||
                 candidates.GetArrayLength() == 0)
             {
-                throw new Exception($"Không tìm thấy candidates trong phản hồi Gemini. Raw body: {body}");
+                // ── promptFeedback bị block (safety filter) ──────────────────
+                if (root.TryGetProperty("promptFeedback", out var feedback) &&
+                    feedback.TryGetProperty("blockReason", out var reason))
+                {
+                    return "Xin lỗi, câu hỏi của bạn không thể được xử lý do bộ lọc nội dung. Vui lòng thử lại với câu hỏi khác.";
+                }
+                throw new Exception($"Không tìm thấy candidates trong phản hồi Gemini. Body: {body[..Math.Min(500, body.Length)]}");
             }
 
             var firstCandidate = candidates[0];
 
+            // ── finishReason không phải STOP → có thể bị cắt hoặc lỗi ────────
+            if (firstCandidate.TryGetProperty("finishReason", out var finishReason))
+            {
+                var reason = finishReason.GetString();
+                if (reason is "SAFETY" or "RECITATION")
+                {
+                    return "Xin lỗi, mình không thể trả lời câu hỏi này. Vui lòng thử lại với cách diễn đạt khác.";
+                }
+                // "OTHER", "MAX_TOKENS" → vẫn cố lấy text nếu có
+            }
+
             if (!firstCandidate.TryGetProperty("content", out var content) ||
                 !content.TryGetProperty("parts", out var parts) ||
-                parts.ValueKind != JsonValueKind.Array)
+                parts.ValueKind != JsonValueKind.Array ||
+                parts.GetArrayLength() == 0)
             {
-                throw new Exception($"Không tìm thấy content.parts trong phản hồi Gemini. Raw body: {body}");
+                // Trả về fallback thay vì throw
+                return "Xin lỗi, mình chưa thể trả lời lúc này. Bạn thử lại sau nhé!";
             }
 
             var texts = new List<string>();
-
             foreach (var part in parts.EnumerateArray())
             {
                 if (part.TryGetProperty("text", out var textElement))
                 {
                     var text = textElement.GetString();
                     if (!string.IsNullOrWhiteSpace(text))
-                    {
                         texts.Add(text);
-                    }
                 }
             }
 
             var result = string.Join("\n", texts).Trim();
 
             if (string.IsNullOrWhiteSpace(result))
-            {
-                throw new Exception($"Gemini không trả về text hợp lệ. Raw body: {body}");
-            }
+                return "Xin lỗi, mình chưa thể tạo câu trả lời lúc này. Bạn thử lại sau nhé!";
 
             return result;
         }

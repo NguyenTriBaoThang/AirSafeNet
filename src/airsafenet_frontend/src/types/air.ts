@@ -1,16 +1,26 @@
 export type AirPredictResponse = {
-  pm25: number; aqi: number; risk: string;
-  recommendation: string; userGroup: string; generatedAt: string;
+  pm25: number;
+  aqi: number;
+  risk: string;
+  recommendation: string;
+  userGroup: string;
+  generatedAt: string;
 };
 
 export type AirForecastItemResponse = {
-  time: string; pm25: number; aqi: number;
-  risk: string; recommendation: string; userGroup: string;
+  time: string;
+  pm25: number;
+  aqi: number;
+  risk: string;
+  recommendation: string;
+  userGroup: string;
 };
 
 export type AirForecastResponse = {
-  userGroup: string; generatedAt: string;
-  hours: number; forecast: AirForecastItemResponse[];
+  userGroup: string;
+  generatedAt: string;
+  hours: number;
+  forecast: AirForecastItemResponse[];
 };
 
 export type AiExplainResponse = {
@@ -18,14 +28,14 @@ export type AiExplainResponse = {
   predAqi: number;
   aqiCategory: string;
 
-  windSpeed: number;        // km/h
-  windDirection: number;    // degrees
-  humidity: number;         // %
-  temperature: number;      // °C
-  pressure: number;         // hPa
-  uvIndex: number;          // WHO 0-11+
-  cloudCover: number;       // %
-  observedPm25: number;     // µg/m³
+  windSpeed: number;
+  windDirection: number;     
+  humidity: number;
+  temperature: number;
+  pressure: number;         
+  uvIndex: number;
+  cloudCover: number;
+  observedPm25: number;
 
   windImpact: number;
   humidityImpact: number;

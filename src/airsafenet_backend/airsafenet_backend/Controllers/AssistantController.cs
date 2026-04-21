@@ -1,4 +1,5 @@
 using airsafenet_backend.Data;
+using airsafenet_backend.DTOs.Air;
 using airsafenet_backend.DTOs.Assistant;
 using airsafenet_backend.Models;
 using airsafenet_backend.Services;
@@ -15,14 +16,14 @@ namespace airsafenet_backend.Controllers
     public class AssistantController : ControllerBase
     {
         private readonly AppDbContext _db;
-        private readonly AiService _aiService;
+        private readonly AiCachedService _aiService;
         private readonly AssistantDomainService _domainService;
         private readonly GeminiChatService _geminiChatService;
         private readonly AssistantTimeResolverService _timeResolverService;
 
         public AssistantController(
             AppDbContext db,
-            AiService aiService,
+            AiCachedService aiService,
             AssistantDomainService domainService,
             GeminiChatService geminiChatService,
             AssistantTimeResolverService timeResolverService)
@@ -245,75 +246,107 @@ namespace airsafenet_backend.Controllers
             var current = await _aiService.GetCurrentAsync(userGroup);
             var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1);
 
-            if (current == null || forecast == null || forecast.Forecast.Count == 0)
-            {
-                return StatusCode(500, new
-                {
-                    message = "Không lấy được dữ liệu từ AI Server để hỗ trợ trả lời."
-                });
-            }
+            // ✅ Fix: 503 = cache chưa sẵn sàng → trả lời graceful thay vì 500
+            bool hasLiveData = current != null && forecast != null && forecast.Forecast.Count > 0;
 
             var nowLocal = DateTime.Now;
+            string nowStr = nowLocal.ToString("HH:mm, dd/MM/yyyy");
 
-            var forecastMatch = _timeResolverService.MatchForecast(
-                request.Message,
-                forecast.Forecast,
-                nowLocal
-            );
+            AiForecastItem? matched = null;
+            AssistantTimeResolverService.ForecastMatchResult? forecastMatch = null;
 
-            var matched = forecastMatch.Item ?? forecast.Forecast
-                .OrderByDescending(x => x.PredAqi)
-                .First();
+            if (hasLiveData)
+            {
+                forecastMatch = _timeResolverService.MatchForecast(
+                    request.Message,
+                    forecast!.Forecast,
+                    nowLocal
+                );
+                matched = forecastMatch.Item ?? forecast.Forecast
+                    .OrderByDescending(x => x.PredAqi)
+                    .First();
+            }
 
-            var systemPrompt = """
-Bạn là trợ lý ảo của AirSafeNet.
+            // ── System prompt cải tiến ─────────────────────────────────────────
+            var systemPrompt = $"""
+Bạn là AirSafeNet Assistant — trợ lý ảo thông minh về chất lượng không khí tại TP. Hồ Chí Minh.
 
-Chỉ được trả lời các câu hỏi liên quan đến:
-- chất lượng không khí
-- AQI, PM2.5
-- dự báo theo thời gian
-- mức độ rủi ro sức khỏe liên quan ô nhiễm không khí
-- khuyến nghị hoạt động ngoài trời / trong nhà
-- giải thích dữ liệu AirSafeNet
+PHẠM VI TRẢ LỜI:
+Chỉ trả lời các chủ đề: AQI, PM2.5, bụi mịn, ô nhiễm không khí, dự báo thời tiết không khí,
+mức độ rủi ro sức khỏe, khuyến nghị hoạt động (chạy bộ, đưa trẻ ra ngoài, đeo khẩu trang...),
+nhóm người nhạy cảm (trẻ em, người cao tuổi, người bệnh hô hấp), giải thích dữ liệu AirSafeNet.
 
-Không được trả lời các câu hỏi ngoài phạm vi trên.
-Nếu câu hỏi ngoài phạm vi, hãy từ chối ngắn gọn và lịch sự.
+Nếu câu hỏi ngoài phạm vi → từ chối lịch sự: "Mình chỉ hỗ trợ về chất lượng không khí và sức khỏe môi trường."
 
-Khi trả lời:
-- ưu tiên tuyệt đối dữ liệu trong context
-- không tự bịa thêm số liệu
-- nếu dữ liệu chưa đủ, nói rõ là chưa đủ dữ liệu
-- trả lời tự nhiên, dễ hiểu, thân thiện
-- ngắn gọn, thực tế, ưu tiên tính an toàn cho người dùng
+CÁCH TRẢ LỜI (quan trọng):
+- Ưu tiên tuyệt đối số liệu trong context, KHÔNG tự bịa
+- Trả lời bằng tiếng Việt, TỰ NHIÊN như người thật, thân thiện, ấm áp
+- Ngắn gọn, thực tế, dễ hiểu — tránh liệt kê gạch đầu dòng quá nhiều
+- Đưa ra khuyến nghị cụ thể phù hợp nhóm "{userGroup}"
+- Nếu AQI tốt → khích lệ ra ngoài. Nếu AQI cao → nhắc nhở cụ thể cách bảo vệ
+- Giờ hiện tại: {nowStr}
+
+{(hasLiveData ? "" : "LƯU Ý: Hệ thống chưa có dữ liệu real-time. Trả lời dựa trên kiến thức chung về không khí TP.HCM.")}
 """;
 
-            var userPrompt = $"""
-Ngữ cảnh hệ thống AirSafeNet:
-- User group: {userGroup}
-- Current AQI: {current.PredAqi}
-- Current PM2.5: {current.PredPm25}
-- Current risk: {current.RiskProfile}
-- Current recommendation: {current.RecommendationProfile}
+            // ── User prompt với context đầy đủ ────────────────────────────────
+            string contextBlock;
+            if (hasLiveData)
+            {
+                var riskViet = current!.RiskProfile switch
+                {
+                    "GOOD" => "Tốt",
+                    "MODERATE" => "Trung bình",
+                    "UNHEALTHY_SENSITIVE" => "Không tốt cho nhóm nhạy cảm",
+                    "UNHEALTHY" => "Không tốt",
+                    "VERY_UNHEALTHY" => "Rất không tốt",
+                    "HAZARDOUS" => "Nguy hiểm",
+                    _ => current.RiskProfile
+                };
 
-Phân tích thời gian từ câu hỏi:
-- Matched phrase: {forecastMatch.MatchedPhrase ?? "không xác định rõ"}
-- Target time: {forecastMatch.TargetTime?.ToString("yyyy-MM-dd HH:mm") ?? "không xác định"}
-- Is fallback: {forecastMatch.IsFallback}
+                var groupViet = userGroup switch
+                {
+                    "children" => "Trẻ em",
+                    "elderly" => "Người cao tuổi",
+                    "respiratory" => "Người có bệnh hô hấp",
+                    _ => "Người bình thường"
+                };
 
-Mốc forecast được chọn gần nhất:
-- Time: {matched.Time}
+                contextBlock = $"""
+[DỮ LIỆU REAL-TIME AIRSAFENET]
+Thời điểm: {nowStr}
+Nhóm người dùng: {groupViet}
+
+Hiện tại:
+- AQI: {current.PredAqi} ({riskViet})
+- PM2.5: {current.PredPm25:F1} µg/m³
+- Khuyến nghị: {current.RecommendationProfile}
+
+Mốc thời gian liên quan đến câu hỏi:
+- Thời điểm: {matched!.Time}
 - AQI: {matched.PredAqi}
-- PM2.5: {matched.PredPm25}
-- Risk: {matched.RiskProfile}
-- Recommendation: {matched.RecommendationProfile}
+- PM2.5: {matched.PredPm25:F1} µg/m³
+- Mức độ rủi ro: {matched.RiskProfile}
+- Khuyến nghị: {matched.RecommendationProfile}
+{(forecastMatch?.IsFallback == true ? "(Dùng mốc gần nhất vì không xác định được thời gian cụ thể)" : "")}
+""";
+            }
+            else
+            {
+                contextBlock = $"""
+[THÔNG BÁO HỆ THỐNG]
+Dữ liệu real-time chưa sẵn sàng (cache đang khởi tạo).
+Thời điểm hiện tại: {nowStr}
+Nhóm người dùng: {userGroup}
+Hãy trả lời dựa trên kiến thức chung, và nhắc người dùng xem dashboard sau khi hệ thống hoàn tất khởi tạo.
+""";
+            }
 
-Câu hỏi người dùng:
+            var userPrompt = $"""
+{contextBlock}
+
+Câu hỏi của người dùng:
 {request.Message}
-
-Yêu cầu trả lời:
-- nếu người dùng hỏi một mốc thời gian cụ thể, hãy trả lời bám sát mốc đó
-- nói rõ nếu hệ thống đang dùng mốc gần nhất do không xác định được thời gian chính xác
-- trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, dễ hiểu
 """;
 
             var answer = await _geminiChatService.GenerateAssistantAnswerAsync(
@@ -327,8 +360,8 @@ Yêu cầu trả lời:
                 Role = "assistant",
                 Content = answer,
                 UserGroup = userGroup,
-                CurrentAqi = current.PredAqi,
-                CurrentPm25 = current.PredPm25,
+                CurrentAqi = hasLiveData ? current!.PredAqi : (int?)null,
+                CurrentPm25 = hasLiveData ? current!.PredPm25 : (double?)null,
                 SourceUserMessageId = userMessage.Id,
                 RegeneratedCount = 0,
                 CreatedAt = DateTime.UtcNow,
@@ -358,18 +391,18 @@ Yêu cầu trả lời:
                 InDomain = true,
                 Answer = answer,
                 ConversationId = conversation.Id,
-                Source = new
+                Source = hasLiveData ? (object)new
                 {
                     userGroup,
-                    currentAqi = current.PredAqi,
+                    currentAqi = current!.PredAqi,
                     currentPm25 = current.PredPm25,
-                    matchedPhrase = forecastMatch.MatchedPhrase,
+                    matchedPhrase = forecastMatch!.MatchedPhrase,
                     targetTime = forecastMatch.TargetTime,
                     isFallback = forecastMatch.IsFallback,
-                    matchedForecastTime = matched.Time,
+                    matchedForecastTime = matched!.Time,
                     matchedForecastAqi = matched.PredAqi,
-                    matchedForecastPm25 = matched.PredPm25
-                }
+                    matchedForecastPm25 = matched.PredPm25,
+                } : new { userGroup, note = "no live data" }
             });
         }
 
@@ -596,83 +629,76 @@ Yêu cầu trả lời:
             var current = await _aiService.GetCurrentAsync(userGroup);
             var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1);
 
-            if (current == null || forecast == null || forecast.Forecast.Count == 0)
+            bool hasLiveDataRegen = current != null && forecast != null && forecast.Forecast.Count > 0;
+            var nowLocalRegen = DateTime.Now;
+            string nowStrRegen = nowLocalRegen.ToString("HH:mm, dd/MM/yyyy");
+
+            AiForecastItem? matchedRegen = null;
+            AssistantTimeResolverService.ForecastMatchResult? forecastMatchRegen = null;
+
+            if (hasLiveDataRegen)
             {
-                return StatusCode(500, new
-                {
-                    message = "Không lấy được dữ liệu từ AI Server để hỗ trợ regenerate."
-                });
+                forecastMatchRegen = _timeResolverService.MatchForecast(
+                    sourceUserMessage.Content,
+                    forecast!.Forecast,
+                    nowLocalRegen
+                );
+                matchedRegen = forecastMatchRegen.Item ?? forecast.Forecast
+                    .OrderByDescending(x => x.PredAqi)
+                    .First();
             }
 
-            var nowLocal = DateTime.Now;
+            var groupVietRegen = userGroup switch
+            {
+                "children" => "Trẻ em",
+                "elderly" => "Người cao tuổi",
+                "respiratory" => "Người có bệnh hô hấp",
+                _ => "Người bình thường"
+            };
 
-            var forecastMatch = _timeResolverService.MatchForecast(
-                sourceUserMessage.Content,
-                forecast.Forecast,
-                nowLocal
-            );
+            var systemPromptRegen = $"""
+Bạn là AirSafeNet Assistant — trợ lý ảo thông minh về chất lượng không khí tại TP. Hồ Chí Minh.
 
-            var matched = forecastMatch.Item ?? forecast.Forecast
-                .OrderByDescending(x => x.PredAqi)
-                .First();
+PHẠM VI TRẢ LỜI:
+Chỉ trả lời các chủ đề: AQI, PM2.5, bụi mịn, ô nhiễm không khí, dự báo thời tiết không khí,
+mức độ rủi ro sức khỏe, khuyến nghị hoạt động, nhóm nhạy cảm, giải thích dữ liệu AirSafeNet.
 
-            var systemPrompt = """
-Bạn là trợ lý ảo của AirSafeNet.
-
-Chỉ được trả lời các câu hỏi liên quan đến:
-- chất lượng không khí
-- AQI, PM2.5
-- dự báo theo thời gian
-- mức độ rủi ro sức khỏe liên quan ô nhiễm không khí
-- khuyến nghị hoạt động ngoài trời / trong nhà
-- giải thích dữ liệu AirSafeNet
-
-Không được trả lời các câu hỏi ngoài phạm vi trên.
-Nếu câu hỏi ngoài phạm vi, hãy từ chối ngắn gọn và lịch sự.
-
-Khi trả lời:
-- ưu tiên tuyệt đối dữ liệu trong context
-- không tự bịa thêm số liệu
-- nếu dữ liệu chưa đủ, nói rõ là chưa đủ dữ liệu
-- trả lời tự nhiên, dễ hiểu, thân thiện
-- ngắn gọn, thực tế, ưu tiên tính an toàn cho người dùng
+CÁCH TRẢ LỜI:
+- Ưu tiên tuyệt đối số liệu trong context, KHÔNG tự bịa
+- Trả lời bằng tiếng Việt, tự nhiên như người thật, thân thiện, ấm áp
+- Đây là lần regenerate — hãy trả lời theo góc độ hoặc cách diễn đạt KHÁC so với lần trước
+- Nhóm người dùng: {groupVietRegen}. Thời điểm: {nowStrRegen}
+{(hasLiveDataRegen ? "" : "LƯU Ý: Dữ liệu real-time chưa sẵn sàng, trả lời dựa trên kiến thức chung.")}
 """;
 
-            var userPrompt = $"""
-Ngữ cảnh hệ thống AirSafeNet:
-- User group: {userGroup}
-- Current AQI: {current.PredAqi}
-- Current PM2.5: {current.PredPm25}
-- Current risk: {current.RiskProfile}
-- Current recommendation: {current.RecommendationProfile}
+            string contextBlockRegen = hasLiveDataRegen
+                ? $"""
+[DỮ LIỆU REAL-TIME AIRSAFENET]
+Thời điểm: {nowStrRegen} | Nhóm: {groupVietRegen}
+AQI hiện tại: {current!.PredAqi} | PM2.5: {current.PredPm25:F1} µg/m³
+Khuyến nghị: {current.RecommendationProfile}
 
-Phân tích thời gian từ câu hỏi:
-- Matched phrase: {forecastMatch.MatchedPhrase ?? "không xác định rõ"}
-- Target time: {forecastMatch.TargetTime?.ToString("yyyy-MM-dd HH:mm") ?? "không xác định"}
-- Is fallback: {forecastMatch.IsFallback}
+Mốc liên quan đến câu hỏi:
+- Thời điểm: {matchedRegen!.Time}
+- AQI: {matchedRegen.PredAqi} | PM2.5: {matchedRegen.PredPm25:F1} µg/m³
+- Rủi ro: {matchedRegen.RiskProfile}
+- Khuyến nghị: {matchedRegen.RecommendationProfile}
+"""
+                : $"[Dữ liệu real-time chưa sẵn sàng — Thời điểm: {nowStrRegen}]";
 
-Mốc forecast được chọn gần nhất:
-- Time: {matched.Time}
-- AQI: {matched.PredAqi}
-- PM2.5: {matched.PredPm25}
-- Risk: {matched.RiskProfile}
-- Recommendation: {matched.RecommendationProfile}
+            var userPromptRegen = $"""
+{contextBlockRegen}
 
-Câu hỏi người dùng:
+Câu hỏi của người dùng:
 {sourceUserMessage.Content}
-
-Yêu cầu trả lời:
-- nếu người dùng hỏi một mốc thời gian cụ thể, hãy trả lời bám sát mốc đó
-- nói rõ nếu hệ thống đang dùng mốc gần nhất do không xác định được thời gian chính xác
-- trả lời bằng tiếng Việt, tự nhiên, ngắn gọn, dễ hiểu
 """;
 
-            var answer = await _geminiChatService.GenerateAssistantAnswerAsync(systemPrompt, userPrompt);
+            var answer = await _geminiChatService.GenerateAssistantAnswerAsync(systemPromptRegen, userPromptRegen);
 
             assistantMessage.Content = answer;
             assistantMessage.UserGroup = userGroup;
-            assistantMessage.CurrentAqi = current.PredAqi;
-            assistantMessage.CurrentPm25 = current.PredPm25;
+            assistantMessage.CurrentAqi = hasLiveDataRegen ? current!.PredAqi : null;
+            assistantMessage.CurrentPm25 = hasLiveDataRegen ? current!.PredPm25 : null;
             assistantMessage.SourceUserMessageId = sourceUserMessage.Id;
             assistantMessage.RegeneratedCount += 1;
             assistantMessage.UpdatedAt = DateTime.UtcNow;
@@ -689,18 +715,18 @@ Yêu cầu trả lời:
                 Answer = answer,
                 RegeneratedCount = assistantMessage.RegeneratedCount,
                 UpdatedAt = assistantMessage.UpdatedAt ?? DateTime.UtcNow,
-                Source = new
+                Source = hasLiveDataRegen ? (object)new
                 {
                     userGroup,
-                    currentAqi = current.PredAqi,
+                    currentAqi = current!.PredAqi,
                     currentPm25 = current.PredPm25,
-                    matchedPhrase = forecastMatch.MatchedPhrase,
-                    targetTime = forecastMatch.TargetTime,
-                    isFallback = forecastMatch.IsFallback,
-                    matchedForecastTime = matched.Time,
-                    matchedForecastAqi = matched.PredAqi,
-                    matchedForecastPm25 = matched.PredPm25
-                }
+                    matchedPhrase = forecastMatchRegen?.MatchedPhrase,
+                    targetTime = forecastMatchRegen?.TargetTime,
+                    isFallback = forecastMatchRegen?.IsFallback ?? true,
+                    matchedForecastTime = matchedRegen?.Time,
+                    matchedForecastAqi = matchedRegen?.PredAqi,
+                    matchedForecastPm25 = matchedRegen?.PredPm25,
+                } : new { userGroup, note = "no live data" }
             });
         }
     }

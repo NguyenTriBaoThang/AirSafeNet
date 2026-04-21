@@ -16,21 +16,13 @@ from app.profiles import aqi_to_category, recommendation_from_aqi, risk_for_prof
 
 logger = logging.getLogger(__name__)
 
-# Load model 1 lần duy nhất khi import
 MODEL = joblib.load(MODEL_PATH)
 
-# ── Hằng số điều chỉnh forecast ──────────────────────────────────────────────
-
-# Giới hạn mức thay đổi PM2.5 tối đa mỗi giờ (µg/m³).
-# Thực tế PM2.5 HCMC thường dao động 0–5 µg/m³/giờ trong điều kiện bình thường,
-# tối đa ~15 µg/m³/giờ khi có sự kiện đặc biệt (đốt rơm, kẹt xe nặng).
 MAX_HOURLY_DELTA = 12.0
 
-# Giới hạn tuyệt đối cho PM2.5 dự báo (µg/m³)
 PM25_MIN = 0.0
 PM25_MAX = 300.0
 
-# Số giờ lịch sử tối thiểu để model hoạt động ổn định
 MIN_HISTORY_ROWS = 30
 
 
@@ -42,13 +34,7 @@ def load_metadata() -> dict[str, Any]:
         return {}
 
 
-# ── Core prediction helpers ───────────────────────────────────────────────────
-
 def _predict_pm25_from_history(history_df: pd.DataFrame) -> float:
-    """
-    Dự báo PM2.5 cho timestep ngay sau history_df dựa trên latest_feature_vector.
-    Dùng cho get_current_snapshot() — không có future exogenous.
-    """
     X = latest_feature_vector(history_df)
     pred = float(MODEL.predict(X)[0])
     return float(np.clip(pred, PM25_MIN, PM25_MAX))
@@ -60,26 +46,9 @@ def _predict_pm25_with_exogenous(
     step_index: int,
     prev_pred_pm25: float | None = None,
 ) -> float:
-    """
-    Dự báo PM2.5 cho 1 bước forecast với đầy đủ weather exogenous features.
-
-    1. Dùng build_feature_vector_for_step() thay vì latest_feature_vector()
-       → Weather features (temp, humidity, wind...) lấy từ future_row thật,
-         không phải từ history bị stale.
-    2. MAX_HOURLY_DELTA clipping: ngăn model nhảy quá xa so với giờ trước
-       → Loại bỏ "flat loop" do feedback loop cộng hưởng.
-    3. Hard clip [PM25_MIN, PM25_MAX] để đảm bảo range hợp lý.
-
-    Args:
-        working_history: lịch sử đã bao gồm các predicted rows trước đó
-        future_row: Series chứa weather exogenous của timestep cần predict
-        step_index: 0-based index của bước forecast
-        prev_pred_pm25: PM2.5 predicted ở bước liền trước (để clamp delta)
-    """
     X = build_feature_vector_for_step(working_history, future_row, step_index)
     raw_pred = float(MODEL.predict(X)[0])
 
-    # Clamp delta so với bước liền trước
     if prev_pred_pm25 is not None:
         delta = raw_pred - prev_pred_pm25
         delta_clamped = float(np.clip(delta, -MAX_HOURLY_DELTA, MAX_HOURLY_DELTA))
@@ -89,8 +58,6 @@ def _predict_pm25_with_exogenous(
 
     return float(np.clip(pred, PM25_MIN, PM25_MAX))
 
-
-# ── Profile columns ───────────────────────────────────────────────────────────
 
 def _build_profile_columns(forecast_df: pd.DataFrame) -> pd.DataFrame:
     profiles = ["general", "children", "elderly", "respiratory"]
@@ -104,32 +71,7 @@ def _build_profile_columns(forecast_df: pd.DataFrame) -> pd.DataFrame:
     return forecast_df
 
 
-# ── Main forecast builder ─────────────────────────────────────────────────────
-
 def build_forecast_df(days: int = 1) -> pd.DataFrame:
-    """
-    Build forecast DataFrame cho N ngày tới.
-
-    Pipeline (đã fix):
-    ┌─────────────────────────────────────────────────────────────────────┐
-    │  Bước gốc (bị flat):                                                │
-    │    working_history ──► latest_feature_vector ──► pred_pm25          │
-    │         ▲                                             │             │
-    │         └──── append(next_row, pm2_5=pred_pm25) ◄─────┘             │
-    │    → lag/roll features chỉ thấy pred_pm25 lặp đi lặp lại            │
-    │                                                                     │
-    │  Bước mới (đã fix):                                                 │
-    │    working_history ──► build_feature_vector_for_step(               │
-    │         ▲                  future_row=future_df[i],  ← weather thật │
-    │         │                  step_index=i              ← horizon info  │
-    │         │               ) ──► raw_pred                               │
-    │         │                        │                                   │
-    │         │               delta_clamp(raw_pred, prev_pred)             │
-    │         │                        │                                   │
-    │         └──── append(future_row, pm2_5=pred_pm25) ◄─────────────────┘
-    │    → Weather features thật + PM2.5 lag có variation tự nhiên        │
-    └─────────────────────────────────────────────────────────────────────┘
-    """
     days = max(1, min(days, 7))
     full_df = load_merged_dataset(
         past_hours=HISTORY_HOURS,
@@ -156,7 +98,6 @@ def build_forecast_df(days: int = 1) -> pd.DataFrame:
     working_history = history_df.copy()
     prev_pred_pm25: float | None = None
 
-    # Lấy observed PM2.5 cuối cùng làm anchor cho bước đầu tiên
     last_observed = float(history_df["pm2_5"].dropna().iloc[-1])
     prev_pred_pm25 = last_observed
 
@@ -179,13 +120,8 @@ def build_forecast_df(days: int = 1) -> pd.DataFrame:
             "aqi_category": aqi_category,
         })
 
-        # ── Cập nhật working_history với row mới ──────────────────────────
-        # Quan trọng: dùng TOÀN BỘ weather từ future_row (temp, humidity,
-        # wind, pressure...) chứ không chỉ gán pm2_5. Đây là điểm khác biệt
-        # cốt lõi so với bản gốc.
         next_row = future_row.copy()
         next_row["pm2_5"] = pred_pm25
-        # pm10 thường tương quan cao với pm2_5, ước lượng để lag features đúng
         if pd.isna(next_row.get("pm10")):
             next_row["pm10"] = pred_pm25 * 1.4
 
@@ -208,12 +144,39 @@ def build_forecast_df(days: int = 1) -> pd.DataFrame:
     return forecast_df
 
 
-# ── Current snapshot ──────────────────────────────────────────────────────────
+def _fetch_realtime_weather() -> dict[str, Any]:
+    try:
+        import requests
+        from app.config import LAT, LON, TIMEZONE
+
+        url = (
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={LAT}&longitude={LON}"
+            "&current=temperature_2m,relative_humidity_2m,wind_speed_10m,"
+            "wind_direction_10m,surface_pressure,uv_index,cloud_cover"
+            f"&timezone={TIMEZONE}"
+            "&wind_speed_unit=kmh"
+        )
+        resp = requests.get(url, timeout=8)
+        resp.raise_for_status()
+        c = resp.json().get("current", {})
+
+        return {
+            "temperature":    float(c.get("temperature_2m",       30.0)),
+            "humidity":       float(c.get("relative_humidity_2m", 70.0)),
+            "wind_speed":     float(c.get("wind_speed_10m",        5.0)),
+            "wind_direction": float(c.get("wind_direction_10m",  180.0)),
+            "pressure":       float(c.get("surface_pressure",   1010.0)),
+            "uv_index":       float(c.get("uv_index",              5.0)),
+            "cloud_cover":    float(c.get("cloud_cover",          40.0)),
+            "observed_at":    c.get("time", ""),
+        }
+    except Exception as exc:
+        logger.warning("_fetch_realtime_weather thất bại, dùng fallback history: %s", exc)
+        return {}
+
 
 def get_current_snapshot(user_group: str = "general") -> dict[str, Any]:
-    """
-    Snapshot hiện tại: dùng toàn bộ history để predict PM2.5 ngay bây giờ.
-    """
     full_df = load_merged_dataset(past_hours=HISTORY_HOURS, forecast_days=2)
     now = pd.Timestamp.now().tz_localize(None)
 
@@ -222,25 +185,39 @@ def get_current_snapshot(user_group: str = "general") -> dict[str, Any]:
         raise ValueError("Không có current history data.")
 
     pred_pm25 = _predict_pm25_from_history(history_df)
-    pred_aqi = pm25_to_aqi(pred_pm25)
-    latest = history_df.iloc[-1]
+    pred_aqi  = pm25_to_aqi(pred_pm25)
+    latest    = history_df.iloc[-1]
+
+    rt = _fetch_realtime_weather()
+
+    def rw(rt_key: str, hist_key: str, default: float = 0.0) -> float:
+        if rt_key in rt:
+            return round(float(rt[rt_key]), 2)
+        val = latest.get(hist_key, default)
+        return round(float(val if not pd.isna(val) else default), 2)
 
     return {
-        "time": str(pd.Timestamp(latest["time"]).isoformat()),
-        "observed_pm25": round(float(latest.get("pm2_5", 0) or 0), 2),
-        "observed_temp": round(float(latest.get("temp", 0) or 0), 2),
-        "observed_humidity": round(float(latest.get("humidity", 0) or 0), 2),
-        "observed_wind_speed": round(float(latest.get("wind_speed", 0) or 0), 2),
-        "pred_pm25": round(pred_pm25, 6),
-        "pred_aqi": int(pred_aqi),
-        "aqi_category": aqi_to_category(pred_aqi),
-        "risk_profile": risk_for_profile(pred_aqi, user_group),
+        "pred_pm25":              round(pred_pm25, 6),
+        "pred_aqi":               int(pred_aqi),
+        "aqi_category":           aqi_to_category(pred_aqi),
+        "risk_profile":           risk_for_profile(pred_aqi, user_group),
         "recommendation_profile": recommendation_from_aqi(pred_aqi, user_group),
-        "user_group": user_group,
+        "user_group":             user_group,
+
+        "observed_pm25":          round(float(latest.get("pm2_5", 0) or 0), 2),
+        "time":                   str(pd.Timestamp(latest["time"]).isoformat()),
+
+        "temperature":            rw("temperature",    "temp",       30.0),
+        "humidity":               rw("humidity",       "humidity",   70.0),
+        "wind_speed":             rw("wind_speed",     "wind_speed",  5.0),
+        "wind_direction":         rw("wind_direction", "wind_dir",  180.0),  # ✅ mới
+        "pressure":               rw("pressure",       "pressure", 1010.0),  # ✅ mới
+        "uv_index":               rw("uv_index",       "uv_index",    5.0),  # ✅ mới
+        "cloud_cover":            rw("cloud_cover",    "cloud_cover", 40.0), # ✅ mới
+        "weather_observed_at":    rt.get("observed_at", ""),
+        "weather_source":         "Open-Meteo Real-time" if rt else "History Fallback",
     }
 
-
-# ── Payload builders ──────────────────────────────────────────────────────────
 
 def forecast_range_payload(days: int = 1, profile: str = "general") -> dict[str, Any]:
     forecast_df = build_forecast_df(days=days)

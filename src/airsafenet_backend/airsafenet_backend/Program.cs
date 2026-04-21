@@ -1,8 +1,10 @@
 ﻿using System.Text;
+using System.Threading.RateLimiting;
 using airsafenet_backend.Data;
 using airsafenet_backend.Models;
 using airsafenet_backend.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -14,21 +16,20 @@ builder.Services.AddSwaggerGen();
 
 // ── Database ──────────────────────────────────────────────────────────────────
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")
-    )
-);
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AssistantDomainService>();
 builder.Services.AddScoped<AssistantTimeResolverService>();
 
+builder.Services.AddHttpClient<AiService>();
 builder.Services.AddHttpClient<AiCachedService>(client =>
 {
-    client.Timeout = TimeSpan.FromSeconds(30); 
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 
+// AirExplainService — real-time Open-Meteo
 builder.Services.AddHttpClient<AirExplainService>();
 
 builder.Services.AddHttpClient<OpenAiChatService>(client =>
@@ -36,17 +37,17 @@ builder.Services.AddHttpClient<OpenAiChatService>(client =>
     client.Timeout = TimeSpan.FromSeconds(60);
 });
 builder.Services.AddHttpClient<GeminiChatService>();
+builder.Services.AddHttpClient<WeatherService>();
 
-// ── JWT Authentication ─────────────────────────────────────────────────────────
-var jwtKey = builder.Configuration["Jwt:Key"]
-    ?? throw new InvalidOperationException("Missing Jwt:Key in appsettings.json");
+// ── JWT ───────────────────────────────────────────────────────────────────────
+var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Thiếu Jwt:Key");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "AirSafeNet";
-var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "AirSafeNetUsers";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "AirSafeNet";
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+    .AddJwtBearer(opt =>
     {
-        options.TokenValidationParameters = new TokenValidationParameters
+        opt.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
@@ -60,19 +61,36 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("AdminOnly", policy =>
-        policy.RequireRole("Admin"));
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+});
+
+var rlWindow = int.Parse(builder.Configuration["RateLimiting:AdminComputeWindowSeconds"] ?? "300");
+var rlMaxReqs = int.Parse(builder.Configuration["RateLimiting:AdminComputeMaxRequests"] ?? "3");
+
+builder.Services.AddRateLimiter(opt =>
+{
+    opt.AddFixedWindowLimiter("admin-compute", limiter =>
+    {
+        limiter.PermitLimit = rlMaxReqs;
+        limiter.Window = TimeSpan.FromSeconds(rlWindow);
+        limiter.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        limiter.QueueLimit = 0;
+    });
+
+    opt.RejectionStatusCode = 429;
+    opt.OnRejected = async (ctx, _) =>
+    {
+        ctx.HttpContext.Response.ContentType = "application/json";
+        await ctx.HttpContext.Response.WriteAsync(
+            "{\"message\":\"Quá nhiều yêu cầu. Vui lòng chờ trước khi tính toán lại.\"}");
+    };
 });
 
 // ── CORS ──────────────────────────────────────────────────────────────────────
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.AllowAnyOrigin()
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
+        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
 });
 
 var app = builder.Build();
@@ -85,6 +103,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors("AllowFrontend");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

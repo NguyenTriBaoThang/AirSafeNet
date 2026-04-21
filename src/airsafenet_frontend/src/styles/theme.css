@@ -5059,3 +5059,284 @@ p {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.4; }
 }
+
+/* ── 503 Cache Initializing State ─────────────────────────── */
+.cache-init-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 32px;
+  max-width: 500px;
+  margin: 0 auto;
+  gap: 16px;
+}
+
+.cache-init-state__icon { font-size: 48px; }
+
+.cache-init-state h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text, #e8eefc);
+  margin: 0;
+}
+
+.cache-init-state p {
+  font-size: 14px;
+  color: var(--muted, #94a3b8);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.cache-init-state__bar {
+  width: 100%;
+  max-width: 300px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.cache-init-state__bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2563eb, #06b6d4);
+  animation: cacheProgress 2.5s ease-in-out infinite;
+}
+
+@keyframes cacheProgress {
+  0%   { width: 0%;   transform: translateX(0); }
+  50%  { width: 70%;  transform: translateX(0); }
+  100% { width: 100%; transform: translateX(0); opacity: 0; }
+}
+
+/* ── Register validation ───────────────────────────────────── */
+.field-error {
+  display: block;
+  font-size: 12px;
+  color: #fca5a5;
+  margin: -6px 0 4px;
+}
+
+input.input-error {
+  border-color: rgba(239, 68, 68, 0.6) !important;
+  background: rgba(239, 68, 68, 0.05) !important;
+}
+
+input.input-error:focus {
+  outline-color: rgba(239, 68, 68, 0.5) !important;
+}
+
+.input-reveal {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-reveal input { flex: 1; padding-right: 60px; }
+
+.input-reveal__btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--muted, #94a3b8);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+.input-reveal__btn:hover { color: var(--text, #e8eefc); }
+
+.password-strength {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 8px;
+}
+
+.password-strength__bars {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.password-strength__bar {
+  height: 3px;
+  flex: 1;
+  border-radius: 999px;
+  transition: background 0.3s;
+}
+
+/* ── Home page live AQI ────────────────────────────────────── */
+.glass-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.glass-card__badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fca5a5;
+  letter-spacing: 0.05em;
+}
+
+.glass-card__loc {
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+}
+
+.mock-stat--aqi strong { font-size: 42px; line-height: 1; }
+
+.mock-stat__risk {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.mock-stat__skeleton {
+  color: rgba(255,255,255,0.2) !important;
+  animation: pulse 1.4s ease infinite;
+}
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.glass-card__note {
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+  text-align: center;
+  margin: 8px 0 0;
+}
+
+/* ── Health Score Widget ───────────────────────────────────── */
+.health-score-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.health-score-ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.health-score-ring svg { transform: rotate(-90deg); }
+
+.health-score-ring__value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.health-score-ring__label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 2px;
+  opacity: 0.7;
+}
+
+.health-score-info { flex: 1; min-width: 0; }
+
+.health-score-info h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text, #e8eefc);
+  margin: 0 0 4px;
+}
+
+.health-score-info p {
+  font-size: 12px;
+  color: var(--muted, #94a3b8);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.health-score-factors {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.health-factor-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid;
+}
+
+/* ── Mobile Responsive ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hero {
+    grid-template-columns: 1fr;
+  }
+  .hero__panel { display: none; }
+  .dashboard-two-col {
+    grid-template-columns: 1fr !important;
+  }
+  .summary-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-page,
+  .dashboard-page,
+  .auth-page {
+    padding: 16px;
+  }
+  .feature-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .section-toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .app-header__center { display: none; }
+  .forecast-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .forecast-table-wrap table {
+    min-width: 600px;
+    table-layout: fixed;
+  }
+}
+
+@media (max-width: 480px) {
+  .summary-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .admin-stats-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  h1 { font-size: 22px !important; }
+}
+
+/* ── ForecastTable mobile fix ──────────────────────────────── */
+.forecast-table-wrap {
+  overflow-x: auto;
+  border-radius: 12px;
+}

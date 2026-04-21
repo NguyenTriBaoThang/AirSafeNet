@@ -9,46 +9,69 @@ using Microsoft.EntityFrameworkCore;
 namespace AirSafeNet.Api.Controllers
 {
     [ApiController]
-    [Authorize]
     [Route("api/[controller]")]
     public class AirController : ControllerBase
     {
         private readonly AppDbContext _db;
-        private readonly AiCachedService _aiService;     
+        private readonly AiCachedService _aiService;
         private readonly AirExplainService _explainService;
 
-        public AirController(
-            AppDbContext db,
-            AiCachedService aiService,
-            AirExplainService explainService)
+        public AirController(AppDbContext db, AiCachedService aiService, AirExplainService explainService)
         {
             _db = db;
             _aiService = aiService;
             _explainService = explainService;
         }
 
+        [HttpGet("public/current")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetPublicCurrent()
+        {
+            try
+            {
+                var current = await _aiService.GetCurrentAsync("general");
+                if (current == null)
+                    return StatusCode(503, new { message = "Cache chưa sẵn sàng." });
+
+                return Ok(new
+                {
+                    aqi = current.PredAqi,
+                    pm25 = Math.Round(current.PredPm25, 1),
+                    risk = current.RiskProfile,
+                    aqi_category = current.AqiCategory,
+                });
+            }
+            catch
+            {
+                return StatusCode(503, new { message = "Dữ liệu chưa sẵn sàng." });
+            }
+        }
+
+
         [HttpGet("current")]
+        [Authorize]
         public async Task<IActionResult> GetCurrent()
         {
             var userGroup = await GetCurrentUserGroupAsync();
             if (userGroup == null) return Unauthorized();
 
-            var aiResult = await _aiService.GetCurrentAsync(userGroup);
-            if (aiResult == null)
+            var current = await _aiService.GetCurrentAsync(userGroup);
+            if (current == null)
                 return StatusCode(503, new { message = "Cache chưa sẵn sàng. Vui lòng chờ admin tính toán." });
 
             return Ok(new AirPredictResponse
             {
-                Pm25 = aiResult.PredPm25,
-                Aqi = aiResult.PredAqi,
-                Risk = aiResult.RiskProfile,
-                Recommendation = aiResult.RecommendationProfile,
+                Pm25 = current.PredPm25,
+                Aqi = current.PredAqi,
+                Risk = current.RiskProfile,
+                Recommendation = current.RecommendationProfile,
                 UserGroup = userGroup,
                 GeneratedAt = DateTime.UtcNow,
             });
         }
 
         [HttpGet("forecast")]
+        [Authorize]
         public async Task<IActionResult> GetForecast([FromQuery] int days = 1)
         {
             var userGroup = await GetCurrentUserGroupAsync();
@@ -61,7 +84,7 @@ namespace AirSafeNet.Api.Controllers
             return Ok(new AirForecastResponse
             {
                 UserGroup = userGroup,
-                GeneratedAt = DateTime.TryParse(aiForecast.GeneratedAt, out var gAt) ? gAt : DateTime.UtcNow,
+                GeneratedAt = DateTime.TryParse(aiForecast.GeneratedAt, out var g) ? g : DateTime.UtcNow,
                 Hours = aiForecast.Hours,
                 Forecast = aiForecast.Forecast.Select(x => new AirForecastItemResponse
                 {
@@ -76,6 +99,7 @@ namespace AirSafeNet.Api.Controllers
         }
 
         [HttpGet("history")]
+        [Authorize]
         public async Task<IActionResult> GetHistory([FromQuery] int days = 7)
         {
             var userGroup = await GetCurrentUserGroupAsync();
@@ -103,6 +127,7 @@ namespace AirSafeNet.Api.Controllers
         }
 
         [HttpGet("explain")]
+        [Authorize]
         public async Task<IActionResult> GetExplain()
         {
             var userGroup = await GetCurrentUserGroupAsync();
@@ -125,13 +150,11 @@ namespace AirSafeNet.Api.Controllers
 
         private async Task<string?> GetCurrentUserGroupAsync()
         {
-            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdValue, out var userId)) return null;
+            var userIdStr = User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdStr, out var userId)) return null;
 
-            var prefs = await _db.UserPreferences
-                .AsNoTracking()
+            var prefs = await _db.UserPreferences.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId);
-
             return prefs?.UserGroup ?? "normal";
         }
     }

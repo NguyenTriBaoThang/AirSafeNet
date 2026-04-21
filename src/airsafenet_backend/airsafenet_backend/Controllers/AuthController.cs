@@ -15,23 +15,21 @@ namespace airsafenet_backend.Controllers
     {
         private readonly AppDbContext _db;
         private readonly JwtService _jwtService;
+        private readonly IConfiguration _config;
 
-        public AuthController(AppDbContext db, JwtService jwtService)
+        public AuthController(AppDbContext db, JwtService jwtService, IConfiguration config)
         {
             _db = db;
             _jwtService = jwtService;
+            _config = config;
         }
 
         [HttpPost("register")]
         public async Task<IActionResult> Register(RegisterRequest request)
         {
             var email = request.Email.Trim().ToLower();
-
-            var exists = await _db.Users.AnyAsync(x => x.Email == email);
-            if (exists)
-            {
+            if (await _db.Users.AnyAsync(x => x.Email == email))
                 return BadRequest(new { message = "Email đã tồn tại." });
-            }
 
             var user = new User
             {
@@ -41,87 +39,94 @@ namespace airsafenet_backend.Controllers
                 Role = "User",
                 CreatedAt = DateTime.UtcNow
             };
-
             _db.Users.Add(user);
             await _db.SaveChangesAsync();
 
-            var preferences = new UserPreferences
+            _db.UserPreferences.Add(new UserPreferences
             {
                 UserId = user.Id,
                 UserGroup = "normal",
                 PreferredLocation = "Ho Chi Minh City",
                 NotifyEnabled = true,
                 UpdatedAt = DateTime.UtcNow
-            };
-
-            _db.UserPreferences.Add(preferences);
+            });
             await _db.SaveChangesAsync();
 
-            var token = _jwtService.GenerateToken(user);
-
-            return Ok(new AuthResponse
-            {
-                Token = token,
-                UserId = user.Id,
-                FullName = user.FullName,
-                Email = user.Email,
-                Role = user.Role
-            });
+            return Ok(BuildAuthResponse(user));
         }
 
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginRequest request)
         {
             var email = request.Email.Trim().ToLower();
-
             var user = await _db.Users.FirstOrDefaultAsync(x => x.Email == email);
-            if (user == null)
-            {
+
+            if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
                 return Unauthorized(new { message = "Email hoặc mật khẩu không đúng." });
-            }
 
-            var isValidPassword = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
-            if (!isValidPassword)
-            {
-                return Unauthorized(new { message = "Email hoặc mật khẩu không đúng." });
-            }
-
-            var token = _jwtService.GenerateToken(user);
-
-            return Ok(new AuthResponse
-            {
-                Token = token,
-                UserId = user.Id,
-                FullName = user.FullName,
-                Email = user.Email,
-                Role = user.Role
-            });
+            return Ok(BuildAuthResponse(user));
         }
 
-        [Authorize]
         [HttpGet("me")]
+        [Authorize]
         public async Task<IActionResult> Me()
         {
-            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdValue, out var userId))
-            {
-                return Unauthorized();
-            }
-
-            var user = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId);
-            if (user == null)
-            {
-                return NotFound(new { message = "Không tìm thấy người dùng." });
-            }
-
-            return Ok(new
-            {
-                user.Id,
-                user.FullName,
-                user.Email,
-                user.Role,
-                user.CreatedAt
-            });
+            var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var user = await _db.Users.FindAsync(userId);
+            if (user == null) return NotFound();
+            return Ok(BuildAuthResponse(user));
         }
+
+        [HttpPost("logout")]
+        public IActionResult Logout() => Ok(new { message = "Đăng xuất thành công." });
+
+        [HttpPost("seed-admin")]
+        public async Task<IActionResult> SeedAdmin(
+            [FromBody] SeedAdminRequest request,
+            [FromHeader(Name = "X-Seed-Key")] string? seedKey)
+        {
+            var expectedKey = _config["SeedAdmin:Key"];
+            if (string.IsNullOrEmpty(expectedKey) || seedKey != expectedKey)
+                return Unauthorized(new { message = "Seed key không hợp lệ." });
+
+            if (await _db.Users.AnyAsync(x => x.Role == "Admin"))
+                return BadRequest(new { message = "Admin đã tồn tại." });
+
+            var email = request.Email.Trim().ToLower();
+            if (await _db.Users.AnyAsync(x => x.Email == email))
+                return BadRequest(new { message = "Email đã tồn tại." });
+
+            var admin = new User
+            {
+                FullName = request.FullName.Trim(),
+                Email = email,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+                Role = "Admin",
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.Users.Add(admin);
+            await _db.SaveChangesAsync();
+
+            _db.UserPreferences.Add(new UserPreferences
+            {
+                UserId = admin.Id,
+                UserGroup = "general",
+                PreferredLocation = "Ho Chi Minh City",
+                NotifyEnabled = true,
+                UpdatedAt = DateTime.UtcNow
+            });
+            await _db.SaveChangesAsync();
+
+            return Ok(new { message = "Admin tạo thành công.", email = admin.Email, role = admin.Role });
+        }
+
+        private AuthResponse BuildAuthResponse(User user) => new()
+        {
+            Token = _jwtService.GenerateToken(user),
+            UserId = user.Id,
+            FullName = user.FullName,
+            Email = user.Email,
+            Role = user.Role,
+        };
     }
 }

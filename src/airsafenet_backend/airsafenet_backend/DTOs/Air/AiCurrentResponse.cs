@@ -4,21 +4,6 @@ namespace airsafenet_backend.DTOs.Air
 {
     public class AiCurrentResponse
     {
-        [JsonPropertyName("time")]
-        public string Time { get; set; } = string.Empty;
-
-        [JsonPropertyName("observed_pm25")]
-        public double ObservedPm25 { get; set; }
-
-        [JsonPropertyName("observed_temp")]
-        public double ObservedTemp { get; set; }
-
-        [JsonPropertyName("observed_humidity")]
-        public double ObservedHumidity { get; set; }
-
-        [JsonPropertyName("observed_wind_speed")]
-        public double ObservedWindSpeed { get; set; }
-
         [JsonPropertyName("pred_pm25")]
         public double PredPm25 { get; set; }
 
@@ -34,7 +19,28 @@ namespace airsafenet_backend.DTOs.Air
         [JsonPropertyName("recommendation_profile")]
         public string RecommendationProfile { get; set; } = string.Empty;
 
-        [JsonPropertyName("user_group")]
-        public string UserGroup { get; set; } = "general";
+        [JsonPropertyName("observed_pm25")]
+        public double ObservedPm25 { get; set; }
+
+        [JsonPropertyName("wind_speed")]
+        public double? WindSpeed { get; set; }
+
+        [JsonPropertyName("wind_direction")]
+        public double? WindDirection { get; set; }
+
+        [JsonPropertyName("humidity")]
+        public double? Humidity { get; set; }
+
+        [JsonPropertyName("temperature")]
+        public double? Temperature { get; set; }
+
+        [JsonPropertyName("pressure")]
+        public double? Pressure { get; set; }
+
+        [JsonPropertyName("uv_index")]
+        public double? UvIndex { get; set; }
+
+        [JsonPropertyName("cloud_cover")]
+        public double? CloudCover { get; set; }
     }
 }
