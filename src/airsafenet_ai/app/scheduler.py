@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import requests
 from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -10,30 +12,64 @@ from app.cache_manager import run_compute
 
 logger = logging.getLogger(__name__)
 
-# ── Singleton scheduler ────────────────────────────────────────────────────────
-
 _scheduler: BackgroundScheduler | None = None
+INTERVAL_MINUTES = 60
 
-INTERVAL_MINUTES = 60 
+# .NET Backend config
+BACKEND_BASE_URL  = os.getenv("BACKEND_BASE_URL",  "https://localhost:7276")
+INTERNAL_KEY      = os.getenv("INTERNAL_KEY",      "airsafenet-internal-2027")
+
+
+# ── Alert trigger ──────────────────────────────────────────────────────────────
+
+def _trigger_alert_check() -> None:
+    """
+    Gọi .NET Backend để kiểm tra AQI và gửi thông báo.
+    Backend tự đọc cache, so sánh ngưỡng từng user, dispatch Telegram/Email.
+    """
+    try:
+        url = f"{BACKEND_BASE_URL}/api/notification/check-and-alert"
+        resp = requests.post(
+            url,
+            headers={"X-Internal-Key": INTERNAL_KEY},
+            timeout=15,
+            verify=False,   # dev SSL cert
+        )
+        if resp.ok:
+            data = resp.json()
+            logger.info(
+                "[Alert] check done: dispatched=%s telegram=%s email=%s skipped=%s",
+                data.get("dispatched", 0),
+                data.get("telegram_sent", 0),
+                data.get("email_sent", 0),
+                data.get("skipped", 0),
+            )
+        else:
+            logger.warning("[Alert] Backend responded %s: %s", resp.status_code, resp.text[:200])
+    except Exception as exc:
+        logger.warning("[Alert] trigger thất bại (non-critical): %s", exc)
+
 
 # ── Job function ───────────────────────────────────────────────────────────────
 
-def _scheduled_compute_job() -> None:
+def _scheduled_job() -> None:
     logger.info(
-        "[Scheduler] Bắt đầu job tự động lúc %s",
+        "[Scheduler] Job bắt đầu lúc %s",
         datetime.now(timezone.utc).isoformat(),
     )
     try:
         result = run_compute(force=False)
         if result.get("skipped"):
-            logger.info("[Scheduler] Cache còn mới, bỏ qua lần này.")
+            logger.info("[Scheduler] Cache còn mới, bỏ qua compute.")
         else:
             logger.info(
-                "[Scheduler] Hoàn thành. Elapsed=%.2fs, forecast=%d rows, history=%d rows",
+                "[Scheduler] Compute xong. Elapsed=%.2fs, rows=%s",
                 result.get("elapsed_seconds", 0),
                 result.get("forecast_rows", 0),
-                result.get("history_rows", 0),
             )
+            # ✅ Trigger alert check sau khi compute xong
+            _trigger_alert_check()
+
     except Exception as exc:
         logger.error("[Scheduler] Job thất bại: %s", exc)
 
@@ -44,35 +80,31 @@ def start_scheduler() -> BackgroundScheduler:
     global _scheduler
 
     if _scheduler is not None and _scheduler.running:
-        logger.warning("Scheduler đang chạy rồi, không khởi động lại.")
         return _scheduler
 
     _scheduler = BackgroundScheduler(
         job_defaults={
-            "coalesce": True,     
-            "max_instances": 1,     
-            "misfire_grace_time": 120,  
+            "coalesce": True,
+            "max_instances": 1,
+            "misfire_grace_time": 120,
         },
         timezone="Asia/Bangkok",
     )
 
     _scheduler.add_job(
-        func=_scheduled_compute_job,
+        func=_scheduled_job,
         trigger=IntervalTrigger(minutes=INTERVAL_MINUTES),
         id="cache_compute",
-        name="AirSafeNet Cache Compute",
+        name="AirSafeNet Cache Compute + Alert",
         replace_existing=True,
     )
 
     _scheduler.start()
-
     next_run = _scheduler.get_job("cache_compute").next_run_time
     logger.info(
         "Scheduler khởi động. Interval=%d phút. Lần chạy kế: %s",
-        INTERVAL_MINUTES,
-        next_run,
+        INTERVAL_MINUTES, next_run,
     )
-
     return _scheduler
 
 

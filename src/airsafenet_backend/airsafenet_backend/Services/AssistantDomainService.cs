@@ -2,7 +2,7 @@
 {
     public class AssistantDomainService
     {
-        // ✅ Mở rộng keywords — bao gồm câu hỏi thực tế người dùng hay hỏi
+        // Mở rộng keywords — bao gồm câu hỏi thực tế người dùng hay hỏi
         private static readonly string[] Keywords =
         {
             // Chỉ số không khí

@@ -20,10 +20,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<JwtService>();
+builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<AssistantDomainService>();
 builder.Services.AddScoped<AssistantTimeResolverService>();
 
 builder.Services.AddHttpClient<AiService>();
+builder.Services.AddHttpClient<NotificationService>();
 builder.Services.AddHttpClient<AiCachedService>(client =>
 {
     client.Timeout = TimeSpan.FromSeconds(30);

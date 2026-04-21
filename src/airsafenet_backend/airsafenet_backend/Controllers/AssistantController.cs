@@ -246,7 +246,6 @@ namespace airsafenet_backend.Controllers
             var current = await _aiService.GetCurrentAsync(userGroup);
             var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1);
 
-            // ✅ Fix: 503 = cache chưa sẵn sàng → trả lời graceful thay vì 500
             bool hasLiveData = current != null && forecast != null && forecast.Forecast.Count > 0;
 
             var nowLocal = DateTime.Now;
@@ -267,7 +266,6 @@ namespace airsafenet_backend.Controllers
                     .First();
             }
 
-            // ── System prompt cải tiến ─────────────────────────────────────────
             var systemPrompt = $"""
 Bạn là AirSafeNet Assistant — trợ lý ảo thông minh về chất lượng không khí tại TP. Hồ Chí Minh.
 
@@ -289,7 +287,6 @@ CÁCH TRẢ LỜI (quan trọng):
 {(hasLiveData ? "" : "LƯU Ý: Hệ thống chưa có dữ liệu real-time. Trả lời dựa trên kiến thức chung về không khí TP.HCM.")}
 """;
 
-            // ── User prompt với context đầy đủ ────────────────────────────────
             string contextBlock;
             if (hasLiveData)
             {
@@ -578,7 +575,6 @@ Câu hỏi của người dùng:
                     x.Role == "user");
             }
 
-            // fallback cho dữ liệu cũ chưa có SourceUserMessageId
             if (sourceUserMessage == null)
             {
                 sourceUserMessage = await _db.ChatMessages

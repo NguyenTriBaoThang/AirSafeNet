@@ -5340,3 +5340,106 @@ input.input-error:focus {
   overflow-x: auto;
   border-radius: 12px;
 }
+
+/* ═══════════════════════════════════════════════════
+   NOTIFICATION STYLES 
+   ═══════════════════════════════════════════════════ */
+
+/* ── Notify section trong preferences form ────────── */
+.notify-section {
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 14px;
+  padding: 18px 20px;
+  background: rgba(245, 158, 11, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.notify-section__header {
+  font-size: 13px;
+  font-weight: 700;
+  color: #fcd34d;
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+
+.notify-section label {
+  font-size: 13px;
+  color: var(--muted, #94a3b8);
+  margin-top: 6px;
+  margin-bottom: 2px;
+}
+
+/* ── Field hint ───────────────────────────────────── */
+.field-hint {
+  font-size: 11.5px;
+  color: var(--muted, #64748b);
+  margin: 2px 0 6px;
+  line-height: 1.5;
+}
+
+.field-hint code {
+  background: rgba(255,255,255,0.08);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: #93c5fd;
+}
+
+/* ── Info list trong preferences card ─────────────── */
+.info-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  font-size: 13px;
+}
+
+.info-item:last-child { border-bottom: none; }
+
+.info-item > span:first-child {
+  color: var(--muted, #94a3b8);
+  flex-shrink: 0;
+}
+
+.info-item strong {
+  color: var(--text, #e8eefc);
+  font-weight: 600;
+  text-align: right;
+  font-size: 12px;
+  word-break: break-all;
+}
+
+/* ── Preferences help section ─────────────────────── */
+.preferences-help {
+  margin: 16px 20px 4px;
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.preferences-help h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text, #e8eefc);
+  margin: 0 0 8px;
+}
+
+.preferences-help p,
+.preferences-help ol {
+  font-size: 12.5px;
+  color: var(--muted, #94a3b8);
+  line-height: 1.6;
+  margin: 0;
+}

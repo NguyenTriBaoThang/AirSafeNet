@@ -22,58 +22,58 @@ namespace airsafenet_backend.Controllers
         [HttpGet]
         public async Task<IActionResult> GetMyPreferences()
         {
-            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdValue, out var userId))
-            {
-                return Unauthorized();
-            }
+            var userId = GetUserId();
+            if (userId == null) return Unauthorized();
 
-            var preferences = await _db.UserPreferences.FirstOrDefaultAsync(x => x.UserId == userId);
-            if (preferences == null)
-            {
-                return NotFound(new { message = "Không tìm thấy cấu hình người dùng." });
-            }
+            var p = await _db.UserPreferences.FirstOrDefaultAsync(x => x.UserId == userId);
+            if (p == null) return NotFound(new { message = "Không tìm thấy cấu hình." });
 
-            return Ok(new UserPreferencesResponse
-            {
-                UserId = preferences.UserId,
-                UserGroup = preferences.UserGroup,
-                PreferredLocation = preferences.PreferredLocation,
-                NotifyEnabled = preferences.NotifyEnabled,
-                UpdatedAt = preferences.UpdatedAt
-            });
+            return Ok(MapToResponse(p));
         }
 
         [HttpPut]
-        public async Task<IActionResult> UpdateMyPreferences(UpdateUserPreferencesRequest request)
+        public async Task<IActionResult> UpdateMyPreferences(UpdateUserPreferencesRequest req)
         {
-            var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            if (!int.TryParse(userIdValue, out var userId))
-            {
-                return Unauthorized();
-            }
+            var userId = GetUserId();
+            if (userId == null) return Unauthorized();
 
-            var preferences = await _db.UserPreferences.FirstOrDefaultAsync(x => x.UserId == userId);
-            if (preferences == null)
-            {
-                return NotFound(new { message = "Không tìm thấy cấu hình người dùng." });
-            }
+            var p = await _db.UserPreferences.FirstOrDefaultAsync(x => x.UserId == userId);
+            if (p == null) return NotFound(new { message = "Không tìm thấy cấu hình." });
 
-            preferences.UserGroup = request.UserGroup.Trim().ToLower();
-            preferences.PreferredLocation = request.PreferredLocation.Trim();
-            preferences.NotifyEnabled = request.NotifyEnabled;
-            preferences.UpdatedAt = DateTime.UtcNow;
+            p.UserGroup = req.UserGroup.Trim().ToLower();
+            p.PreferredLocation = req.PreferredLocation.Trim();
+            p.NotifyEnabled = req.NotifyEnabled;
+
+            p.NotifyChannel = req.NotifyChannel.Trim().ToLower();
+            p.TelegramChatId = string.IsNullOrWhiteSpace(req.TelegramChatId)
+                ? null : req.TelegramChatId.Trim();
+            p.NotifyEmail = string.IsNullOrWhiteSpace(req.NotifyEmail)
+                ? null : req.NotifyEmail.Trim().ToLower();
+            p.NotifyThreshold = Math.Clamp(req.NotifyThreshold, 0, 500);
+            p.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
-
-            return Ok(new UserPreferencesResponse
-            {
-                UserId = preferences.UserId,
-                UserGroup = preferences.UserGroup,
-                PreferredLocation = preferences.PreferredLocation,
-                NotifyEnabled = preferences.NotifyEnabled,
-                UpdatedAt = preferences.UpdatedAt
-            });
+            return Ok(MapToResponse(p));
         }
+
+        private int? GetUserId()
+        {
+            var v = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            return int.TryParse(v, out var id) ? id : null;
+        }
+
+        private static UserPreferencesResponse MapToResponse(Models.UserPreferences p) => new()
+        {
+            UserId = p.UserId,
+            UserGroup = p.UserGroup,
+            PreferredLocation = p.PreferredLocation,
+            NotifyEnabled = p.NotifyEnabled,
+            NotifyChannel = p.NotifyChannel,
+            TelegramChatId = p.TelegramChatId,
+            NotifyEmail = p.NotifyEmail,
+            NotifyThreshold = p.NotifyThreshold,
+            LastAlertSentAt = p.LastAlertSentAt,
+            UpdatedAt = p.UpdatedAt,
+        };
     }
 }

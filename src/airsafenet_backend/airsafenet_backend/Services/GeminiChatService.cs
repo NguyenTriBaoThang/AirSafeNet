@@ -74,7 +74,6 @@ namespace airsafenet_backend.Services
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("Gemini error body: {Body}", body);
-                // Trả về fallback thân thiện thay vì throw → tránh 500 ở controller
                 return "Xin lỗi, mình đang gặp sự cố kết nối. Bạn thử lại sau một chút nhé! 🙏";
             }
 
@@ -184,7 +183,6 @@ Hãy tạo tiêu đề ngắn cho hội thoại.
             using var doc = JsonDocument.Parse(body);
             var root = doc.RootElement;
 
-            // ── Kiểm tra error từ Gemini API ──────────────────────────────────
             if (root.TryGetProperty("error", out var errorProp))
             {
                 var errMsg = errorProp.TryGetProperty("message", out var em)
@@ -196,7 +194,6 @@ Hãy tạo tiêu đề ngắn cho hội thoại.
                 candidates.ValueKind != JsonValueKind.Array ||
                 candidates.GetArrayLength() == 0)
             {
-                // ── promptFeedback bị block (safety filter) ──────────────────
                 if (root.TryGetProperty("promptFeedback", out var feedback) &&
                     feedback.TryGetProperty("blockReason", out var reason))
                 {
@@ -207,7 +204,6 @@ Hãy tạo tiêu đề ngắn cho hội thoại.
 
             var firstCandidate = candidates[0];
 
-            // ── finishReason không phải STOP → có thể bị cắt hoặc lỗi ────────
             if (firstCandidate.TryGetProperty("finishReason", out var finishReason))
             {
                 var reason = finishReason.GetString();
@@ -215,7 +211,6 @@ Hãy tạo tiêu đề ngắn cho hội thoại.
                 {
                     return "Xin lỗi, mình không thể trả lời câu hỏi này. Vui lòng thử lại với cách diễn đạt khác.";
                 }
-                // "OTHER", "MAX_TOKENS" → vẫn cố lấy text nếu có
             }
 
             if (!firstCandidate.TryGetProperty("content", out var content) ||
@@ -223,7 +218,6 @@ Hãy tạo tiêu đề ngắn cho hội thoại.
                 parts.ValueKind != JsonValueKind.Array ||
                 parts.GetArrayLength() == 0)
             {
-                // Trả về fallback thay vì throw
                 return "Xin lỗi, mình chưa thể trả lời lúc này. Bạn thử lại sau nhé!";
             }
 
