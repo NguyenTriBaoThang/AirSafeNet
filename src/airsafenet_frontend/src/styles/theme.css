@@ -6522,3 +6522,568 @@ input.input-error:focus {
 .impact-days-select:focus {
   border-color: rgba(37,99,235,0.5);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PRESENTATION MODE
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Page ─────────────────────────────────────────────────── */
+.pres-page {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(circle at 20% 20%, rgba(37,99,235,0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, color-mix(in srgb, var(--accent, #3b82f6) 15%, transparent) 0%, transparent 50%),
+    #070e1f;
+  color: #f1f5f9;
+  font-family: Inter, system-ui, sans-serif;
+  overflow: hidden;
+  z-index: 9999;
+}
+
+/* ── Top bar ──────────────────────────────────────────────── */
+.pres-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 28px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.2);
+  backdrop-filter: blur(8px);
+}
+
+.pres-topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+}
+
+.pres-topbar__logo {
+  width: 30px; height: 30px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #2563eb, #06b6d4);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 14px; color: #fff;
+}
+
+.pres-dots {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pres-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  border: none;
+  cursor: pointer;
+  transition: background 0.25s, transform 0.25s;
+  padding: 0;
+}
+
+.pres-dot.active {
+  transform: scale(1.4);
+}
+
+.pres-dot:hover:not(.active) {
+  background: rgba(255,255,255,0.4);
+}
+
+.pres-topbar__right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.pres-ctrl-btn {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.07);
+  color: rgba(255,255,255,0.7);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pres-ctrl-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+.pres-ctrl-btn--exit { color: #fca5a5; border-color: rgba(239,68,68,0.3); }
+.pres-ctrl-btn--exit:hover { background: rgba(239,68,68,0.12); }
+
+/* ── Progress bar ─────────────────────────────────────────── */
+.pres-progress-track {
+  height: 3px;
+  background: rgba(255,255,255,0.07);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.pres-progress-fill {
+  height: 100%;
+  background: var(--accent, #3b82f6);
+  width: 0%;
+  animation: presProgress linear forwards;
+  transform-origin: left;
+}
+
+@keyframes presProgress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+/* ── Stage ────────────────────────────────────────────────── */
+.pres-stage {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 40px;
+}
+
+/* ── Common slide ─────────────────────────────────────────── */
+.pres-slide {
+  width: 100%;
+  max-width: 1100px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  animation: presSlideIn 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes presSlideIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+.pres-slide__eyebrow {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.4);
+}
+
+.pres-slide__title {
+  font-size: clamp(24px, 3vw, 36px);
+  font-weight: 900;
+  color: #f1f5f9;
+  margin: 0;
+  text-align: center;
+}
+
+/* ── Slide 1: AQI ─────────────────────────────────────────── */
+.pres-aqi-ring {
+  position: relative;
+  width: clamp(180px, 25vw, 260px);
+  height: clamp(180px, 25vw, 260px);
+  flex-shrink: 0;
+}
+
+.pres-aqi-ring__svg {
+  width: 100%; height: 100%;
+}
+
+.pres-aqi-ring__inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.pres-aqi-ring__label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.4);
+}
+
+.pres-aqi-ring__value {
+  font-size: clamp(52px, 8vw, 80px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.pres-aqi-ring__cat {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.pres-aqi-stats {
+  display: flex;
+  gap: 32px;
+  align-items: center;
+}
+
+.pres-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.pres-stat > span:first-child { font-size: 11px; color: rgba(255,255,255,0.4); text-transform: uppercase; letter-spacing: 0.07em; }
+.pres-stat > strong           { font-size: clamp(28px, 4vw, 44px); font-weight: 900; line-height: 1; }
+.pres-stat > span:last-child  { font-size: 12px; color: rgba(255,255,255,0.5); }
+
+.pres-stat--who > strong { font-size: clamp(22px, 3vw, 34px); }
+
+.pres-recommendation {
+  font-size: clamp(13px, 1.5vw, 17px);
+  color: rgba(255,255,255,0.6);
+  text-align: center;
+  max-width: 700px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ── Slide 2: Impact ──────────────────────────────────────── */
+.pres-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+
+.pres-impact-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 24px 16px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: transform 0.2s;
+}
+
+.pres-impact-card:hover { transform: translateY(-3px); }
+
+.pres-impact-card__icon { font-size: 32px; margin-bottom: 4px; }
+
+.pres-impact-card > strong {
+  font-size: clamp(28px, 4.5vw, 48px);
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.pres-impact-card > span {
+  font-size: 13px;
+  color: rgba(255,255,255,0.6);
+}
+
+.pres-impact-card__sub {
+  font-size: 11px;
+  color: rgba(255,255,255,0.35);
+  margin-top: 2px;
+}
+
+/* ── Slide 3: Forecast ────────────────────────────────────── */
+.pres-forecast-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: clamp(6px, 1.2vw, 16px);
+  width: 100%;
+  height: clamp(140px, 22vw, 220px);
+}
+
+.pres-forecast-bar-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  flex: 1;
+  max-width: 80px;
+  height: 100%;
+}
+
+.pres-forecast-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.pres-forecast-bar {
+  width: 100%;
+  border-radius: 8px 8px 4px 4px;
+  transition: height 0.8s cubic-bezier(0.4,0,0.2,1);
+  min-height: 8px;
+}
+
+.pres-forecast-bar-aqi  { font-size: 13px; font-weight: 800; }
+.pres-forecast-bar-pm25 { font-size: 10px; color: rgba(255,255,255,0.45); }
+.pres-forecast-bar-time { font-size: 10px; color: rgba(255,255,255,0.35); }
+
+.pres-forecast-legend {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pres-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+}
+
+.pres-legend-dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 3px;
+}
+
+/* ── Slide 4: XAI ─────────────────────────────────────────── */
+.pres-xai-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 22px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  font-size: 15px;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.5;
+  max-width: 800px;
+  text-align: center;
+}
+
+.pres-xai-trend {
+  font-size: 24px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+
+.pres-xai-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.pres-xai-card {
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pres-xai-card__top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pres-xai-card__icon { font-size: 20px; flex-shrink: 0; }
+
+.pres-xai-card__label {
+  font-size: 11px;
+  color: rgba(255,255,255,0.4);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: block;
+}
+
+.pres-xai-card__value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #f1f5f9;
+  display: block;
+  line-height: 1;
+}
+
+.pres-xai-card__note {
+  font-size: 11.5px;
+  color: rgba(255,255,255,0.45);
+  margin: 0;
+  line-height: 1.4;
+}
+
+/* ── Slide 5: WHO ─────────────────────────────────────────── */
+.pres-who-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  width: 100%;
+}
+
+.pres-who-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+  padding: 28px 20px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.pres-who-card__standard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.pres-who-card__standard > strong {
+  font-size: 22px;
+  font-weight: 900;
+  color: #f1f5f9;
+}
+
+.pres-who-card__badge {
+  padding: 3px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: rgba(34,197,94,0.15);
+  color: #86efac;
+  border: 1px solid rgba(34,197,94,0.25);
+}
+
+.pres-who-card__badge--vn {
+  background: rgba(251,191,36,0.12);
+  color: #fcd34d;
+  border-color: rgba(251,191,36,0.25);
+}
+
+.pres-who-card__divider {
+  width: 40px;
+  height: 1px;
+  background: rgba(255,255,255,0.1);
+  margin-bottom: 16px;
+}
+
+.pres-who-card__result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.pres-who-card__result > span {
+  font-size: 13px;
+  color: rgba(255,255,255,0.5);
+}
+
+.pres-who-card__today {
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+  line-height: 1.5;
+}
+
+/* ── Bottom bar ───────────────────────────────────────────── */
+.pres-bottombar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 28px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.2);
+}
+
+.pres-nav-btn {
+  padding: 8px 20px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.65);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pres-nav-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+.pres-slide-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 13px;
+  color: rgba(255,255,255,0.4);
+}
+
+.pres-key-hint {
+  font-size: 10px;
+  color: rgba(255,255,255,0.2);
+}
+
+/* ── Source note ──────────────────────────────────────────── */
+.pres-source {
+  font-size: 11px;
+  color: rgba(255,255,255,0.25);
+  text-align: center;
+}
+
+/* ── Loading ──────────────────────────────────────────────── */
+.pres-loading {
+  position: fixed;
+  inset: 0;
+  background: #070e1f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: rgba(255,255,255,0.5);
+  font-size: 15px;
+  z-index: 9999;
+}
+
+.pres-loading__spinner {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: 3px solid rgba(37,99,235,0.2);
+  border-top-color: #3b82f6;
+  animation: presSpin 0.8s linear infinite;
+}
+
+@keyframes presSpin { to { transform: rotate(360deg); } }
+
+/* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .pres-impact-grid  { grid-template-columns: repeat(2, 1fr); }
+  .pres-who-grid     { grid-template-columns: 1fr; gap: 10px; }
+  .pres-xai-grid     { grid-template-columns: repeat(2, 1fr); }
+  .pres-stage        { padding: 12px 16px; }
+}
+
+@media (max-width: 600px) {
+  .pres-impact-grid  { grid-template-columns: 1fr 1fr; }
+  .pres-aqi-ring     { width: 160px; height: 160px; }
+  .pres-topbar       { padding: 10px 14px; }
+  .pres-bottombar    { padding: 8px 14px; }
+}

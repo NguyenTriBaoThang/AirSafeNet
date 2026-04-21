@@ -72,6 +72,7 @@ export default function Home() {
           </p>
           <div className="hero__actions">
             <Link to="/dashboard" className="btn btn-primary">Xem Dashboard</Link>
+            <Link to="/presentation" className="btn btn-primary">Xem Demo</Link>
             <Link to="/login" className="btn btn-secondary">Đăng nhập</Link>
           </div>
         </div>
