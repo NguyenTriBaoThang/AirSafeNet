@@ -54,8 +54,8 @@ namespace airsafenet_backend.Services
                 },
                 generationConfig = new
                 {
-                    temperature = 0.4,
-                    maxOutputTokens = 500
+                    temperature = 0.5,      
+                    maxOutputTokens = 800  
                 }
             };
 
@@ -194,6 +194,7 @@ Hãy tạo tiêu đề ngắn cho hội thoại.
                 candidates.ValueKind != JsonValueKind.Array ||
                 candidates.GetArrayLength() == 0)
             {
+                // ── promptFeedback bị block (safety filter) ──────────────────
                 if (root.TryGetProperty("promptFeedback", out var feedback) &&
                     feedback.TryGetProperty("blockReason", out var reason))
                 {

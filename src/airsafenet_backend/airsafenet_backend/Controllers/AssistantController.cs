@@ -287,6 +287,7 @@ CÁCH TRẢ LỜI (quan trọng):
 {(hasLiveData ? "" : "LƯU Ý: Hệ thống chưa có dữ liệu real-time. Trả lời dựa trên kiến thức chung về không khí TP.HCM.")}
 """;
 
+            // ── User prompt với context đầy đủ ────────────────────────────────
             string contextBlock;
             if (hasLiveData)
             {
@@ -309,23 +310,61 @@ CÁCH TRẢ LỜI (quan trọng):
                     _ => "Người bình thường"
                 };
 
+                var windDirText = current.WindDirection.HasValue
+                    ? WindDirectionToText(current.WindDirection.Value)
+                    : "—";
+
+                var uvText = current.UvIndex.HasValue ? UvIndexToText(current.UvIndex.Value) : "—";
+
+                var next6 = forecast!.Forecast
+                    .Take(24)
+                    .Where((_, i) => i % 4 == 0)
+                    .Take(6)
+                    .Select(x =>
+                    {
+                        var t = System.DateTime.TryParse(x.Time, out var dt)
+                            ? dt.ToString("HH:mm dd/MM")
+                            : x.Time;
+                        var rv = x.RiskProfile switch
+                        {
+                            "GOOD" => "Tốt",
+                            "MODERATE" => "TB",
+                            "UNHEALTHY_SENSITIVE" => "Nhạy cảm",
+                            "UNHEALTHY" => "Kém",
+                            "VERY_UNHEALTHY" => "Rất kém",
+                            "HAZARDOUS" => "Nguy hiểm",
+                            _ => x.RiskProfile
+                        };
+                        return $"  {t}: AQI {x.PredAqi}, PM2.5 {x.PredPm25:F1} ({rv})";
+                    });
+
                 contextBlock = $"""
-[DỮ LIỆU REAL-TIME AIRSAFENET]
-Thời điểm: {nowStr}
+[DỮ LIỆU THỰC TẾ AIRSAFENET — CẬP NHẬT LÚC {nowStr}]
+Địa điểm: TP. Hồ Chí Minh
 Nhóm người dùng: {groupViet}
 
-Hiện tại:
-- AQI: {current.PredAqi} ({riskViet})
-- PM2.5: {current.PredPm25:F1} µg/m³
-- Khuyến nghị: {current.RecommendationProfile}
+═══ CHẤT LƯỢNG KHÔNG KHÍ HIỆN TẠI ═══
+AQI:       {current.PredAqi} — {riskViet}
+PM2.5:     {current.PredPm25:F1} µg/m³  (WHO năm: 5 | WHO 24h: 15 | QCVN: 25)
+Khuyến nghị cho {groupViet}: {current.RecommendationProfile}
 
-Mốc thời gian liên quan đến câu hỏi:
-- Thời điểm: {matched!.Time}
-- AQI: {matched.PredAqi}
-- PM2.5: {matched.PredPm25:F1} µg/m³
-- Mức độ rủi ro: {matched.RiskProfile}
-- Khuyến nghị: {matched.RecommendationProfile}
-{(forecastMatch?.IsFallback == true ? "(Dùng mốc gần nhất vì không xác định được thời gian cụ thể)" : "")}
+═══ THỜI TIẾT THỰC TẾ (Open-Meteo) ═══
+🌡 Nhiệt độ:    {current.Temperature?.ToString("F1") ?? "—"} °C
+💧 Độ ẩm:      {current.Humidity?.ToString("F0") ?? "—"} %
+💨 Gió:        {current.WindSpeed?.ToString("F1") ?? "—"} km/h, hướng {windDirText}
+🔵 Áp suất:    {current.Pressure?.ToString("F1") ?? "—"} hPa
+☀️ UV Index:    {current.UvIndex?.ToString("F1") ?? "—"} — {uvText}
+☁️ Mây:        {current.CloudCover?.ToString("F0") ?? "—"} %
+
+═══ DỰ BÁO 24H TỚI (mỗi 4 giờ) ═══
+{string.Join("\n", next6)}
+
+═══ MỐC LIÊN QUAN ĐẾN CÂU HỎI ═══
+Thời điểm: {matched!.Time}
+AQI: {matched.PredAqi} — PM2.5: {matched.PredPm25:F1} µg/m³
+Mức độ: {matched.RiskProfile}
+Khuyến nghị: {matched.RecommendationProfile}
+{(forecastMatch?.IsFallback == true ? "(Không xác định được thời gian chính xác → dùng mốc gần nhất)" : "")}
 """;
             }
             else
@@ -335,7 +374,8 @@ Mốc thời gian liên quan đến câu hỏi:
 Dữ liệu real-time chưa sẵn sàng (cache đang khởi tạo).
 Thời điểm hiện tại: {nowStr}
 Nhóm người dùng: {userGroup}
-Hãy trả lời dựa trên kiến thức chung, và nhắc người dùng xem dashboard sau khi hệ thống hoàn tất khởi tạo.
+Hãy trả lời dựa trên kiến thức chung về không khí TP.HCM,
+và nhắc người dùng xem dashboard sau khi hệ thống hoàn tất khởi tạo (5-8 phút).
 """;
             }
 
@@ -669,16 +709,23 @@ CÁCH TRẢ LỜI:
 
             string contextBlockRegen = hasLiveDataRegen
                 ? $"""
-[DỮ LIỆU REAL-TIME AIRSAFENET]
-Thời điểm: {nowStrRegen} | Nhóm: {groupVietRegen}
-AQI hiện tại: {current!.PredAqi} | PM2.5: {current.PredPm25:F1} µg/m³
+[DỮ LIỆU THỰC TẾ AIRSAFENET — CẬP NHẬT LÚC {nowStrRegen}]
+Địa điểm: TP. Hồ Chí Minh | Nhóm: {groupVietRegen}
+
+═══ CHẤT LƯỢNG KHÔNG KHÍ HIỆN TẠI ═══
+AQI: {current!.PredAqi} | PM2.5: {current.PredPm25:F1} µg/m³
 Khuyến nghị: {current.RecommendationProfile}
 
-Mốc liên quan đến câu hỏi:
-- Thời điểm: {matchedRegen!.Time}
-- AQI: {matchedRegen.PredAqi} | PM2.5: {matchedRegen.PredPm25:F1} µg/m³
-- Rủi ro: {matchedRegen.RiskProfile}
-- Khuyến nghị: {matchedRegen.RecommendationProfile}
+═══ THỜI TIẾT THỰC TẾ ═══
+Nhiệt độ: {current.Temperature?.ToString("F1") ?? "—"} °C | Độ ẩm: {current.Humidity?.ToString("F0") ?? "—"} %
+Gió: {current.WindSpeed?.ToString("F1") ?? "—"} km/h hướng {(current.WindDirection.HasValue ? WindDirectionToText(current.WindDirection.Value) : "—")}
+UV Index: {current.UvIndex?.ToString("F1") ?? "—"} — {(current.UvIndex.HasValue ? UvIndexToText(current.UvIndex.Value) : "—")}
+Áp suất: {current.Pressure?.ToString("F1") ?? "—"} hPa | Mây: {current.CloudCover?.ToString("F0") ?? "—"} %
+
+═══ MỐC LIÊN QUAN ĐẾN CÂU HỎI ═══
+Thời điểm: {matchedRegen!.Time}
+AQI: {matchedRegen.PredAqi} | PM2.5: {matchedRegen.PredPm25:F1} µg/m³
+Mức độ: {matchedRegen.RiskProfile} | Khuyến nghị: {matchedRegen.RecommendationProfile}
 """
                 : $"[Dữ liệu real-time chưa sẵn sàng — Thời điểm: {nowStrRegen}]";
 
@@ -724,6 +771,32 @@ Câu hỏi của người dùng:
                     matchedForecastPm25 = matchedRegen?.PredPm25,
                 } : new { userGroup, note = "no live data" }
             });
+        }
+        private static string WindDirectionToText(double degrees)
+        {
+            return ((degrees % 360 + 360) % 360) switch
+            {
+                >= 337.5 or < 22.5 => "Bắc (N)",
+                >= 22.5 and < 67.5 => "Đông Bắc (NE)",
+                >= 67.5 and < 112.5 => "Đông (E)",
+                >= 112.5 and < 157.5 => "Đông Nam (SE)",
+                >= 157.5 and < 202.5 => "Nam (S)",
+                >= 202.5 and < 247.5 => "Tây Nam (SW)",
+                >= 247.5 and < 292.5 => "Tây (W)",
+                _ => "Tây Bắc (NW)",
+            };
+        }
+
+        private static string UvIndexToText(double uv)
+        {
+            return uv switch
+            {
+                < 3 => $"{uv:F1} (Thấp — an toàn ra ngoài)",
+                < 6 => $"{uv:F1} (Trung bình — đeo kem chống nắng)",
+                < 8 => $"{uv:F1} (Cao — hạn chế 10h–14h)",
+                < 11 => $"{uv:F1} (Rất cao — tránh nắng trực tiếp)",
+                _ => $"{uv:F1} (Cực độ — ở trong nhà)",
+            };
         }
     }
 }
