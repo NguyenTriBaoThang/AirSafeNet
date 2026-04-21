@@ -5443,3 +5443,390 @@ input.input-error:focus {
   line-height: 1.6;
   margin: 0;
 }
+
+/* ═══════════════════════════════════════════════════
+   ALERT HISTORY PANEL
+   ═══════════════════════════════════════════════════ */
+
+.alert-history-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Stats row ───────────────────────────────────── */
+.alert-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.alert-stat-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  transition: background 0.15s;
+}
+
+.alert-stat-card:hover { background: rgba(255,255,255,0.07); }
+
+.alert-stat-card--unread {
+  border-color: rgba(245,158,11,0.3);
+  background: rgba(245,158,11,0.06);
+}
+
+.alert-stat-card__icon { font-size: 20px; }
+
+.alert-stat-card__value {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text, #e8eefc);
+  line-height: 1;
+}
+
+.alert-stat-card--unread .alert-stat-card__value { color: #fcd34d; }
+
+.alert-stat-card__label {
+  display: block;
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+  margin-top: 3px;
+}
+
+/* ── Gmail CTA banner ────────────────────────────── */
+.alert-gmail-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: rgba(37,99,235,0.08);
+  border: 1px solid rgba(37,99,235,0.2);
+  flex-wrap: wrap;
+}
+
+.alert-gmail-banner__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-gmail-banner__icon { font-size: 22px; flex-shrink: 0; }
+
+.alert-gmail-banner__left strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text, #e8eefc);
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.alert-gmail-banner__left span {
+  font-size: 12px;
+  color: var(--muted, #94a3b8);
+}
+
+.alert-gmail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 18px;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+
+.alert-gmail-btn:hover { background: #1d4ed8; }
+
+/* ── List header ─────────────────────────────────── */
+.alert-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted, #94a3b8);
+  padding: 0 2px;
+}
+
+.alert-mark-read-btn {
+  background: none;
+  border: none;
+  color: #93c5fd;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.alert-mark-read-btn:hover { background: rgba(147,197,253,0.1); }
+
+/* ── List items ──────────────────────────────────── */
+.alert-list { display: flex; flex-direction: column; gap: 6px; }
+
+.alert-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  position: relative;
+  transition: background 0.15s;
+}
+
+.alert-item:hover { background: rgba(255,255,255,0.06); }
+
+.alert-item--unread {
+  background: rgba(255,255,255,0.055);
+  border-color: rgba(255,255,255,0.1);
+}
+
+.alert-item--failed {
+  opacity: 0.6;
+  border-color: rgba(239,68,68,0.15);
+}
+
+/* Unread blue dot */
+.alert-item__dot {
+  position: absolute;
+  top: 14px;
+  left: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #3b82f6;
+  box-shadow: 0 0 6px #3b82f6;
+}
+
+/* AQI badge */
+.alert-item__aqi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 44px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 1.5px solid;
+  background: rgba(255,255,255,0.03);
+  flex-shrink: 0;
+}
+
+.alert-item__aqi-emoji { font-size: 14px; }
+
+.alert-item__aqi strong {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+/* Body */
+.alert-item__body { flex: 1; min-width: 0; }
+
+.alert-item__top-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
+.alert-item__risk {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.alert-item__pm25 {
+  font-size: 11px;
+  color: var(--muted, #94a3b8);
+  background: rgba(255,255,255,0.06);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.alert-item__time {
+  font-size: 11px;
+  color: var(--muted, #64748b);
+  margin-left: auto;
+}
+
+.alert-item__msg {
+  font-size: 12.5px;
+  color: var(--muted, #94a3b8);
+  line-height: 1.45;
+  margin: 0 0 7px;
+}
+
+/* Channel tags */
+.alert-item__channels {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.alert-item__channel-tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.07);
+  color: var(--muted, #94a3b8);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.alert-item__channel-tag--telegram {
+  background: rgba(37,99,235,0.1);
+  color: #93c5fd;
+  border-color: rgba(37,99,235,0.2);
+}
+
+.alert-item__channel-tag--failed {
+  background: rgba(239,68,68,0.1);
+  color: #fca5a5;
+  border-color: rgba(239,68,68,0.2);
+}
+
+/* Gmail link inside item */
+.alert-item__gmail-link {
+  font-size: 11px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: rgba(37,99,235,0.12);
+  color: #93c5fd;
+  border: 1px solid rgba(37,99,235,0.25);
+  text-decoration: none;
+  transition: background 0.15s;
+  cursor: pointer;
+}
+
+.alert-item__gmail-link:hover {
+  background: rgba(37,99,235,0.22);
+  color: #bfdbfe;
+}
+
+/* ── Empty state ─────────────────────────────────── */
+.alert-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--muted, #94a3b8);
+}
+
+.alert-empty span:first-child { font-size: 32px; }
+.alert-empty p { margin: 0; font-size: 14px; }
+
+/* ── Load more ───────────────────────────────────── */
+.alert-load-more {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--muted, #94a3b8);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.alert-load-more:hover {
+  background: rgba(255,255,255,0.09);
+  color: var(--text, #e8eefc);
+}
+
+.alert-loading-more {
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted, #94a3b8);
+  padding: 8px;
+}
+
+/* ── Error ───────────────────────────────────────── */
+.alert-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.2);
+  font-size: 13px;
+  color: #fca5a5;
+}
+
+.alert-error button {
+  margin-left: auto;
+  background: none;
+  border: none;
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+/* ── Skeleton ────────────────────────────────────── */
+.alert-skeleton { display: flex; flex-direction: column; gap: 8px; }
+
+.alert-skeleton__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.alert-sk {
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 25%,
+    rgba(255,255,255,0.09) 50%,
+    rgba(255,255,255,0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: alertShimmer 1.4s infinite;
+}
+
+@keyframes alertShimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.alert-sk--icon { width: 44px; height: 56px; border-radius: 10px; flex-shrink: 0; }
+.alert-sk--line { height: 12px; border-radius: 999px; }
+
+/* ── Responsive ──────────────────────────────────── */
+@media (max-width: 768px) {
+  .alert-stats { grid-template-columns: repeat(2, 1fr); }
+  .alert-gmail-banner { flex-direction: column; align-items: flex-start; }
+  .alert-item__time { margin-left: 0; }
+}
+
+@media (max-width: 480px) {
+  .alert-stats { grid-template-columns: 1fr 1fr; }
+}

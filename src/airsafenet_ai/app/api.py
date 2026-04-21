@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import requests
 import threading
 from contextlib import asynccontextmanager
 
@@ -22,9 +23,8 @@ logger = logging.getLogger(__name__)
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "airsafenet-admin-secret")
 VALID_PROFILES = set(ALL_PROFILES)
 
-# ── Lock để tránh 2 compute chạy song song ────────────────────────────────────
 _compute_lock = threading.Lock()
-_compute_running = False
+_compute_running = False  
 
 
 def verify_admin(key: str) -> None:
@@ -42,20 +42,46 @@ def normalize_profile(profile: str) -> str:
     return p
 
 
-# ── Background compute wrapper ────────────────────────────────────────────────
+BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "https://localhost:7276")
+INTERNAL_KEY     = os.getenv("INTERNAL_KEY",     "airsafenet-internal-2027")
+
+
+def _trigger_alert_check() -> None:
+    try:
+        url  = f"{BACKEND_BASE_URL}/api/notification/check-and-alert"
+        resp = requests.post(
+            url,
+            headers={"X-Internal-Key": INTERNAL_KEY},
+            timeout=15,
+            verify=False,  # dev SSL
+        )
+        if resp.ok:
+            data = resp.json()
+            logger.info(
+                "[Alert] dispatched=%s telegram=%s email=%s skipped=%s",
+                data.get("dispatched", 0),
+                data.get("telegram_sent", 0),
+                data.get("email_sent", 0),
+                data.get("skipped", 0),
+            )
+        else:
+            logger.warning("[Alert] Backend %s: %s", resp.status_code, resp.text[:200])
+    except Exception as exc:
+        logger.warning("[Alert] trigger thất bại (non-critical): %s", exc)
+
 
 def _run_compute_background(force: bool) -> None:
-    """Chạy compute trong thread riêng, cập nhật cache_meta khi xong."""
     global _compute_running
     try:
         run_compute(force=force)
+        logger.info("Compute xong, trigger alert check...")
+        _trigger_alert_check()
     except Exception as e:
         logger.error("Background compute thất bại: %s", e)
     finally:
         _compute_running = False
 
 
-# ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -74,7 +100,6 @@ async def lifespan(app: FastAPI):
     logger.info("AirSafeNet AI Server đã dừng.")
 
 
-# ── App ───────────────────────────────────────────────────────────────────────
 
 app = FastAPI(
     title="AirSafeNet AI Server",
@@ -89,8 +114,6 @@ app.add_middleware(
     allow_methods=["*"], allow_headers=["*"],
 )
 
-
-#  PUBLIC — đọc từ cache
 
 @app.get("/")
 def root():
@@ -179,18 +202,11 @@ def history(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-#  ADMIN — X-Admin-Key required
-
 @app.post("/admin/compute")
 def admin_compute(
     force: bool = Query(default=True),
     x_admin_key: str = Header(..., alias="X-Admin-Key"),
 ):
-    """
-    ✅ FIX v5.1: Chạy compute trong BACKGROUND THREAD.
-    Trả về {"status":"running"} NGAY LẬP TỨC — không block.
-    Frontend polling /admin/cache/status mỗi 3s để biết khi nào xong.
-    """
     verify_admin(x_admin_key)
 
     global _compute_running
@@ -203,7 +219,7 @@ def admin_compute(
         }
 
     with _compute_lock:
-        if _compute_running: 
+        if _compute_running:  
             return {"status": "running", "message": "Đang tính toán...", "skipped": True}
         _compute_running = True
 
@@ -232,15 +248,6 @@ def admin_cache_status(
     import datetime as dt
 
     meta = read_meta()
-
-    if not _compute_running and meta.get("status") == "running":
-        if FORECAST_CSV.exists() and HISTORY_CSV.exists() and CURRENT_JSON.exists():
-            meta["status"] = "ok"
-            from app.cache_manager import write_meta as _write_meta
-            _write_meta("ok")
-        else:
-            meta["status"] = "error"
-            meta["error"] = "Server restart trong khi đang tính. Vui lòng tính lại."
 
     if _compute_running:
         meta["status"] = "running"

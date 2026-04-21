@@ -7,6 +7,7 @@ import { useToast } from "../components/common/useToast";
 import SectionHeader from "../components/common/SectionHeader";
 import StatusChip from "../components/common/StatusChip";
 import AppIcon from "../components/common/AppIcon";
+import AlertHistoryPanel from "../components/dashboard/AlertHistoryPanel";
 
 const USER_GROUP_OPTIONS = [
   { value: "normal",      label: "Người dùng phổ thông" },
@@ -42,15 +43,10 @@ function timeAgo(iso?: string | null): string {
 export default function UserPreferencesPage() {
   const [data, setData]   = useState<UserPreferencesResponse | null>(null);
   const [form, setForm]   = useState<UpdateUserPreferencesRequest>({
-    userGroup:         "normal",
-    preferredLocation: "Ho Chi Minh City",
-    notifyEnabled:     true,
-    notifyChannel:     "none",
-    telegramChatId:    "",
-    notifyEmail:       "",
-    notifyThreshold:   100,
+    userGroup: "normal", preferredLocation: "Ho Chi Minh City",
+    notifyEnabled: true, notifyChannel: "none",
+    telegramChatId: "", notifyEmail: "", notifyThreshold: 100,
   });
-
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
   const [error,   setError]   = useState("");
@@ -66,9 +62,9 @@ export default function UserPreferencesPage() {
         userGroup:         result.userGroup,
         preferredLocation: result.preferredLocation,
         notifyEnabled:     result.notifyEnabled,
-        notifyChannel:     result.notifyChannel ?? "none",
+        notifyChannel:     result.notifyChannel  ?? "none",
         telegramChatId:    result.telegramChatId ?? "",
-        notifyEmail:       result.notifyEmail ?? "",
+        notifyEmail:       result.notifyEmail    ?? "",
         notifyThreshold:   result.notifyThreshold ?? 100,
       });
       if (silent) showToast("Đã tải lại cài đặt", "success");
@@ -112,17 +108,14 @@ export default function UserPreferencesPage() {
         eyebrow="Cài đặt cá nhân"
         title="Tùy chỉnh trải nghiệm người dùng"
         description="Thiết lập nhóm người dùng, kênh nhận cảnh báo AQI và ngưỡng cảnh báo phù hợp."
-        rightSlot={
-          <button className="btn btn-secondary" onClick={() => loadData(true)}>Tải lại</button>
-        }
+        rightSlot={<button className="btn btn-secondary" onClick={() => loadData(true)}>Tải lại</button>}
       />
 
       <div className="section-toolbar">
         <StatusChip label={`Nhóm: ${form.userGroup}`} variant="info" />
         <StatusChip
           label={form.notifyEnabled && form.notifyChannel !== "none"
-            ? `Cảnh báo: ${form.notifyChannel}`
-            : "Cảnh báo: tắt"}
+            ? `Cảnh báo: ${form.notifyChannel}` : "Cảnh báo: tắt"}
           variant={form.notifyEnabled && form.notifyChannel !== "none" ? "success" : "neutral"}
         />
         {data?.lastAlertSentAt && (
@@ -131,7 +124,7 @@ export default function UserPreferencesPage() {
       </div>
 
       <div className="preferences-grid">
-
+        
         <form className="card preferences-form interactive-card" onSubmit={handleSave}>
           <div className="card__header card__header--with-icon">
             <div className="card__header-icon"><AppIcon name="settings" /></div>
@@ -142,10 +135,7 @@ export default function UserPreferencesPage() {
           </div>
 
           <label>Nhóm người dùng</label>
-          <select
-            value={form.userGroup}
-            onChange={e => setForm(p => ({ ...p, userGroup: e.target.value }))}
-          >
+          <select value={form.userGroup} onChange={e => setForm(p => ({ ...p, userGroup: e.target.value }))}>
             {USER_GROUP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
 
@@ -188,8 +178,7 @@ export default function UserPreferencesPage() {
                     placeholder="Ví dụ: 123456789"
                   />
                   <p className="field-hint">
-                    Nhắn <code>/start</code> cho bot của bạn → dùng{" "}
-                    <code>@userinfobot</code> để lấy Chat ID
+                    Nhắn <code>/start</code> cho bot → dùng <code>@userinfobot</code> để lấy Chat ID
                   </p>
                 </>
               )}
@@ -213,20 +202,15 @@ export default function UserPreferencesPage() {
                     value={form.notifyThreshold}
                     onChange={e => setForm(p => ({ ...p, notifyThreshold: Number(e.target.value) }))}
                   >
-                    {THRESHOLD_PRESETS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
+                    {THRESHOLD_PRESETS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
-                  <p className="field-hint">
-                    Hệ thống gửi tối đa 1 cảnh báo mỗi 4 giờ để tránh spam.
-                  </p>
+                  <p className="field-hint">Hệ thống gửi tối đa 1 cảnh báo mỗi 4 giờ để tránh spam.</p>
                 </>
               )}
             </div>
           )}
 
           {error && <div className="form-error">{error}</div>}
-
           <div className="form-actions">
             <button className="btn btn-primary" disabled={saving}>
               {saving ? "Đang lưu..." : "Lưu thay đổi"}
@@ -244,33 +228,18 @@ export default function UserPreferencesPage() {
           </div>
 
           <div className="info-list">
-            <div className="info-item">
-              <span>Nhóm người dùng</span>
-              <strong>{data?.userGroup ?? "—"}</strong>
-            </div>
-            <div className="info-item">
-              <span>Khu vực ưu tiên</span>
-              <strong>{data?.preferredLocation ?? "—"}</strong>
-            </div>
+            <div className="info-item"><span>Nhóm người dùng</span><strong>{data?.userGroup ?? "—"}</strong></div>
+            <div className="info-item"><span>Khu vực ưu tiên</span><strong>{data?.preferredLocation ?? "—"}</strong></div>
             <div className="info-item">
               <span>Kênh thông báo</span>
               <strong>{data?.notifyChannel === "none" ? "Tắt" : data?.notifyChannel ?? "—"}</strong>
             </div>
-            <div className="info-item">
-              <span>Ngưỡng AQI</span>
-              <strong>{data?.notifyThreshold ?? 100}</strong>
-            </div>
+            <div className="info-item"><span>Ngưỡng AQI</span><strong>{data?.notifyThreshold ?? 100}</strong></div>
             {data?.telegramChatId && (
-              <div className="info-item">
-                <span>Telegram ID</span>
-                <strong>{data.telegramChatId}</strong>
-              </div>
+              <div className="info-item"><span>Telegram ID</span><strong>{data.telegramChatId}</strong></div>
             )}
             {data?.notifyEmail && (
-              <div className="info-item">
-                <span>Email cảnh báo</span>
-                <strong>{data.notifyEmail}</strong>
-              </div>
+              <div className="info-item"><span>Email cảnh báo</span><strong>{data.notifyEmail}</strong></div>
             )}
             <div className="info-item">
               <span>Cảnh báo gần nhất</span>
@@ -285,13 +254,22 @@ export default function UserPreferencesPage() {
           <div className="preferences-help">
             <h4>💡 Hướng dẫn cài Telegram Bot</h4>
             <ol style={{ paddingLeft: 16, lineHeight: 1.8, fontSize: 13 }}>
-              <li>Tìm <strong>@BotFather</strong> trên Telegram → <code>/newbot</code></li>
-              <li>Đặt tên bot → lấy <strong>BotToken</strong> → gửi Admin</li>
+              <li>Tìm <strong>@BotFather</strong> → <code>/newbot</code></li>
+              <li>Đặt tên → lấy <strong>BotToken</strong> → gửi Admin</li>
               <li>Nhắn <code>/start</code> cho bot của bạn</li>
-              <li>Tìm <strong>@userinfobot</strong> → lấy <strong>Chat ID</strong></li>
-              <li>Điền Chat ID vào ô trên → Lưu thay đổi</li>
+              <li>Tìm <strong>@userinfobot</strong> → lấy Chat ID</li>
+              <li>Điền Chat ID vào ô trên → Lưu</li>
             </ol>
           </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 4 }}>
+        <div className="card__header">
+          <h3>📬 Lịch sử cảnh báo đã gửi</h3>
+        </div>
+        <div style={{ padding: "0 0 16px" }}>
+          <AlertHistoryPanel />
         </div>
       </div>
     </div>

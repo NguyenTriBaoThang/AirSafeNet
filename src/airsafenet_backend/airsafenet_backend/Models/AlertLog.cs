@@ -20,22 +20,22 @@ namespace airsafenet_backend.Models
         [MaxLength(500)]
         public string Message { get; set; } = string.Empty;
 
-        /// <summary>"telegram" | "email" | "both"</summary>
+        /// "telegram" | "email" | "both"
         [MaxLength(20)]
         public string Channel { get; set; } = "email";
 
-        /// <summary>Email đã gửi (để hiển thị + tạo link mailto)</summary>
+        /// Email đã gửi (để hiển thị + tạo link mailto)
         [MaxLength(150)]
         public string? SentToEmail { get; set; }
 
-        /// <summary>Telegram Chat ID đã gửi</summary>
+        /// Telegram Chat ID đã gửi
         [MaxLength(50)]
         public string? SentToTelegramChatId { get; set; }
 
-        /// <summary>User đã đọc thông báo này chưa</summary>
+        /// User đã đọc thông báo này chưa
         public bool IsRead { get; set; } = false;
 
-        /// <summary>Gửi thành công không</summary>
+        /// Gửi thành công không
         public bool Success { get; set; } = true;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
