@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import ImpactPage from "./pages/ImpactPage";
+import HeatmapPage from "./pages/HeatmapPage";
 import PresentationPage from "./pages/PresentationPage";
 import UserPreferencesPage from "./pages/UserPreferences";
 import AssistantPage from "./pages/AssistantPage";
@@ -120,6 +121,17 @@ export default function App() {
             <PrivateRoute>
               <AppShell>
                 <ImpactPage />
+              </AppShell>
+            </PrivateRoute>
+          } 
+        />
+
+        <Route 
+          path="/heatmap" 
+          element={
+            <PrivateRoute>
+              <AppShell>
+                <HeatmapPage />
               </AppShell>
             </PrivateRoute>
           } 
