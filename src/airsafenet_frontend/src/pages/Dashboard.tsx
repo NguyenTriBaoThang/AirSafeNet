@@ -9,6 +9,7 @@ import GoldenHoursWidget from "../components/dashboard/GoldenHoursWidget";
 import ImpactEstimateWidget from "../components/dashboard/ImpactEstimateWidget";
 import AiExplainPanel from "../components/dashboard/AiExplainPanel";
 import RiskBadge from "../components/dashboard/RiskBadge";
+import WhoComparisonChart from "../components/dashboard/WhoComparisonChart";
 import DashboardFilters from "../components/dashboard/DashboardFilters";
 import DashboardSkeleton from "../components/common/DashboardSkeleton";
 import { useToast } from "../components/common/useToast";
@@ -163,6 +164,7 @@ export default function Dashboard() {
       </div>
 
       <ForecastVsActualChart forecastPoints={chart.points} historyPoints={historyPoints} />
+      <WhoComparisonChart />
       <AiExplainPanel />
       <ImpactEstimateWidget
         currentRisk={summary.currentRisk}
