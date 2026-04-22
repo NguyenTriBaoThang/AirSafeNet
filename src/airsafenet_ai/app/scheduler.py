@@ -9,31 +9,25 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.cache_manager import run_compute
+from app.districts import compute_district_heatmap
 
 logger = logging.getLogger(__name__)
 
 _scheduler: BackgroundScheduler | None = None
 INTERVAL_MINUTES = 60
 
-# .NET Backend config
 BACKEND_BASE_URL  = os.getenv("BACKEND_BASE_URL",  "https://localhost:7276")
 INTERNAL_KEY      = os.getenv("INTERNAL_KEY",      "airsafenet-internal-2027")
 
 
-# ── Alert trigger ──────────────────────────────────────────────────────────────
-
 def _trigger_alert_check() -> None:
-    """
-    Gọi .NET Backend để kiểm tra AQI và gửi thông báo.
-    Backend tự đọc cache, so sánh ngưỡng từng user, dispatch Telegram/Email.
-    """
     try:
         url = f"{BACKEND_BASE_URL}/api/notification/check-and-alert"
         resp = requests.post(
             url,
             headers={"X-Internal-Key": INTERNAL_KEY},
             timeout=15,
-            verify=False,   # dev SSL cert
+            verify=False,  
         )
         if resp.ok:
             data = resp.json()
@@ -50,8 +44,6 @@ def _trigger_alert_check() -> None:
         logger.warning("[Alert] trigger thất bại (non-critical): %s", exc)
 
 
-# ── Job function ───────────────────────────────────────────────────────────────
-
 def _scheduled_job() -> None:
     logger.info(
         "[Scheduler] Job bắt đầu lúc %s",
@@ -67,14 +59,16 @@ def _scheduled_job() -> None:
                 result.get("elapsed_seconds", 0),
                 result.get("forecast_rows", 0),
             )
-            # ✅ Trigger alert check sau khi compute xong
             _trigger_alert_check()
+            try:
+                compute_district_heatmap(max_workers=8)
+                logger.info("[Scheduler] District heatmap OK")
+            except Exception as exc:
+                logger.warning("[Scheduler] District heatmap lỗi: %s", exc)
 
     except Exception as exc:
         logger.error("[Scheduler] Job thất bại: %s", exc)
 
-
-# ── Public API ─────────────────────────────────────────────────────────────────
 
 def start_scheduler() -> BackgroundScheduler:
     global _scheduler

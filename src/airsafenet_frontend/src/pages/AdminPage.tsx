@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useAdminCache } from "../hooks/useAdminCache";
-import type { CacheFileDetail, ComputeStatus } from "../types/admin";
+import { triggerDistrictComputeApi, getDistrictStatusApi } from "../api/admin";
+import type { CacheFileDetail, ComputeStatus, AdminDistrictStatus } from "../types/admin";
 import SectionHeader from "../components/common/SectionHeader";
 import { useToast } from "../components/common/useToast";
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function formatDateVN(iso?: string | null): string {
   if (!iso) return "—";
@@ -50,7 +50,6 @@ function statusLabel(computing: boolean, s?: ComputeStatus | string): string {
   }
 }
 
-// ── Sub-components ─────────────────────────────────────────────────────────────
 
 function FileRow({ label, icon, file }: {
   label: string;
@@ -99,7 +98,6 @@ function SkeletonCard() {
   );
 }
 
-// ── Main Page ──────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
   const { showToast } = useToast();
@@ -115,6 +113,37 @@ export default function AdminPage() {
   } = useAdminCache();
 
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const [districtStatus,    setDistrictStatus]    = useState<AdminDistrictStatus | null>(null);
+  const [districtComputing, setDistrictComputing] = useState(false);
+  const [districtMsg,       setDistrictMsg]       = useState<string | null>(null);
+
+  async function handleDistrictCompute() {
+    setDistrictComputing(true);
+    setDistrictMsg(null);
+    try {
+      const r = await triggerDistrictComputeApi();
+      setDistrictMsg(r.message);
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        try {
+          const s = await getDistrictStatusApi();
+          setDistrictStatus(s);
+          if (!s.running || attempts >= 10) {
+            clearInterval(poll);
+            setDistrictComputing(false);
+            setDistrictMsg(s.cache_info?.exists
+              ? `✓ Bản đồ nhiệt sẵn sàng · ${s.cache_info.district_count ?? 22} quận/huyện`
+              : "Tính toán hoàn thành");
+          }
+        } catch { clearInterval(poll); setDistrictComputing(false); }
+      }, 3000);
+    } catch (err) {
+      setDistrictMsg(err instanceof Error ? err.message : "Lỗi kích hoạt");
+      setDistrictComputing(false);
+    }
+  }
 
   const meta      = status?.cache_meta;
   const files     = status?.files;
@@ -132,8 +161,6 @@ export default function AdminPage() {
         .filter(f => f?.exists === true).length
     : 0;
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
-
   async function handleCompute() {
     await triggerCompute(true);
   }
@@ -143,8 +170,6 @@ export default function AdminPage() {
     await clearCache();
     showToast("Cache đã được xóa. User sẽ thấy lỗi 503 cho đến khi tính lại.", "info");
   }
-
-  // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="admin-page">
@@ -350,6 +375,52 @@ export default function AdminPage() {
               )}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="admin-district-card">
+        <div className="admin-district-card__left">
+          <span className="admin-district-card__icon">🗺</span>
+          <div>
+            <h3>Bản đồ nhiệt 22 quận/huyện</h3>
+            <p>
+              Tính AQI từng quận bằng model AI — inject weather từng tọa độ →
+              ghi <code>district_cache.csv</code> → frontend đọc tại <code>/heatmap</code>
+            </p>
+            {districtStatus?.cache_info?.exists && (
+              <div className="admin-district-card__meta">
+                <span>📁 {districtStatus.cache_info.size_kb ?? "?"} KB</span>
+                <span>·</span>
+                <span>{districtStatus.cache_info.district_count ?? "?"} quận</span>
+                {districtStatus.cache_info.modified_at && (
+                  <><span>·</span><span>{timeAgo(districtStatus.cache_info.modified_at)}</span></>
+                )}
+              </div>
+            )}
+            {districtMsg && (
+              <div className={`admin-district-card__msg ${districtMsg.startsWith("✓") ? "admin-district-card__msg--ok" : ""}`}>
+                {districtMsg}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="admin-district-card__right">
+          <button
+            className={`admin-compute-btn ${districtComputing ? "admin-compute-btn--loading" : ""}`}
+            onClick={handleDistrictCompute}
+            disabled={districtComputing || computing || computeStatus === "running"}
+            type="button"
+            style={{ minWidth: 160 }}
+          >
+            {districtComputing ? (
+              <><span className="admin-compute-btn__spinner" />Đang tính...</>
+            ) : (
+              <><span>🗺</span> Tính heatmap</>
+            )}
+          </button>
+          <p className="admin-compute-card__note" style={{ marginTop: 6 }}>
+            ~5-10s · 22 quận
+          </p>
         </div>
       </div>
 

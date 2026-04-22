@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import requests
 import threading
 from contextlib import asynccontextmanager
 
@@ -17,6 +16,10 @@ from app.cache_manager import (
 from app.config import FEATURE_COLS_PATH, MODEL_PATH
 from app.predict import load_metadata
 from app.scheduler import get_scheduler_status, start_scheduler, stop_scheduler
+from app.districts import (
+    compute_district_heatmap, read_district_cache,
+    district_cache_exists, get_district_cache_info,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +27,7 @@ ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "airsafenet-admin-secret")
 VALID_PROFILES = set(ALL_PROFILES)
 
 _compute_lock = threading.Lock()
-_compute_running = False  
+_compute_running = False 
 
 
 def verify_admin(key: str) -> None:
@@ -42,45 +45,15 @@ def normalize_profile(profile: str) -> str:
     return p
 
 
-BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "https://localhost:7276")
-INTERNAL_KEY     = os.getenv("INTERNAL_KEY",     "airsafenet-internal-2027")
-
-
-def _trigger_alert_check() -> None:
-    try:
-        url  = f"{BACKEND_BASE_URL}/api/notification/check-and-alert"
-        resp = requests.post(
-            url,
-            headers={"X-Internal-Key": INTERNAL_KEY},
-            timeout=15,
-            verify=False,  # dev SSL
-        )
-        if resp.ok:
-            data = resp.json()
-            logger.info(
-                "[Alert] dispatched=%s telegram=%s email=%s skipped=%s",
-                data.get("dispatched", 0),
-                data.get("telegram_sent", 0),
-                data.get("email_sent", 0),
-                data.get("skipped", 0),
-            )
-        else:
-            logger.warning("[Alert] Backend %s: %s", resp.status_code, resp.text[:200])
-    except Exception as exc:
-        logger.warning("[Alert] trigger thất bại (non-critical): %s", exc)
-
-
 def _run_compute_background(force: bool) -> None:
+    """Chạy compute trong thread riêng, cập nhật cache_meta khi xong."""
     global _compute_running
     try:
         run_compute(force=force)
-        logger.info("Compute xong, trigger alert check...")
-        _trigger_alert_check()
     except Exception as e:
         logger.error("Background compute thất bại: %s", e)
     finally:
         _compute_running = False
-
 
 
 @asynccontextmanager
@@ -98,7 +71,6 @@ async def lifespan(app: FastAPI):
     yield
     stop_scheduler()
     logger.info("AirSafeNet AI Server đã dừng.")
-
 
 
 app = FastAPI(
@@ -309,3 +281,75 @@ def admin_scheduler_status(
 ):
     verify_admin(x_admin_key)
     return get_scheduler_status()
+
+
+_district_running = False
+_district_lock    = __import__("threading").Lock()
+
+
+def _run_district_background() -> None:
+    global _district_running
+    try:
+        compute_district_heatmap(max_workers=8)
+    except Exception as e:
+        logger.error("District compute thất bại: %s", e)
+    finally:
+        _district_running = False
+
+
+@app.get("/districts/current")
+def districts_current():
+    try:
+        data = read_district_cache()
+        return {
+            "source":       "district_cache",
+            "cache_info":   get_district_cache_info(),
+            "district_count": len(data),
+            "districts":    data,
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        logger.warning(f"Cache lỗi, đang recompute: {e}")
+        compute_district_heatmap()
+        data = read_district_cache()
+        return {
+            "source": "recomputed",
+            "districts": data
+        }
+
+
+@app.post("/admin/districts/compute")
+def admin_districts_compute(
+    x_admin_key: str = Header(..., alias="X-Admin-Key"),
+):
+    verify_admin(x_admin_key)
+    global _district_running
+
+    if _district_running:
+        return {"status": "running", "message": "District compute đang chạy, vui lòng chờ."}
+
+    with _district_lock:
+        if _district_running:
+            return {"status": "running", "message": "District compute đang chạy."}
+        _district_running = True
+
+    __import__("threading").Thread(
+        target=_run_district_background, daemon=True
+    ).start()
+
+    return {
+        "status":  "running",
+        "message": "Đã kích hoạt tính toán 22 quận/huyện trong background (~5-10s).",
+    }
+
+
+@app.get("/admin/districts/status")
+def admin_districts_status(
+    x_admin_key: str = Header(..., alias="X-Admin-Key"),
+):
+    verify_admin(x_admin_key)
+    return {
+        "running":    _district_running,
+        "cache_info": get_district_cache_info(),
+    }

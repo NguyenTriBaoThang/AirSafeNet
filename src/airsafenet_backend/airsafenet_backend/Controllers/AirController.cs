@@ -157,5 +157,41 @@ namespace AirSafeNet.Api.Controllers
                 .FirstOrDefaultAsync(x => x.UserId == userId);
             return prefs?.UserGroup ?? "normal";
         }
+
+        [HttpGet("districts")]
+        public async Task<IActionResult> GetDistricts()
+        {
+            try
+            {
+                var (body, statusCode) = await _aiService.GetDistrictsRawAsync();
+
+                if (statusCode == 503)
+                    return StatusCode(503, new { message = "District cache chưa sẵn sàng. Đang tính toán..." });
+
+                if (statusCode >= 400)
+                    return StatusCode(statusCode, new { message = $"AI Server error: {statusCode}" });
+
+                return Content(body, "application/json");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = $"Lỗi kết nối AI Server: {ex.Message}" });
+            }
+        }
+
+        [HttpPost("districts/compute")]
+        public async Task<IActionResult> TriggerDistrictCompute()
+        {
+            try
+            {
+                var (body, _) = await _aiService.TriggerDistrictComputeRawAsync();
+                return Content(body, "application/json");
+            }
+            catch (Exception ex)
+            {
+                return Ok(new { status = "running", message = $"Đã kích hoạt. ({ex.Message})" });
+            }
+        }
+
     }
 }

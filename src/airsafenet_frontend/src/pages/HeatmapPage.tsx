@@ -1,29 +1,52 @@
 import { useEffect, useRef, useState } from "react";
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  22 QUẬN/HUYỆN TP.HCM — khớp với districts.py
+// ══════════════════════════════════════════════════════════════════════════════
 const STATIONS = [
-  { id: "q1",       name: "Quận 1",          lat: 10.7769, lon: 106.7009, area: "Trung tâm" },
-  { id: "q3",       name: "Quận 3",          lat: 10.7850, lon: 106.6889, area: "Trung tâm" },
-  { id: "q7",       name: "Quận 7",          lat: 10.7322, lon: 106.7224, area: "Nam" },
-  { id: "binh_tan", name: "Bình Tân",        lat: 10.7657, lon: 106.6017, area: "Tây" },
-  { id: "go_vap",   name: "Gò Vấp",          lat: 10.8384, lon: 106.6651, area: "Bắc" },
-  { id: "thu_duc",  name: "Thủ Đức",         lat: 10.8561, lon: 106.7729, area: "Đông" },
-  { id: "binh_chanh", name: "Bình Chánh",   lat: 10.6866, lon: 106.5673, area: "Tây Nam" },
-  { id: "hoc_mon",  name: "Hóc Môn",         lat: 10.8911, lon: 106.5965, area: "Tây Bắc" },
-  { id: "nha_be",   name: "Nhà Bè",          lat: 10.6928, lon: 106.7374, area: "Nam" },
-  { id: "cu_chi",   name: "Củ Chi",          lat: 11.0128, lon: 106.4938, area: "Bắc" },
+  { id: "q1",   name: "Quận 1",     lat: 10.7769, lon: 106.7009, area: "Trung tâm"   },
+  { id: "q3",   name: "Quận 3",     lat: 10.7849, lon: 106.6898, area: "Trung tâm"   },
+  { id: "q4",   name: "Quận 4",     lat: 10.7580, lon: 106.7047, area: "Nam TT"      },
+  { id: "q5",   name: "Quận 5",     lat: 10.7537, lon: 106.6600, area: "Tây TT"      },
+  { id: "q6",   name: "Quận 6",     lat: 10.7485, lon: 106.6328, area: "Tây"         },
+  { id: "q8",   name: "Quận 8",     lat: 10.7236, lon: 106.6333, area: "Tây Nam"     },
+  { id: "q10",  name: "Quận 10",    lat: 10.7746, lon: 106.6676, area: "Trung tâm"   },
+  { id: "q11",  name: "Quận 11",    lat: 10.7631, lon: 106.6519, area: "Tây TT"      },
+  { id: "q_pn", name: "Phú Nhuận",  lat: 10.7986, lon: 106.6800, area: "Bắc TT"     },
+  { id: "q_bt", name: "Bình Thạnh", lat: 10.8127, lon: 106.7081, area: "Đông Bắc TT"},
+  { id: "q7",   name: "Quận 7",     lat: 10.7322, lon: 106.7224, area: "Nam"         },
+  { id: "q9",   name: "Quận 9",     lat: 10.8420, lon: 106.7864, area: "Đông"        },
+  { id: "q12",  name: "Quận 12",    lat: 10.8631, lon: 106.6476, area: "Bắc"         },
+  { id: "q_gv", name: "Gò Vấp",     lat: 10.8384, lon: 106.6651, area: "Bắc TT"     },
+  { id: "q_tb", name: "Tân Bình",   lat: 10.8015, lon: 106.6517, area: "Tây Bắc TT" },
+  { id: "q_tp", name: "Tân Phú",    lat: 10.7893, lon: 106.6286, area: "Tây"         },
+  { id: "q_btn",name: "Bình Tân",   lat: 10.7657, lon: 106.6017, area: "Tây"         },
+  { id: "q_td", name: "Thủ Đức",    lat: 10.8561, lon: 106.7729, area: "Đông"        },
+  { id: "h_bc", name: "Bình Chánh", lat: 10.6866, lon: 106.5673, area: "Tây Nam"     },
+  { id: "h_hm", name: "Hóc Môn",    lat: 10.8911, lon: 106.5965, area: "Tây Bắc"    },
+  { id: "h_nb", name: "Nhà Bè",     lat: 10.6928, lon: 106.7374, area: "Nam"         },
+  { id: "h_cc", name: "Củ Chi",     lat: 11.0128, lon: 106.4938, area: "Bắc"         },
+  { id: "h_cn", name: "Cần Giờ",    lat: 10.4100, lon: 106.9600, area: "Nam biển"    },
 ] as const;
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  PIXEL MAP — viewBox 0 0 520 660 — phủ toàn HCMC kể cả Cần Giờ
+// ══════════════════════════════════════════════════════════════════════════════
 const STATION_PIXELS: Record<string, { x: number; y: number }> = {
-  q1:         { x: 290, y: 300 },
-  q3:         { x: 265, y: 275 },
-  q7:         { x: 305, y: 370 },
-  binh_tan:   { x: 170, y: 295 },
-  go_vap:     { x: 240, y: 215 },
-  thu_duc:    { x: 355, y: 205 },
-  binh_chanh: { x: 145, y: 395 },
-  hoc_mon:    { x: 155, y: 165 },
-  nha_be:     { x: 305, y: 430 },
-  cu_chi:     { x: 130, y:  90 },
+  // Nội thành
+  q1:    { x: 305, y: 295 }, q3:    { x: 280, y: 275 },
+  q4:    { x: 300, y: 335 }, q5:    { x: 265, y: 320 },
+  q6:    { x: 235, y: 335 }, q8:    { x: 225, y: 370 },
+  q10:   { x: 270, y: 285 }, q11:   { x: 248, y: 305 },
+  q_pn:  { x: 278, y: 255 }, q_bt:  { x: 315, y: 240 },
+  q7:    { x: 316, y: 370 }, q9:    { x: 368, y: 225 },
+  q12:   { x: 253, y: 195 }, q_gv:  { x: 255, y: 225 },
+  q_tb:  { x: 248, y: 255 }, q_tp:  { x: 218, y: 268 },
+  q_btn: { x: 190, y: 308 }, q_td:  { x: 368, y: 205 },
+  // Ngoại thành
+  h_bc:  { x: 165, y: 395 }, h_hm:  { x: 168, y: 168 },
+  h_nb:  { x: 315, y: 430 }, h_cc:  { x: 138, y:  95 },
+  h_cn:  { x: 365, y: 570 },
 };
 
 type StationData = {
@@ -39,17 +62,66 @@ type StationData = {
   uvIndex:     number;
   aqi:         number;
   risk:        string;
+  population?: number;
   loading:     boolean;
   error:       boolean;
 };
 
-function pm25ToAqi(pm: number): number {
-  if (pm <=  12.0) return Math.round((50  / 12.0)  * pm);
-  if (pm <=  35.4) return Math.round(50  + (50  / 23.4)  * (pm - 12.0));
-  if (pm <=  55.4) return Math.round(100 + (50  / 19.9)  * (pm - 35.4));
-  if (pm <= 150.4) return Math.round(150 + (50  / 94.9)  * (pm - 55.4));
-  if (pm <= 250.4) return Math.round(200 + (100 / 99.9)  * (pm - 150.4));
-  return Math.min(500, Math.round(300 + (200 / 149.9) * (pm - 250.4)));
+type DistrictApiItem = {
+  id: string; name: string; area: string;
+  lat: number; lon: number; population: number;
+  pred_pm25: number; pred_aqi: number;
+  aqi_category: string; risk_general: string;
+  temperature: number; humidity: number;
+  wind_speed: number; uv_index: number;
+};
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7276";
+
+async function fetchDistrictsFromBackend(): Promise<StationData[]> {
+  const token = localStorage.getItem("airsafenet_token");
+  const headers: Record<string, string> = token
+    ? { Authorization: `Bearer ${token}` }
+    : {};
+
+  const res = await fetch(`${API_BASE}/api/air/districts`, { headers });
+
+  if (res.status === 503) {
+    throw new Error("503");
+  }
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+  const json = await res.json() as { districts?: DistrictApiItem[] };
+  const items = json.districts ?? [];
+
+  return items.map(d => ({
+    id:          d.id,
+    name:        d.name,
+    area:        d.area,
+    lat:         d.lat,
+    lon:         d.lon,
+    pm25:        d.pred_pm25,
+    aqi:         d.pred_aqi,
+    risk:        d.risk_general,
+    temperature: d.temperature,
+    humidity:    d.humidity,
+    windSpeed:   d.wind_speed,
+    uvIndex:     d.uv_index,
+    population:  d.population,
+    loading:     false,
+    error:       false,
+  }));
+}
+
+async function triggerDistrictCompute(): Promise<void> {
+  const token = localStorage.getItem("airsafenet_token");
+  if (!token) return;
+  try {
+    await fetch(`${API_BASE}/api/air/districts/compute`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch { /* ignore */ }
 }
 
 function aqiToRisk(aqi: number): string {
@@ -77,53 +149,6 @@ function riskViet(risk: string): string {
        : risk === "UNHEALTHY"           ? "Không tốt"
        : risk === "VERY_UNHEALTHY"      ? "Rất không tốt"
        : "Nguy hiểm";
-}
-
-async function fetchStation(
-  id: string, lat: number, lon: number
-): Promise<Partial<StationData>> {
-  const aqUrl = `https://air-quality-api.open-meteo.com/v1/air-quality`
-    + `?latitude=${lat}&longitude=${lon}`
-    + `&current=pm2_5,us_aqi`
-    + `&timezone=Asia%2FBangkok`;
-
-  const wxUrl = `https://api.open-meteo.com/v1/forecast`
-    + `?latitude=${lat}&longitude=${lon}`
-    + `&current=temperature_2m,relative_humidity_2m,wind_speed_10m,uv_index`
-    + `&timezone=Asia%2FBangkok&wind_speed_unit=kmh`;
-
-  const [aqRes, wxRes] = await Promise.all([
-    fetch(aqUrl, { signal: AbortSignal.timeout(10_000) }),
-    fetch(wxUrl, { signal: AbortSignal.timeout(10_000) }),
-  ]);
-
-  if (!aqRes.ok || !wxRes.ok) throw new Error(`HTTP ${aqRes.status}/${wxRes.status}`);
-
-  const aq = await aqRes.json() as {
-    current?: { pm2_5?: number; us_aqi?: number };
-  };
-  const wx = await wxRes.json() as {
-    current?: {
-      temperature_2m?: number;
-      relative_humidity_2m?: number;
-      wind_speed_10m?: number;
-      uv_index?: number;
-    };
-  };
-
-  const pm25 = aq.current?.pm2_5 ?? 0;
-  const aqi  = aq.current?.us_aqi ?? pm25ToAqi(pm25);
-
-  return {
-    id,
-    pm25:        Math.round(pm25 * 10) / 10,
-    aqi:         Math.round(aqi),
-    risk:        aqiToRisk(aqi),
-    temperature: Math.round((wx.current?.temperature_2m ?? 0) * 10) / 10,
-    humidity:    Math.round(wx.current?.relative_humidity_2m ?? 0),
-    windSpeed:   Math.round((wx.current?.wind_speed_10m ?? 0) * 10) / 10,
-    uvIndex:     Math.round((wx.current?.uv_index ?? 0) * 10) / 10,
-  };
 }
 
 function HeatBlob({
@@ -337,37 +362,48 @@ export default function HeatmapPage() {
       loading: true, error: false,
     }))
   );
-  const [activeId,    setActiveId]    = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string>("");
+  const [activeId,      setActiveId]      = useState<string | null>(null);
+  const [lastUpdated,   setLastUpdated]   = useState<string>("");
   const [globalLoading, setGlobalLoading] = useState(true);
+  const [computing,     setComputing]     = useState(false);
   const refreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     async function loadAll() {
       setGlobalLoading(true);
-
-      const results = await Promise.allSettled(
-        STATIONS.map(s => fetchStation(s.id, s.lat, s.lon))
-      );
-
-      setStations(prev => prev.map((station, i) => {
-        const result = results[i];
-        if (result.status === "fulfilled") {
-          return { ...station, ...result.value, loading: false, error: false };
+      try {
+        const data = await fetchDistrictsFromBackend();
+        setStations(data);
+        setLastUpdated(new Date().toLocaleString("vi-VN", {
+          hour: "2-digit", minute: "2-digit",
+          day:  "2-digit", month: "2-digit",
+        }));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg === "503") {
+          setComputing(true);
+          await triggerDistrictCompute();
+          setTimeout(async () => {
+            try {
+              const data = await fetchDistrictsFromBackend();
+              setStations(data);
+              setLastUpdated(new Date().toLocaleString("vi-VN", {
+                hour: "2-digit", minute: "2-digit",
+                day:  "2-digit", month: "2-digit",
+              }));
+            } catch { /* ignore retry error */ }
+            setComputing(false);
+          }, 12_000);
+        } else {
+          setStations(prev => prev.map(s => ({ ...s, loading: false, error: true })));
         }
-        return { ...station, loading: false, error: true };
-      }));
-
-      setLastUpdated(new Date().toLocaleString("vi-VN", {
-        hour: "2-digit", minute: "2-digit",
-        day: "2-digit",  month: "2-digit",
-      }));
-      setGlobalLoading(false);
+      } finally {
+        setGlobalLoading(false);
+      }
     }
 
     loadAll();
-
-    refreshRef.current = setInterval(loadAll, 15 * 60 * 1000);
+    refreshRef.current = setInterval(loadAll, 60 * 60 * 1000);
     return () => { if (refreshRef.current) clearInterval(refreshRef.current); };
   }, []);
 
@@ -384,10 +420,12 @@ export default function HeatmapPage() {
 
       <div className="hm-header">
         <div className="hm-header__left">
-          <div className="hm-header__eyebrow">🗺 Bản đồ nhiệt</div>
-          <h2 className="hm-header__title">Chất lượng không khí TP.HCM</h2>
+          <div className="hm-header__eyebrow">🗺 Bản đồ nhiệt · Dự báo từ mô hình AI</div>
+          <h2 className="hm-header__title">Chất lượng không khí TP.HCM — 22 quận/huyện</h2>
           <p className="hm-header__sub">
-            10 điểm đo · Open-Meteo Air Quality API · Cập nhật {lastUpdated || "..."}
+            {computing
+              ? "⏳ Đang tính toán lần đầu (~10s)..."
+              : `Model AI · district_cache.csv · Cập nhật ${lastUpdated || "..."}`}
           </p>
         </div>
 
@@ -421,7 +459,7 @@ export default function HeatmapPage() {
 
         <div className="hm-map-wrap">
           <svg
-            viewBox="0 0 500 580"
+            viewBox="0 0 520 660"
             className="hm-map-svg"
             onClick={() => setActiveId(null)}
           >
@@ -429,10 +467,16 @@ export default function HeatmapPage() {
               rx={16} fill="#0a1628" />
 
             <polygon
-              points="130,60 210,40 290,50 360,80 420,140 440,220 420,310 390,380 360,450 310,500 260,530 210,520 160,490 120,440 90,380 75,300 80,220 100,150 120,90"
+              points="138,60 215,38 295,48 365,78 425,138 445,218 428,312 395,382 362,452 330,510 290,548 258,570 215,568 162,540 118,498 90,428 72,348 68,268 80,188 105,120 125,82"
               fill="rgba(37,99,235,0.06)"
               stroke="rgba(37,99,235,0.2)"
               strokeWidth={1.5}
+            />
+            <polygon
+              points="318,510 345,530 368,560 378,600 360,630 335,640 308,628 292,600 295,568 310,545"
+              fill="rgba(6,182,212,0.05)"
+              stroke="rgba(6,182,212,0.15)"
+              strokeWidth={1}
             />
 
             <line x1={230} y1={200} x2={320} y2={200} stroke="rgba(255,255,255,0.04)" strokeWidth={1} />

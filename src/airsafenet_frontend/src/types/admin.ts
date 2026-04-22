@@ -25,8 +25,8 @@ export type SchedulerInfo = {
 };
 
 export type AdminCacheStatus = {
-  cache_meta: CacheMeta | undefined;       
-  compute_running: boolean | undefined;  
+  cache_meta: CacheMeta | undefined;
+  compute_running: boolean | undefined;
   files: CacheFiles | undefined;
   scheduler: SchedulerInfo | undefined;
   model?: {
@@ -45,4 +45,21 @@ export type AdminComputeResult = {
   history_rows?: number;
   skipped?: boolean;
   error?: string;
+};
+
+export type DistrictCacheInfo = {
+  exists: boolean;
+  size_kb?: number;
+  modified_at?: string;
+  district_count?: number;
+};
+
+export type AdminDistrictStatus = {
+  running: boolean;
+  cache_info: DistrictCacheInfo;
+};
+
+export type AdminDistrictResult = {
+  status: "running" | "ok" | "error";
+  message: string;
 };
