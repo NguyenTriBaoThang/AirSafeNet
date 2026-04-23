@@ -15,6 +15,7 @@ namespace airsafenet_backend.Data
         public DbSet<AlertLog> AlertLogs => Set<AlertLog>();
         public DbSet<ChatConversation> ChatConversations => Set<ChatConversation>();
         public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+        public DbSet<UserActivitySchedule> UserActivitySchedules => Set<UserActivitySchedule>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -8,6 +8,7 @@ import SectionHeader from "../components/common/SectionHeader";
 import StatusChip from "../components/common/StatusChip";
 import AppIcon from "../components/common/AppIcon";
 import AlertHistoryPanel from "../components/dashboard/AlertHistoryPanel";
+import ActivitySchedulerWidget from "../components/dashboard/ActivitySchedulerWidget";
 
 const USER_GROUP_OPTIONS = [
   { value: "normal",      label: "Người dùng phổ thông" },
@@ -263,6 +264,8 @@ export default function UserPreferencesPage() {
           </div>
         </div>
       </div>
+
+      <ActivitySchedulerWidget />
 
       <div className="card" style={{ marginTop: 4 }}>
         <div className="card__header">

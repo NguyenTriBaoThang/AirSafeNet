@@ -13,17 +13,18 @@ export function clearAccessToken() {
   localStorage.removeItem("airsafenet_token");
 }
 
-type RequestOptions = RequestInit & {
+type RequestOptions = Omit<RequestInit, "body"> & {
   auth?: boolean;
+  body?: unknown; 
 };
 
 export async function http<T>(
   path: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { auth = false, headers, ...rest } = options;
+  const { auth = false, headers, body, ...rest } = options;
 
-  const finalHeaders = new Headers(headers ?? {});
+  const finalHeaders = new Headers(headers as HeadersInit ?? {});
   finalHeaders.set("Content-Type", "application/json");
 
   if (auth) {
@@ -33,9 +34,17 @@ export async function http<T>(
     }
   }
 
+  const serializedBody =
+    body === undefined || body === null
+      ? undefined
+      : typeof body === "string"
+      ? body
+      : JSON.stringify(body);
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...rest,
     headers: finalHeaders,
+    body: serializedBody,
   });
 
   if (!response.ok) {
