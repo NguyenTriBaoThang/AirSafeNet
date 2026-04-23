@@ -15,6 +15,7 @@ import { useToast } from "../components/common/useToast";
 import SectionHeader from "../components/common/SectionHeader";
 import StatusChip from "../components/common/StatusChip";
 import AppIcon from "../components/common/AppIcon";
+import AnomalyBanner from "../components/dashboard/AnomalyBanner";
 
 function CacheInitializingState({ onRetry }: { onRetry: () => void }) {
   const [dots, setDots] = useState(".");
@@ -103,6 +104,8 @@ export default function Dashboard() {
 
       <DashboardFilters days={days} mode={mode} onDaysChange={setDays} onModeChange={setMode} />
 
+      <AnomalyBanner />
+
       <div className="summary-grid">
         <SummaryCard title="AQI hiện tại"   value={summary.currentAqi}             subtext={summary.currentRisk}                                                                   icon={<AppIcon name="aqi" />}   tone="primary" />
         <SummaryCard title="PM2.5 hiện tại" value={summary.currentPm25.toFixed(1)} subtext="µg/m³"                                                                                 icon={<AppIcon name="air" />}   tone="default" />
@@ -134,7 +137,6 @@ export default function Dashboard() {
       <AiExplainPanel />
       <ForecastTable points={chart.points} mode={mode} />
 
-      {/* ── Teaser card dẫn sang /impact ── */}
       <Link to="/impact" className="impact-teaser-card">
         <div className="impact-teaser-card__left">
           <span className="impact-teaser-card__icon">💰</span>

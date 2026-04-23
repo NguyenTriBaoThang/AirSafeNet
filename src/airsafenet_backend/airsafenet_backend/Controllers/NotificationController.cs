@@ -1,4 +1,5 @@
-﻿using airsafenet_backend.Services;
+﻿using airsafenet_backend.DTOs.Notification;
+using airsafenet_backend.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace airsafenet_backend.Controllers
@@ -26,7 +27,8 @@ namespace airsafenet_backend.Controllers
 
         [HttpPost("check-and-alert")]
         public async Task<IActionResult> CheckAndAlert(
-            [FromHeader(Name = "X-Internal-Key")] string? internalKey)
+            [FromHeader(Name = "X-Internal-Key")] string? internalKey,
+            [FromBody] AnomalyAlertRequest? body = null)
         {
             var expectedKey = _config["Notification:InternalKey"];
             if (string.IsNullOrEmpty(expectedKey) || internalKey != expectedKey)
@@ -38,11 +40,27 @@ namespace airsafenet_backend.Controllers
                 return Ok(new { message = "Cache chưa sẵn sàng, bỏ qua alert check." });
             }
 
+            string recommendation = current.RecommendationProfile;
+            if (body?.Anomaly != null)
+            {
+                var a = body.Anomaly;
+                var xaiSummary = a.Xai?.Summary ?? "Không xác định nguyên nhân.";
+                recommendation =
+                    $"⚠️ CẢNH BÁO ĐỘT BIẾN: PM2.5 tăng {a.SpikePm25:F1} µg/m³ " +
+                    $"(từ {a.FromPm25:F1} → {a.ToPm25:F1} µg/m³) trong 1 giờ. " +
+                    $"Phân tích AI: {xaiSummary} " +
+                    $"Khuyến nghị: {recommendation}";
+
+                _logger.LogWarning(
+                    "Anomaly alert: spike={Spike} µg/m³, AQI={Aqi}, XAI={Xai}",
+                    a.SpikePm25, current.PredAqi, xaiSummary);
+            }
+
             var result = await _alertService.DispatchAlertsAsync(
                 currentAqi: current.PredAqi,
                 currentPm25: current.PredPm25,
                 currentRisk: current.RiskProfile,
-                recommendation: current.RecommendationProfile);
+                recommendation: recommendation);
 
             return Ok(new
             {
@@ -54,6 +72,7 @@ namespace airsafenet_backend.Controllers
                 telegram_sent = result.TelegramSent,
                 email_sent = result.EmailSent,
                 skipped = result.Skipped,
+                is_anomaly = body?.Anomaly != null,
             });
         }
 

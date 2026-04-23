@@ -16,6 +16,10 @@ from app.cache_manager import (
 from app.config import FEATURE_COLS_PATH, MODEL_PATH
 from app.predict import load_metadata
 from app.scheduler import get_scheduler_status, start_scheduler, stop_scheduler
+from app.anomaly_detector import (
+    run_anomaly_detection, get_latest_anomaly,
+    load_anomaly_log, SPIKE_THRESHOLD,
+)
 from app.districts import (
     compute_district_heatmap, read_district_cache,
     district_cache_exists, get_district_cache_info,
@@ -27,7 +31,31 @@ ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "airsafenet-admin-secret")
 VALID_PROFILES = set(ALL_PROFILES)
 
 _compute_lock = threading.Lock()
-_compute_running = False 
+_compute_running = False
+
+
+BACKEND_BASE_URL = os.getenv("BACKEND_BASE_URL", "https://localhost:7276")
+INTERNAL_KEY     = os.getenv("INTERNAL_KEY",     "airsafenet-internal-2027")
+
+
+def _trigger_alert_check(anomaly_context: dict | None = None) -> None:
+    try:
+        import requests as _req
+        url     = f"{BACKEND_BASE_URL}/api/notification/check-and-alert"
+        headers = {"X-Internal-Key": INTERNAL_KEY, "Content-Type": "application/json"}
+        body    = {"anomaly": anomaly_context} if anomaly_context else {}
+        resp    = _req.post(url, headers=headers, json=body, timeout=15, verify=False)
+        if resp.ok:
+            data = resp.json()
+            logger.info(
+                "[Alert] dispatched=%s telegram=%s email=%s skipped=%s",
+                data.get("dispatched", 0), data.get("telegram_sent", 0),
+                data.get("email_sent", 0), data.get("skipped", 0),
+            )
+        else:
+            logger.warning("[Alert] Backend %s: %s", resp.status_code, resp.text[:200])
+    except Exception as exc:
+        logger.warning("[Alert] trigger thất bại (non-critical): %s", exc)
 
 
 def verify_admin(key: str) -> None:
@@ -46,10 +74,24 @@ def normalize_profile(profile: str) -> str:
 
 
 def _run_compute_background(force: bool) -> None:
-    """Chạy compute trong thread riêng, cập nhật cache_meta khi xong."""
     global _compute_running
     try:
         run_compute(force=force)
+        logger.info("Compute xong, trigger alert check...")
+        _trigger_alert_check()
+        try:
+            result = run_anomaly_detection()
+            if result.get("detected") and result.get("severity") == "critical":
+                anomaly = result["anomaly"]
+                logger.warning(
+                    "🚨 ANOMALY: spike=%.2f µg/m³, AQI=%d",
+                    anomaly["spike_pm25"], anomaly["aqi_after"],
+                )
+                _trigger_alert_check(anomaly_context=anomaly)
+            else:
+                logger.info("Anomaly check: %s", result.get("severity", "none"))
+        except Exception as exc:
+            logger.warning("Anomaly detection lỗi (non-critical): %s", exc)
     except Exception as e:
         logger.error("Background compute thất bại: %s", e)
     finally:
@@ -353,3 +395,34 @@ def admin_districts_status(
         "running":    _district_running,
         "cache_info": get_district_cache_info(),
     }
+
+
+@app.get("/anomaly/latest")
+def anomaly_latest():
+    anomaly = get_latest_anomaly(hours=24)
+    return {
+        "has_anomaly": anomaly is not None,
+        "anomaly":     anomaly,
+        "threshold":   SPIKE_THRESHOLD,
+    }
+
+
+@app.get("/anomaly/history")
+def anomaly_history(
+    x_admin_key: str = Header(..., alias="X-Admin-Key"),
+):
+    verify_admin(x_admin_key)
+    log = load_anomaly_log()
+    return {
+        "count":   len(log),
+        "entries": list(reversed(log)), 
+    }
+
+
+@app.post("/anomaly/check")
+def anomaly_check_manual(
+    x_admin_key: str = Header(..., alias="X-Admin-Key"),
+):
+    verify_admin(x_admin_key)
+    result = run_anomaly_detection(force=True)
+    return result

@@ -68,5 +68,73 @@ namespace airsafenet_backend.Services
 
             return await response.Content.ReadFromJsonAsync<AiHistoryResponse>();
         }
+
+        public string GetAdminKey() =>
+            _configuration["AiServer:AdminKey"] ?? "airsafenet-admin-secret";
+
+        public async Task<(string body, int statusCode)> GetRawAsync(string path)
+        {
+            var response = await _httpClient.GetAsync($"{GetBaseUrl()}{path}");
+            var body = await response.Content.ReadAsStringAsync();
+            return (body, (int)response.StatusCode);
+        }
+
+        public async Task<(string body, int statusCode)> GetRawWithAdminKeyAsync(
+            string path, string adminKey)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{GetBaseUrl()}{path}");
+            request.Headers.Add("X-Admin-Key", adminKey);
+            var response = await _httpClient.SendAsync(request);
+            var body = await response.Content.ReadAsStringAsync();
+            return (body, (int)response.StatusCode);
+        }
+
+        public async Task<(string body, int statusCode)> PostRawWithAdminKeyAsync(
+            string path, string adminKey)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{GetBaseUrl()}{path}");
+            request.Headers.Add("X-Admin-Key", adminKey);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            try
+            {
+                var response = await _httpClient.SendAsync(request, cts.Token);
+                var body = await response.Content.ReadAsStringAsync();
+                return (body, (int)response.StatusCode);
+            }
+            catch (TaskCanceledException)
+            {
+                return ("{\"status\":\"running\",\"message\":\"Triggered.\"}", 200);
+            }
+        }
+
+        public async Task<(string body, int statusCode)> GetDistrictsRawAsync()
+        {
+            var url = $"{GetBaseUrl()}/districts/current";
+            var response = await _httpClient.GetAsync(url);
+            var body = await response.Content.ReadAsStringAsync();
+            return (body, (int)response.StatusCode);
+        }
+
+        public async Task<(string body, int statusCode)> TriggerDistrictComputeRawAsync()
+        {
+            var adminKey = _configuration["AiServer:AdminKey"] ?? "airsafenet-admin-secret";
+
+            using var request = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"{GetBaseUrl()}/admin/districts/compute");
+            request.Headers.Add("X-Admin-Key", adminKey);
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try
+            {
+                var response = await _httpClient.SendAsync(request, cts.Token);
+                var body = await response.Content.ReadAsStringAsync();
+                return (body, (int)response.StatusCode);
+            }
+            catch (TaskCanceledException)
+            {
+                return ("{\"status\":\"running\",\"message\":\"Đã kích hoạt tính toán 22 quận/huyện.\"}", 200);
+            }
+        }
     }
 }
