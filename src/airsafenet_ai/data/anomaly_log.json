@@ -1,0 +1,45 @@
+[
+  {
+    "detected": true,
+    "spike_pm25": 11.3,
+    "from_pm25": 32.4,
+    "to_pm25": 21.1,
+    "spike_time": "2026-04-24T08:00:00",
+    "severity": "warning",
+    "aqi_after": 70,
+    "risk_after": "MODERATE",
+    "recommendation": "Chất lượng không khí ở mức chấp nhận được. Người dùng nên theo dõi nếu ở ngoài trời lâu.",
+    "xai": {
+      "top_factors": [
+        {
+          "feature": "pm10",
+          "label": "pm10",
+          "delta": -10.4,
+          "direction": "giảm",
+          "explanation": "Thay đổi 10.40 units",
+          "importance": 0.0
+        },
+        {
+          "feature": "co",
+          "label": "co",
+          "delta": -149.0,
+          "direction": "giảm",
+          "explanation": "Thay đổi 149.00 units",
+          "importance": 0.0
+        },
+        {
+          "feature": "no2",
+          "label": "no2",
+          "delta": -6.5,
+          "direction": "giảm",
+          "explanation": "Thay đổi 6.50 units",
+          "importance": 0.0
+        }
+      ],
+      "summary": "Spike chủ yếu do pm10. Đồng thời co cũng góp phần.",
+      "confidence": 100
+    },
+    "created_at": "2026-04-24T02:59:55.339410+00:00",
+    "alerted": false
+  }
+]

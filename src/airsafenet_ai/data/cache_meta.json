@@ -1,8 +1,9 @@
 {
   "status": "ok",
-  "computed_at": "2026-04-22T03:55:51.266178+00:00",
+  "computed_at": "2026-04-25T20:03:00.841619+00:00",
   "forecast_csv": "G:\\GITHUB\\AirSafeNet\\src\\airsafenet_ai\\data\\forecast_cache.csv",
   "history_csv": "G:\\GITHUB\\AirSafeNet\\src\\airsafenet_ai\\data\\history_cache.csv",
   "current_json": "G:\\GITHUB\\AirSafeNet\\src\\airsafenet_ai\\data\\current_cache.json",
+  "ensemble": true,
   "error": null
 }

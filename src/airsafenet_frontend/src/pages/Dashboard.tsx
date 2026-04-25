@@ -14,6 +14,7 @@ import DashboardSkeleton from "../components/common/DashboardSkeleton";
 import { useToast } from "../components/common/useToast";
 import SectionHeader from "../components/common/SectionHeader";
 import StatusChip from "../components/common/StatusChip";
+import EnsembleBadge from "../components/dashboard/EnsembleBadge";
 import AppIcon from "../components/common/AppIcon";
 import AnomalyBanner from "../components/dashboard/AnomalyBanner";
 
@@ -105,6 +106,8 @@ export default function Dashboard() {
       <DashboardFilters days={days} mode={mode} onDaysChange={setDays} onModeChange={setMode} />
 
       <AnomalyBanner />
+
+      <EnsembleBadge />
 
       <div className="summary-grid">
         <SummaryCard title="AQI hiện tại"   value={summary.currentAqi}             subtext={summary.currentRisk}                                                                   icon={<AppIcon name="aqi" />}   tone="primary" />
