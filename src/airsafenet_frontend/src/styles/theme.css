@@ -10447,3 +10447,261 @@ input.input-error:focus {
   .sso-actions { flex-direction: column-reverse; }
   .sso-actions .btn { width: 100%; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   WEEKLY PLANNER
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Card ─────────────────────────────────────────────────────────── */
+.wplanner-card {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.02);
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.wplanner-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 16px; padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  flex-wrap: wrap;
+}
+.wplanner-header__eyebrow {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .09em; color: #60a5fa; margin-bottom: 3px;
+}
+.wplanner-header__title { font-size: 15px; font-weight: 800; color: #f0f6ff; margin: 0 0 3px; }
+.wplanner-header__sub   { font-size: 11.5px; color: rgba(255,255,255,.3); margin: 0; }
+
+.wplanner-header__legend {
+  display: flex; align-items: center; gap: 12px; flex-shrink: 0; flex-wrap: wrap;
+}
+.wplanner-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: rgba(255,255,255,.4); }
+.wplanner-legend-dot  { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+
+/* ── Loading ──────────────────────────────────────────────────────── */
+.wplanner-loading {
+  display: flex; align-items: center; gap: 10px;
+  padding: 28px 20px; font-size: 13px; color: rgba(255,255,255,.4);
+}
+.wplanner-spin {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 2px solid rgba(59,130,246,.2); border-top-color: #3b82f6;
+  animation: wpSpin .7s linear infinite; flex-shrink: 0;
+}
+@keyframes wpSpin { to { transform: rotate(360deg); } }
+
+/* ── Wrapper (time axis + grid) ───────────────────────────────────── */
+.wplanner-wrap {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 540px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,.1) transparent;
+}
+
+/* ── Time axis ────────────────────────────────────────────────────── */
+.wplanner-timeaxis {
+  flex-shrink: 0;
+  width: 36px;
+  padding-top: 38px; /* header height */
+  border-right: 1px solid rgba(255,255,255,.06);
+  background: rgba(0,0,0,.2);
+  position: sticky; left: 0; z-index: 10;
+}
+.wplanner-timeaxis__cell {
+  display: flex; align-items: flex-start; justify-content: flex-end;
+  padding-right: 6px;
+  font-size: 9px; font-family: ui-monospace, monospace;
+  color: rgba(255,255,255,.25); line-height: 1;
+}
+
+/* ── Grid ─────────────────────────────────────────────────────────── */
+.wplanner-grid {
+  display: flex;
+  flex: 1;
+  min-width: 560px;
+  user-select: none;
+}
+
+/* ── Column ───────────────────────────────────────────────────────── */
+.wplanner-col {
+  flex: 1; min-width: 80px;
+  display: flex; flex-direction: column;
+  border-right: 1px solid rgba(255,255,255,.05);
+}
+.wplanner-col:last-child { border-right: none; }
+.wplanner-col--today     { background: rgba(59,130,246,.03); }
+
+/* Column header */
+.wplanner-col__header {
+  position: sticky; top: 0; z-index: 8;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 6px 4px;
+  background: rgba(15,23,41,.95);
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  min-height: 38px;
+  backdrop-filter: blur(4px);
+}
+.wplanner-col__header > strong { font-size: 12px; font-weight: 800; color: rgba(255,255,255,.6); }
+.wplanner-col__header > span   { font-size: 10px; color: rgba(255,255,255,.3); }
+.wplanner-col__header--today > strong { color: #93c5fd; }
+
+.wplanner-today-badge {
+  font-size: 8.5px !important;
+  font-weight: 700; padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(59,130,246,.25);
+  color: #93c5fd !important;
+  border: 1px solid rgba(59,130,246,.3);
+  margin-top: 2px;
+}
+
+/* Column body */
+.wplanner-col__body {
+  flex: 1;
+}
+
+/* ── Hour cell ────────────────────────────────────────────────────── */
+.wplanner-cell {
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  position: relative;
+  transition: background .12s;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.wplanner-cell:hover { background: rgba(255,255,255,.04) !important; }
+.wplanner-cell--now  { background: rgba(59,130,246,.08) !important; }
+.wplanner-cell--drop {
+  background: rgba(139,92,246,.25) !important;
+  border: 1px dashed rgba(139,92,246,.6);
+}
+
+/* Now line */
+.wplanner-cell__now-line {
+  position: absolute; left: 0; right: 0; top: 0;
+  height: 2px; background: #3b82f6;
+  box-shadow: 0 0 6px #3b82f6;
+}
+
+/* AQI label (every 6h) */
+.wplanner-cell__aqi-label {
+  position: absolute; right: 3px; top: 2px;
+  font-size: 8px; font-weight: 700;
+  opacity: .7; font-family: ui-monospace, monospace;
+}
+
+/* ── Activity block ───────────────────────────────────────────────── */
+.wplanner-block {
+  position: absolute; left: 2px; right: 2px;
+  border-radius: 6px;
+  background: rgba(15,23,41,.92);
+  border: 1px solid var(--blk-color, #3b82f6);
+  overflow: hidden;
+  cursor: grab;
+  transition: box-shadow .12s, transform .1s;
+  z-index: 5;
+  display: flex;
+}
+.wplanner-block:hover {
+  box-shadow: 0 2px 10px rgba(0,0,0,.4),
+              0 0 0 1px var(--blk-color, #3b82f6);
+  transform: scale(1.02);
+  z-index: 6;
+}
+.wplanner-block:active { cursor: grabbing; }
+
+.wplanner-block__stripe {
+  width: 3px; flex-shrink: 0; min-height: 100%;
+}
+
+.wplanner-block__body {
+  flex: 1; padding: 2px 4px;
+  display: flex; flex-direction: column; justify-content: center;
+  min-width: 0;
+}
+.wplanner-block__name {
+  display: flex; align-items: center; gap: 3px;
+  font-size: 10.5px; font-weight: 700; color: #f0f6ff;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.wplanner-block__name > span:first-child { font-size: 12px; flex-shrink: 0; }
+.wplanner-block__time {
+  font-size: 9px; color: rgba(255,255,255,.4);
+  font-family: ui-monospace, monospace;
+}
+
+.wplanner-block__del {
+  position: absolute; right: 2px; top: 2px;
+  width: 14px; height: 14px; border-radius: 3px;
+  border: none; background: rgba(239,68,68,.0);
+  color: rgba(255,255,255,.0); font-size: 8px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: background .1s, color .1s;
+}
+.wplanner-block:hover .wplanner-block__del {
+  background: rgba(239,68,68,.3); color: #fca5a5;
+}
+
+/* ── Saving overlay ───────────────────────────────────────────────── */
+.wplanner-saving {
+  position: absolute; bottom: 12px; right: 14px;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: rgba(255,255,255,.5);
+  padding: 5px 12px; border-radius: 999px;
+  background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.1);
+}
+
+/* ── Drag ghost ───────────────────────────────────────────────────── */
+.wplanner-ghost {
+  position: fixed; z-index: 9999; pointer-events: none;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 10px;
+  background: rgba(139,92,246,.9);
+  border: 1px solid rgba(139,92,246,.6);
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  font-size: 13px; font-weight: 700; color: #fff;
+  transform: rotate(-1deg);
+  animation: wpGhostIn .1s ease;
+  white-space: nowrap;
+}
+@keyframes wpGhostIn { from{opacity:0;transform:scale(.9) rotate(-1deg)} to{opacity:1;transform:scale(1) rotate(-1deg)} }
+
+.wplanner-ghost > span:first-child { font-size: 17px; }
+.wplanner-ghost__target {
+  font-size: 11px; font-weight: 600; color: rgba(255,255,255,.7);
+  border-left: 1px solid rgba(255,255,255,.3); padding-left: 8px; margin-left: 4px;
+}
+
+/* ── Tooltip ──────────────────────────────────────────────────────── */
+.wplanner-tip {
+  position: fixed; z-index: 9998; pointer-events: none;
+  background: #1e293b; border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px; padding: 8px 12px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.5);
+  min-width: 160px;
+  animation: wpTipIn .12s ease;
+}
+@keyframes wpTipIn { from{opacity:0;transform:translateY(3px)} to{opacity:1;transform:none} }
+
+.wplanner-tip__head {
+  font-size: 11px; font-weight: 700; color: rgba(255,255,255,.55);
+  margin-bottom: 6px; padding-bottom: 5px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.wplanner-tip__row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 11.5px; margin-top: 3px;
+}
+.wplanner-tip__row > span   { color: rgba(255,255,255,.35); }
+.wplanner-tip__row > strong { font-weight: 800; color: #f0f6ff; }
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  .wplanner-col    { min-width: 60px; }
+  .wplanner-header { flex-direction: column; }
+  .wplanner-header__legend { display: none; }
+}
