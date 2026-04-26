@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { http } from "../../api/http";
 
-
 type ForecastCell = {
   dayIndex: number;   
-  hour:     number;  
+  hour:     number;   
   aqi:      number;
   pm25:     number;
   risk:     string;
@@ -31,7 +30,6 @@ type DragState = {
 };
 
 type HoverCell = { dayIndex: number; hour: number } | null;
-//type QuickAdd  = { dayIndex: number; hour: number } | null;
 
 type Props = {
   schedules:  Schedule[];
@@ -46,7 +44,6 @@ const DAY_LABELS   = ["CN","T2","T3","T4","T5","T6","T7"];
 const DAY_FULL     = ["Chủ nhật","Thứ 2","Thứ 3","Thứ 4","Thứ 5","Thứ 6","Thứ 7"];
 
 function jsToDb(jsDay: number): number { return jsDay === 0 ? 7 : jsDay; }
-// function dbToJs(db: number): number    { return db === 7 ? 0 : db; }
 
 function aqiBg(aqi: number): string {
   const alpha = 0.13 + Math.min(aqi, 300) / 300 * 0.22;

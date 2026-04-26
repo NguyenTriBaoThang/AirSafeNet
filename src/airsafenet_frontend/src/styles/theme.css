@@ -10705,3 +10705,203 @@ input.input-error:focus {
   .wplanner-header { flex-direction: column; }
   .wplanner-header__legend { display: none; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   PATTERN INSIGHT WIDGET 
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Widget wrapper ───────────────────────────────────────────────── */
+.pit-widget {
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.02);
+  overflow: hidden;
+}
+
+/* ── Header ───────────────────────────────────────────────────────── */
+.pit-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 14px; padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  flex-wrap: wrap;
+}
+.pit-header__eyebrow {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .09em; color: #c084fc; margin-bottom: 3px;
+}
+.pit-header__title { font-size: 15px; font-weight: 800; color: #f0f6ff; margin: 0 0 3px; }
+.pit-header__sub   { font-size: 11.5px; color: rgba(255,255,255,.3); margin: 0; }
+.pit-header__right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+
+.pit-badge {
+  padding: 3px 10px; border-radius: 999px;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.pit-badge--warn { background: rgba(249,115,22,.12); color: #fb923c; border: 1px solid rgba(249,115,22,.25); }
+.pit-badge--good { background: rgba(34,197,94,.1);   color: #86efac; border: 1px solid rgba(34,197,94,.25);  }
+
+.pit-toggle-btn {
+  width: 28px; height: 28px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05);
+  color: rgba(255,255,255,.4); cursor: pointer; font-size: 11px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.pit-toggle-btn:hover { background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); }
+
+/* ── All good state ───────────────────────────────────────────────── */
+.pit-all-good {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 16px 18px; font-size: 13px;
+}
+.pit-all-good > span { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+.pit-all-good > div  { display: flex; flex-direction: column; gap: 3px; }
+.pit-all-good > div > strong { color: #86efac; font-size: 14px; }
+.pit-all-good > div > span   { color: rgba(255,255,255,.4); }
+
+/* ── Cards list ───────────────────────────────────────────────────── */
+.pit-cards { display: flex; flex-direction: column; gap: 0; }
+
+/* ── Single insight card ──────────────────────────────────────────── */
+.pit-card {
+  border-left: 3px solid transparent;
+  border-right: none; border-top: none; border-bottom: 1px solid rgba(255,255,255,.05);
+  padding: 14px 18px;
+  animation: pitSlideIn .25s ease;
+  transition: background .15s;
+}
+.pit-card:last-child { border-bottom: none; }
+.pit-card:hover { background: rgba(255,255,255,.015); }
+
+.pit-card--loading, .pit-card--error, .pit-card--empty {
+  padding: 20px 18px; border: none;
+}
+
+@keyframes pitSlideIn {
+  from { opacity:0; transform: translateX(-6px); }
+  to   { opacity:1; transform: none; }
+}
+
+.pit-card__header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; margin-bottom: 8px; flex-wrap: wrap;
+}
+.pit-card__left { display: flex; align-items: flex-start; gap: 10px; flex: 1; }
+.pit-card__icon { font-size: 22px; flex-shrink: 0; margin-top: 2px; }
+
+.pit-card__activity {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: rgba(255,255,255,.35); margin-bottom: 3px;
+}
+.pit-card__title {
+  font-size: 13.5px; font-weight: 700; color: #f0f6ff;
+  display: flex; align-items: center; gap: 5px;
+}
+
+.pit-card__impact {
+  font-size: 11px; font-weight: 700;
+  padding: 3px 10px; border-radius: 999px;
+  background: rgba(255,255,255,.06); color: rgba(255,255,255,.5);
+  border: 1px solid rgba(255,255,255,.1);
+  white-space: nowrap; flex-shrink: 0;
+}
+
+.pit-card__desc {
+  font-size: 12.5px; color: rgba(255,255,255,.5);
+  line-height: 1.55; margin: 0 0 12px;
+}
+
+/* ── AQI Timeline mini bar ────────────────────────────────────────── */
+.pit-timeline {
+  display: flex; gap: 4px; height: 44px; align-items: flex-end;
+  margin-bottom: 12px; padding: 0 2px;
+}
+.pit-timeline__col {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; gap: 2px; height: 100%;
+}
+.pit-timeline__bar-track {
+  flex: 1; width: 100%; display: flex;
+  align-items: flex-end; background: rgba(255,255,255,.04);
+  border-radius: 4px 4px 0 0; overflow: hidden;
+}
+.pit-timeline__bar {
+  width: 100%; border-radius: 4px 4px 0 0;
+  transition: height .5s ease;
+}
+.pit-timeline__label {
+  font-size: 8.5px; font-weight: 700;
+  color: rgba(255,255,255,.25); text-align: center;
+}
+.pit-timeline__label--schd { color: rgba(255,255,255,.65) !important; }
+.pit-timeline__dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  margin-top: 1px;
+}
+
+/* ── Actions ──────────────────────────────────────────────────────── */
+.pit-card__actions { display: flex; gap: 8px; align-items: center; }
+.pit-dismiss {
+  font-size: 11.5px; color: rgba(255,255,255,.3);
+  background: transparent; border: none; cursor: pointer;
+  padding: 4px 8px; border-radius: 6px;
+  transition: color .15s, background .15s;
+}
+.pit-dismiss:hover { color: rgba(255,255,255,.6); background: rgba(255,255,255,.05); }
+
+.pit-apply {
+  padding: 6px 14px; border-radius: 8px; font-size: 12px; font-weight: 700;
+  background: transparent; border: 1px solid;
+  cursor: pointer; transition: background .15s, transform .1s;
+}
+.pit-apply:hover:not(:disabled) {
+  background: rgba(255,255,255,.06); transform: translateY(-1px);
+}
+.pit-apply:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── Loading ──────────────────────────────────────────────────────── */
+.pit-loading {
+  display: flex; align-items: center; gap: 14px;
+  font-size: 13px;
+}
+.pit-spin {
+  width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid rgba(192,132,252,.2); border-top-color: #c084fc;
+  animation: pitSpin .75s linear infinite;
+}
+@keyframes pitSpin { to { transform: rotate(360deg); } }
+.pit-loading > div { display: flex; flex-direction: column; gap: 3px; }
+.pit-loading > div > strong { color: #e8eefc; font-size: 13px; }
+.pit-loading > div > span   { font-size: 11.5px; color: rgba(255,255,255,.35); }
+
+/* ── Empty / Error ────────────────────────────────────────────────── */
+.pit-card--empty {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: rgba(255,255,255,.35);
+}
+.pit-card--error {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: rgba(239,68,68,.7);
+}
+
+/* ── Dismissed note ───────────────────────────────────────────────── */
+.pit-dismissed-note {
+  padding: 10px 18px; font-size: 11.5px;
+  color: rgba(255,255,255,.25);
+  border-top: 1px solid rgba(255,255,255,.05);
+}
+.pit-reset-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 11.5px; color: rgba(255,255,255,.4);
+  text-decoration: underline; padding: 0;
+  transition: color .15s;
+}
+.pit-reset-btn:hover { color: rgba(255,255,255,.7); }
+
+/* ── Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .pit-header { flex-direction: column; gap: 10px; }
+  .pit-card__header { flex-direction: column; }
+  .pit-card__impact { align-self: flex-start; }
+  .pit-timeline { height: 36px; }
+}
