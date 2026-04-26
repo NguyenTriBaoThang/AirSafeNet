@@ -11,6 +11,7 @@ import PresentationPage from "./pages/PresentationPage";
 import UserPreferencesPage from "./pages/UserPreferences";
 import AssistantPage from "./pages/AssistantPage";
 import AdminPage from "./pages/AdminPage";
+import ActivityPage from "./pages/ActivityPage";
 
 import AppShell from "./components/layout/AppShell";
 import { getAccessToken } from "./api/http";
@@ -163,6 +164,17 @@ export default function App() {
             <PrivateRoute>
               <AppShell>
                 <AssistantPage />
+              </AppShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/activity"
+          element={
+            <PrivateRoute>
+              <AppShell>
+                <ActivityPage />
               </AppShell>
             </PrivateRoute>
           }
