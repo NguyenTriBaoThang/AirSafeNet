@@ -8,6 +8,7 @@ import ExposureScoreWidget from "../components/dashboard/ExposureScoreWidget";
 import SmartScheduleOptimizer from "../components/dashboard/SmartScheduleOptimizer";
 import WeeklyPlannerView from "../components/dashboard/WeeklyPlannerView";
 import PatternInsightWidget from "../components/dashboard/PatternInsightWidget";
+import ExposureLogWidget from "../components/dashboard/ExposureLogWidget";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ActivitySchedule = {
@@ -308,7 +309,7 @@ export default function ActivityPage() {
 
   const loadSched = useCallback(async()=>{
     try { setLoadingSched(true); const d=await http<ActivitySchedule[]>("/api/activity",{method:"GET",auth:true}); setSchedules(d??[]); }
-    catch{ /* empty */ } finally{setLoadingSched(false);}
+    catch(e){ void e; } finally{setLoadingSched(false);}
   },[]);
 
   const loadFore = useCallback(async()=>{
@@ -326,7 +327,7 @@ export default function ActivityPage() {
       else await http("/api/activity",{method:"POST",auth:true,body:form});
       setShowModal(false); setEditTarget(null);
       await loadSched(); await loadFore();
-    }catch{ /* empty */ }finally{setSaving(false);}
+    }catch(e){ void e; }finally{setSaving(false);}
   }
 
   async function handleDelete(id:number){
@@ -389,8 +390,9 @@ export default function ActivityPage() {
       body: { ...s, hourOfDay, daysOfWeek },
     });
     await loadSched(); await loadFore();
-  } 
+  }
 
+  // Nhan ket qua tu SmartScheduleOptimizer
   async function handleOptimize(payload: {
     name: string; icon: string; hourOfDay: number; minute: number;
     durationMinutes: number; isOutdoor: boolean;
@@ -507,6 +509,11 @@ export default function ActivityPage() {
                   onApplyHour={handleInsightApplyHour}
                   onRemoveDays={handleInsightRemoveDays}
                 />
+              </div>
+
+              {/* ── Exposure Log ── */}
+              <div style={{ marginTop: 16 }}>
+                <ExposureLogWidget schedules={schedules} />
               </div>
             </>
           )}
