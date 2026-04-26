@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { http } from "../api/http";
 import SectionHeader from "../components/common/SectionHeader";
 import StatusChip from "../components/common/StatusChip";
+import GoldenHourPicker from "../components/dashboard/GoldenHourPicker";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 type ActivitySchedule = {
   id: number; name: string; icon: string;
   hourOfDay: number; minute: number; durationMinutes: number;
@@ -20,7 +20,6 @@ type ForecastResponse = {
 };
 type FormState = Omit<ActivitySchedule, "id">;
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const PRESETS: FormState[] = [
   { name:"Đi làm",         icon:"💼", hourOfDay:7,  minute:0,  durationMinutes:30,  isOutdoor:true,  intensity:"low",      daysOfWeek:"1,2,3,4,5" },
   { name:"Tập thể dục",    icon:"🏃", hourOfDay:6,  minute:0,  durationMinutes:45,  isOutdoor:true,  intensity:"high",     daysOfWeek:"1,2,3,4,5" },
@@ -182,8 +181,8 @@ function ActivityModal({ initial, onSave, onClose, saving }:{
   );
 }
 
-function RiskCard({ a, onEdit, onDelete }:{
-  a:ActivityRisk; onEdit:()=>void; onDelete:()=>void;
+function RiskCard({ a, onEdit, onDelete, onGoldenHour }:{
+  a:ActivityRisk; onEdit:()=>void; onDelete:()=>void; onGoldenHour:()=>void;
 }) {
   const [open, setOpen] = useState(false);
   const color = riskColor(a.riskLevel);
@@ -244,6 +243,7 @@ function RiskCard({ a, onEdit, onDelete }:{
         </div>
 
         <div className="ap-card__acts">
+          <button className="ap-btn ap-btn--gold" type="button" onClick={onGoldenHour} title="Chọn giờ vàng">★</button>
           <button className="ap-btn" type="button" onClick={()=>setOpen(v=>!v)}>{open?"▲":"▼"}</button>
           <button className="ap-btn" type="button" onClick={onEdit}>✎</button>
           <button className="ap-btn ap-btn--x" type="button" onClick={onDelete}>✕</button>
@@ -283,6 +283,7 @@ export default function ActivityPage() {
   const [editTarget,   setEditTarget]   = useState<ActivitySchedule|null>(null);
   const [tab,          setTab]          = useState<"today"|"manage">("today");
   const [error,        setError]        = useState("");
+  const [goldenTarget, setGoldenTarget] = useState<ActivityRisk|null>(null);
 
   const loadSched = useCallback(async()=>{
     try { setLoadingSched(true); const d=await http<ActivitySchedule[]>("/api/activity",{method:"GET",auth:true}); setSchedules(d??[]); }
@@ -304,12 +305,32 @@ export default function ActivityPage() {
       else await http("/api/activity",{method:"POST",auth:true,body:form});
       setShowModal(false); setEditTarget(null);
       await loadSched(); await loadFore();
-    }catch{ /* empty */ }finally{setSaving(false);} 
+    }catch{ /* empty */ }finally{setSaving(false);}
   }
 
   async function handleDelete(id:number){
     await http(`/api/activity/${id}`,{method:"DELETE",auth:true});
     await loadSched(); await loadFore();
+  }
+
+  async function handleApplyHour(activity: ActivityRisk, newHour: number) {
+    try {
+      await http(`/api/activity/${activity.id}`, {
+        method: "PUT", auth: true,
+        body: {
+          name:            activity.name,
+          icon:            activity.icon,
+          hourOfDay:       newHour,
+          minute:          activity.minute,
+          durationMinutes: activity.durationMinutes,
+          isOutdoor:       activity.isOutdoor,
+          intensity:       activity.intensity,
+          daysOfWeek:      activity.daysOfWeek,
+        },
+      });
+      setGoldenTarget(null);
+      await loadSched(); await loadFore();
+    } catch { /* silent */ }
   }
 
   const oc = riskColor(forecast?.overallRisk??"GOOD");
@@ -382,6 +403,7 @@ export default function ActivityPage() {
                 <RiskCard key={a.id} a={a}
                   onEdit={()=>{setEditTarget(a);setShowModal(true);}}
                   onDelete={()=>handleDelete(a.id)}
+                  onGoldenHour={()=>setGoldenTarget(a)}
                 />
               ))}
             </div>
@@ -427,6 +449,20 @@ export default function ActivityPage() {
           onSave={handleSave}
           onClose={()=>{setShowModal(false);setEditTarget(null);}}
           saving={saving}
+        />
+      )}
+
+      {goldenTarget&&(
+        <GoldenHourPicker
+          activityName={goldenTarget.name}
+          activityIcon={goldenTarget.icon}
+          currentHour={goldenTarget.hourOfDay}
+          currentMinute={goldenTarget.minute}
+          groupMultiplier={goldenTarget.groupMultiplier}
+          intensityMultiplier={goldenTarget.intensityMultiplier}
+          isOutdoor={goldenTarget.isOutdoor}
+          onSelectHour={(h)=>handleApplyHour(goldenTarget,h)}
+          onClose={()=>setGoldenTarget(null)}
         />
       )}
     </div>
