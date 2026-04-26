@@ -9,8 +9,9 @@ import SmartScheduleOptimizer from "../components/dashboard/SmartScheduleOptimiz
 import WeeklyPlannerView from "../components/dashboard/WeeklyPlannerView";
 import PatternInsightWidget from "../components/dashboard/PatternInsightWidget";
 import ExposureLogWidget from "../components/dashboard/ExposureLogWidget";
+import { HealthProfilePanel, HealthProfileSummary } from "../components/dashboard/HealthProfilePanel";
+import type { UserGroup } from "../components/dashboard/HealthProfilePanel";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 type ActivitySchedule = {
   id: number; name: string; icon: string;
   hourOfDay: number; minute: number; durationMinutes: number;
@@ -27,7 +28,6 @@ type ForecastResponse = {
 };
 type FormState = Omit<ActivitySchedule, "id">;
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const PRESETS: FormState[] = [
   { name:"Đi làm",         icon:"💼", hourOfDay:7,  minute:0,  durationMinutes:30,  isOutdoor:true,  intensity:"low",      daysOfWeek:"1,2,3,4,5" },
   { name:"Tập thể dục",    icon:"🏃", hourOfDay:6,  minute:0,  durationMinutes:45,  isOutdoor:true,  intensity:"high",     daysOfWeek:"1,2,3,4,5" },
@@ -47,7 +47,6 @@ const DAYS = [
 ];
 const EMPTY: FormState = { name:"", icon:"📅", hourOfDay:7, minute:0, durationMinutes:30, isOutdoor:true, intensity:"moderate", daysOfWeek:"1,2,3,4,5" };
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const riskColor = (r:string) => r==="GOOD"?"#22c55e":r==="MODERATE"?"#eab308":r==="UNHEALTHY_SENSITIVE"?"#f97316":r==="UNHEALTHY"?"#ef4444":r==="VERY_UNHEALTHY"?"#a855f7":"#7f1d1d";
 const riskLabel = (r:string) => r==="GOOD"?"Tốt":r==="MODERATE"?"Trung bình":r==="UNHEALTHY_SENSITIVE"?"Nhạy cảm":r==="UNHEALTHY"?"Không tốt":r==="VERY_UNHEALTHY"?"Rất kém":"Nguy hiểm";
 const riskEmoji = (r:string) => r==="GOOD"?"✅":r==="MODERATE"?"🟡":r==="UNHEALTHY_SENSITIVE"?"🟠":"🔴";
@@ -65,9 +64,6 @@ function timeUntil(h:number, m:number) {
   return `${Math.floor(mins/60)}h nữa`;
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  MODAL
-// ══════════════════════════════════════════════════════════════════════════════
 function ActivityModal({ initial, onSave, onClose, saving }:{
   initial?:FormState; onSave:(f:FormState)=>void; onClose:()=>void; saving:boolean;
 }) {
@@ -193,11 +189,8 @@ function ActivityModal({ initial, onSave, onClose, saving }:{
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  RISK CARD
-// ══════════════════════════════════════════════════════════════════════════════
-function RiskCard({ a, onEdit, onDelete, onGoldenHour }:{
-  a:ActivityRisk; onEdit:()=>void; onDelete:()=>void; onGoldenHour:()=>void;
+function RiskCard({ a, onEdit, onDelete, onGoldenHour, userGroup }:{
+  a:ActivityRisk; onEdit:()=>void; onDelete:()=>void; onGoldenHour:()=>void; userGroup: UserGroup;
 }) {
   const [open, setOpen] = useState(false);
   const color = riskColor(a.riskLevel);
@@ -227,17 +220,29 @@ function RiskCard({ a, onEdit, onDelete, onGoldenHour }:{
             <span className="ap-tag ap-tag--aqi">AQI&nbsp;{a.forecastAqi}</span>
           </div>
           {open && (
-            <div className="ap-card__detail">
-              <p className="ap-card__reco">{a.recommendation}</p>
-              <div className="ap-card__mults">
-                <span>Nhóm ×{a.groupMultiplier}</span>
-                <span>Cường độ ×{a.intensityMultiplier}</span>
-                {!a.isOutdoor&&<span>Trong nhà ×0.3</span>}
+            <>
+              <div className="ap-card__detail">
+                <p className="ap-card__reco">{a.recommendation}</p>
+                <div className="ap-card__mults">
+                  <span>Nhóm ×{a.groupMultiplier}</span>
+                  <span>Cường độ ×{a.intensityMultiplier}</span>
+                  {!a.isOutdoor&&<span>Trong nhà ×0.3</span>}
+                </div>
+                {a.bestAlternativeHour!=null&&a.riskLevel!=="GOOD"&&(
+                  <div className="ap-alt">💡 Giờ tốt hơn: <strong>{String(a.bestAlternativeHour).padStart(2,"0")}:00</strong></div>
+                )}
               </div>
-              {a.bestAlternativeHour!=null&&a.riskLevel!=="GOOD"&&(
-                <div className="ap-alt">💡 Giờ tốt hơn: <strong>{String(a.bestAlternativeHour).padStart(2,"0")}:00</strong></div>
-              )}
-            </div>
+              <HealthProfilePanel
+                activity={{
+                  name: a.name, icon: a.icon,
+                  isOutdoor: a.isOutdoor, intensity: a.intensity,
+                  durationMinutes: a.durationMinutes,
+                  forecastAqi: a.forecastAqi, forecastPm25: a.forecastPm25,
+                  riskScore: a.riskScore,
+                }}
+                userGroup={userGroup}
+              />
+            </>
           )}
         </div>
 
@@ -269,9 +274,6 @@ function RiskCard({ a, onEdit, onDelete, onGoldenHour }:{
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  SCHEDULE ROW
-// ══════════════════════════════════════════════════════════════════════════════
 function SchedRow({ s, onEdit, onDelete }:{ s:ActivitySchedule; onEdit:()=>void; onDelete:()=>void }) {
   const days = s.daysOfWeek.split(",").map(Number).filter(Boolean)
     .map(n=>DAYS.find(d=>d.num===n)?.label??"").join(" · ");
@@ -291,9 +293,6 @@ function SchedRow({ s, onEdit, onDelete }:{ s:ActivitySchedule; onEdit:()=>void;
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-//  PAGE
-// ══════════════════════════════════════════════════════════════════════════════
 export default function ActivityPage() {
   const [schedules,    setSchedules]    = useState<ActivitySchedule[]>([]);
   const [forecast,     setForecast]     = useState<ForecastResponse|null>(null);
@@ -304,7 +303,6 @@ export default function ActivityPage() {
   const [editTarget,   setEditTarget]   = useState<ActivitySchedule|null>(null);
   const [tab, setTab] = useState<"today"|"manage"|"planner">("today");
   const [error,        setError]        = useState("");
-  // Golden Hour Picker state
   const [goldenTarget, setGoldenTarget] = useState<ActivityRisk|null>(null);
 
   const loadSched = useCallback(async()=>{
@@ -335,7 +333,6 @@ export default function ActivityPage() {
     await loadSched(); await loadFore();
   }
 
-  // Áp dụng giờ mới từ Golden Hour Picker → cập nhật schedule
   async function handleApplyHour(activity: ActivityRisk, newHour: number) {
     try {
       await http(`/api/activity/${activity.id}`, {
@@ -356,7 +353,6 @@ export default function ActivityPage() {
     } catch { /* silent */ }
   }
 
-  // Pattern Insight: áp dụng giờ mới từ AI gợi ý
   async function handleInsightApplyHour(id: number, newHour: number) {
     const s = schedules.find(x => x.id === id);
     if (!s) return;
@@ -367,13 +363,12 @@ export default function ActivityPage() {
     await loadSched(); await loadFore();
   }
 
-  // Pattern Insight: bỏ ngày bất lợi khỏi daysOfWeek
   async function handleInsightRemoveDays(id: number, removeDays: number[]) {
     const s = schedules.find(x => x.id === id);
     if (!s) return;
     const cur     = (s.daysOfWeek ?? "").split(",").map(Number).filter(Boolean);
     const newDays = cur.filter(d => !removeDays.includes(d));
-    if (newDays.length === 0) return; // không xóa hết
+    if (newDays.length === 0) return; 
     await http(`/api/activity/${id}`, {
       method: "PUT", auth: true,
       body: { ...s, daysOfWeek: newDays.join(",") },
@@ -381,7 +376,6 @@ export default function ActivityPage() {
     await loadSched(); await loadFore();
   }
 
-  // Cập nhật giờ từ WeeklyPlannerView (drag & drop)
   async function handlePlannerUpdate(id: number, hourOfDay: number, daysOfWeek: string) {
     const s = schedules.find(x => x.id === id);
     if (!s) return;
@@ -392,7 +386,6 @@ export default function ActivityPage() {
     await loadSched(); await loadFore();
   }
 
-  // Nhan ket qua tu SmartScheduleOptimizer
   async function handleOptimize(payload: {
     name: string; icon: string; hourOfDay: number; minute: number;
     durationMinutes: number; isOutdoor: boolean;
@@ -443,7 +436,14 @@ export default function ActivityPage() {
         </div>
       )}
 
-      {/* ── Smart Schedule Optimizer ── */}
+      {forecast && (
+        <HealthProfileSummary
+          userGroup={(forecast.userGroup as UserGroup) ?? "normal"}
+          currentAqi={forecast.activities[0]?.forecastAqi ?? 75}
+          activities={forecast.activities}
+        />
+      )}
+
       <SmartScheduleOptimizer
         existingSchedules={schedules}
         groupMultiplier={forecast?.activities[0]?.groupMultiplier ?? 1.0}
@@ -485,11 +485,11 @@ export default function ActivityPage() {
                     onEdit={()=>{setEditTarget(a);setShowModal(true);}}
                     onDelete={()=>handleDelete(a.id)}
                     onGoldenHour={()=>setGoldenTarget(a)}
+                    userGroup={(forecast.userGroup as UserGroup) ?? "normal"}
                   />
                 ))}
               </div>
 
-              {/* ── Exposure Score ── */}
               <div style={{ marginTop: 20 }}>
                 <ExposureScoreWidget
                   activities={forecast.activities}
@@ -497,12 +497,10 @@ export default function ActivityPage() {
                 />
               </div>
 
-              {/* ── Weekly Risk Matrix ── */}
               <div style={{ marginTop: 16 }}>
                 <WeeklyRiskMatrix activities={forecast.activities} />
               </div>
 
-              {/* ── Pattern Insight ── */}
               <div style={{ marginTop: 16 }}>
                 <PatternInsightWidget
                   schedules={schedules}
@@ -511,7 +509,6 @@ export default function ActivityPage() {
                 />
               </div>
 
-              {/* ── Exposure Log ── */}
               <div style={{ marginTop: 16 }}>
                 <ExposureLogWidget schedules={schedules} />
               </div>
@@ -561,8 +558,7 @@ export default function ActivityPage() {
               setEditTarget(null);
               setShowModal(true);
               setTab("planner");
-              // Pre-fill hour — modal sẽ mở với giờ này
-              void dayIndex; void hour; // hint for quick-add integration
+              void dayIndex; void hour;
             }}
             onDelete={handleDelete}
           />
