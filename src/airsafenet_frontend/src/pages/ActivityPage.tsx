@@ -5,6 +5,7 @@ import StatusChip from "../components/common/StatusChip";
 import GoldenHourPicker from "../components/dashboard/GoldenHourPicker";
 import WeeklyRiskMatrix from "../components/dashboard/WeeklyRiskMatrix";
 import ExposureScoreWidget from "../components/dashboard/ExposureScoreWidget";
+import SmartScheduleOptimizer from "../components/dashboard/SmartScheduleOptimizer";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ActivitySchedule = {
@@ -352,6 +353,17 @@ export default function ActivityPage() {
     } catch { /* silent */ }
   }
 
+  // Nhận kết quả từ SmartScheduleOptimizer → tạo activity mới
+  async function handleOptimize(payload: {
+    name: string; icon: string; hourOfDay: number; minute: number;
+    durationMinutes: number; isOutdoor: boolean;
+    intensity: "low"|"moderate"|"high"; daysOfWeek: string;
+  }) {
+    try {
+      await http("/api/activity", { method: "POST", auth: true, body: payload });
+      await loadSched(); await loadFore();
+    } catch { /* silent */ }
+  }
   const oc = riskColor(forecast?.overallRisk??"GOOD");
   const goodCnt = forecast?.activities.filter(a=>["GOOD","MODERATE"].includes(a.riskLevel)).length??0;
   const badCnt  = forecast?.activities.filter(a=>["UNHEALTHY","VERY_UNHEALTHY","HAZARDOUS"].includes(a.riskLevel)).length??0;
@@ -391,6 +403,13 @@ export default function ActivityPage() {
           <button className="ap-sumbar__refresh" type="button" onClick={()=>{loadSched();loadFore();}}>↺ Làm mới</button>
         </div>
       )}
+
+      {/* ── Smart Schedule Optimizer ── */}
+      <SmartScheduleOptimizer
+        existingSchedules={schedules}
+        groupMultiplier={forecast?.activities[0]?.groupMultiplier ?? 1.0}
+        onApply={handleOptimize}
+      />
 
       <div className="ap-tabs">
         <button className={`ap-tab ${tab==="today"?"on":""}`} type="button" onClick={()=>setTab("today")}>
