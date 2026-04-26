@@ -4,6 +4,7 @@ import SectionHeader from "../components/common/SectionHeader";
 import StatusChip from "../components/common/StatusChip";
 import GoldenHourPicker from "../components/dashboard/GoldenHourPicker";
 import WeeklyRiskMatrix from "../components/dashboard/WeeklyRiskMatrix";
+import ExposureScoreWidget from "../components/dashboard/ExposureScoreWidget";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ActivitySchedule = {
@@ -427,8 +428,16 @@ export default function ActivityPage() {
                 ))}
               </div>
 
-              {/* ── Weekly Risk Matrix ── */}
+              {/* ── Exposure Score ── */}
               <div style={{ marginTop: 20 }}>
+                <ExposureScoreWidget
+                  activities={forecast.activities}
+                  backgroundPm25={forecast.activities[0]?.forecastPm25 ?? 25}
+                />
+              </div>
+
+              {/* ── Weekly Risk Matrix ── */}
+              <div style={{ marginTop: 16 }}>
                 <WeeklyRiskMatrix activities={forecast.activities} />
               </div>
             </>
