@@ -3,7 +3,9 @@ import { http } from "../api/http";
 import SectionHeader from "../components/common/SectionHeader";
 import StatusChip from "../components/common/StatusChip";
 import GoldenHourPicker from "../components/dashboard/GoldenHourPicker";
+import WeeklyRiskMatrix from "../components/dashboard/WeeklyRiskMatrix";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 type ActivitySchedule = {
   id: number; name: string; icon: string;
   hourOfDay: number; minute: number; durationMinutes: number;
@@ -20,6 +22,7 @@ type ForecastResponse = {
 };
 type FormState = Omit<ActivitySchedule, "id">;
 
+// ── Constants ─────────────────────────────────────────────────────────────────
 const PRESETS: FormState[] = [
   { name:"Đi làm",         icon:"💼", hourOfDay:7,  minute:0,  durationMinutes:30,  isOutdoor:true,  intensity:"low",      daysOfWeek:"1,2,3,4,5" },
   { name:"Tập thể dục",    icon:"🏃", hourOfDay:6,  minute:0,  durationMinutes:45,  isOutdoor:true,  intensity:"high",     daysOfWeek:"1,2,3,4,5" },
@@ -39,6 +42,7 @@ const DAYS = [
 ];
 const EMPTY: FormState = { name:"", icon:"📅", hourOfDay:7, minute:0, durationMinutes:30, isOutdoor:true, intensity:"moderate", daysOfWeek:"1,2,3,4,5" };
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const riskColor = (r:string) => r==="GOOD"?"#22c55e":r==="MODERATE"?"#eab308":r==="UNHEALTHY_SENSITIVE"?"#f97316":r==="UNHEALTHY"?"#ef4444":r==="VERY_UNHEALTHY"?"#a855f7":"#7f1d1d";
 const riskLabel = (r:string) => r==="GOOD"?"Tốt":r==="MODERATE"?"Trung bình":r==="UNHEALTHY_SENSITIVE"?"Nhạy cảm":r==="UNHEALTHY"?"Không tốt":r==="VERY_UNHEALTHY"?"Rất kém":"Nguy hiểm";
 const riskEmoji = (r:string) => r==="GOOD"?"✅":r==="MODERATE"?"🟡":r==="UNHEALTHY_SENSITIVE"?"🟠":"🔴";
@@ -56,6 +60,9 @@ function timeUntil(h:number, m:number) {
   return `${Math.floor(mins/60)}h nữa`;
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  MODAL
+// ══════════════════════════════════════════════════════════════════════════════
 function ActivityModal({ initial, onSave, onClose, saving }:{
   initial?:FormState; onSave:(f:FormState)=>void; onClose:()=>void; saving:boolean;
 }) {
@@ -181,6 +188,9 @@ function ActivityModal({ initial, onSave, onClose, saving }:{
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  RISK CARD
+// ══════════════════════════════════════════════════════════════════════════════
 function RiskCard({ a, onEdit, onDelete, onGoldenHour }:{
   a:ActivityRisk; onEdit:()=>void; onDelete:()=>void; onGoldenHour:()=>void;
 }) {
@@ -254,6 +264,9 @@ function RiskCard({ a, onEdit, onDelete, onGoldenHour }:{
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCHEDULE ROW
+// ══════════════════════════════════════════════════════════════════════════════
 function SchedRow({ s, onEdit, onDelete }:{ s:ActivitySchedule; onEdit:()=>void; onDelete:()=>void }) {
   const days = s.daysOfWeek.split(",").map(Number).filter(Boolean)
     .map(n=>DAYS.find(d=>d.num===n)?.label??"").join(" · ");
@@ -273,6 +286,9 @@ function SchedRow({ s, onEdit, onDelete }:{ s:ActivitySchedule; onEdit:()=>void;
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  PAGE
+// ══════════════════════════════════════════════════════════════════════════════
 export default function ActivityPage() {
   const [schedules,    setSchedules]    = useState<ActivitySchedule[]>([]);
   const [forecast,     setForecast]     = useState<ForecastResponse|null>(null);
@@ -283,6 +299,7 @@ export default function ActivityPage() {
   const [editTarget,   setEditTarget]   = useState<ActivitySchedule|null>(null);
   const [tab,          setTab]          = useState<"today"|"manage">("today");
   const [error,        setError]        = useState("");
+  // Golden Hour Picker state
   const [goldenTarget, setGoldenTarget] = useState<ActivityRisk|null>(null);
 
   const loadSched = useCallback(async()=>{
@@ -313,6 +330,7 @@ export default function ActivityPage() {
     await loadSched(); await loadFore();
   }
 
+  // Áp dụng giờ mới từ Golden Hour Picker → cập nhật schedule
   async function handleApplyHour(activity: ActivityRisk, newHour: number) {
     try {
       await http(`/api/activity/${activity.id}`, {
@@ -398,15 +416,22 @@ export default function ActivityPage() {
               </button>
             </div>
           ):(
-            <div className="ap-cards">
-              {forecast.activities.map(a=>(
-                <RiskCard key={a.id} a={a}
-                  onEdit={()=>{setEditTarget(a);setShowModal(true);}}
-                  onDelete={()=>handleDelete(a.id)}
-                  onGoldenHour={()=>setGoldenTarget(a)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="ap-cards">
+                {forecast.activities.map(a=>(
+                  <RiskCard key={a.id} a={a}
+                    onEdit={()=>{setEditTarget(a);setShowModal(true);}}
+                    onDelete={()=>handleDelete(a.id)}
+                    onGoldenHour={()=>setGoldenTarget(a)}
+                  />
+                ))}
+              </div>
+
+              {/* ── Weekly Risk Matrix ── */}
+              <div style={{ marginTop: 20 }}>
+                <WeeklyRiskMatrix activities={forecast.activities} />
+              </div>
+            </>
           )}
         </div>
       )}
