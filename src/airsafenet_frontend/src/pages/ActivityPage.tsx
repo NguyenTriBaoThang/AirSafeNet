@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { http } from "../api/http";
 import SectionHeader from "../components/common/SectionHeader";
 import StatusChip from "../components/common/StatusChip";
@@ -11,7 +11,10 @@ import PatternInsightWidget from "../components/dashboard/PatternInsightWidget";
 import ExposureLogWidget from "../components/dashboard/ExposureLogWidget";
 import { HealthProfilePanel, HealthProfileSummary } from "../components/dashboard/HealthProfilePanel";
 import type { UserGroup } from "../components/dashboard/HealthProfilePanel";
+import DoseBudgetMeter from "../components/dashboard/DoseBudgetMeter";
+import type { DoseBudgetActivity } from "../components/dashboard/DoseBudgetMeter";
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 type ActivitySchedule = {
   id: number; name: string; icon: string;
   hourOfDay: number; minute: number; durationMinutes: number;
@@ -28,6 +31,7 @@ type ForecastResponse = {
 };
 type FormState = Omit<ActivitySchedule, "id">;
 
+// ── Constants ─────────────────────────────────────────────────────────────────
 const PRESETS: FormState[] = [
   { name:"Đi làm",         icon:"💼", hourOfDay:7,  minute:0,  durationMinutes:30,  isOutdoor:true,  intensity:"low",      daysOfWeek:"1,2,3,4,5" },
   { name:"Tập thể dục",    icon:"🏃", hourOfDay:6,  minute:0,  durationMinutes:45,  isOutdoor:true,  intensity:"high",     daysOfWeek:"1,2,3,4,5" },
@@ -47,6 +51,7 @@ const DAYS = [
 ];
 const EMPTY: FormState = { name:"", icon:"📅", hourOfDay:7, minute:0, durationMinutes:30, isOutdoor:true, intensity:"moderate", daysOfWeek:"1,2,3,4,5" };
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 const riskColor = (r:string) => r==="GOOD"?"#22c55e":r==="MODERATE"?"#eab308":r==="UNHEALTHY_SENSITIVE"?"#f97316":r==="UNHEALTHY"?"#ef4444":r==="VERY_UNHEALTHY"?"#a855f7":"#7f1d1d";
 const riskLabel = (r:string) => r==="GOOD"?"Tốt":r==="MODERATE"?"Trung bình":r==="UNHEALTHY_SENSITIVE"?"Nhạy cảm":r==="UNHEALTHY"?"Không tốt":r==="VERY_UNHEALTHY"?"Rất kém":"Nguy hiểm";
 const riskEmoji = (r:string) => r==="GOOD"?"✅":r==="MODERATE"?"🟡":r==="UNHEALTHY_SENSITIVE"?"🟠":"🔴";
@@ -64,8 +69,17 @@ function timeUntil(h:number, m:number) {
   return `${Math.floor(mins/60)}h nữa`;
 }
 
-function ActivityModal({ initial, onSave, onClose, saving }:{
-  initial?:FormState; onSave:(f:FormState)=>void; onClose:()=>void; saving:boolean;
+// ══════════════════════════════════════════════════════════════════════════════
+//  MODAL
+// ══════════════════════════════════════════════════════════════════════════════
+function ActivityModal({ initial, onSave, onClose, saving, forecastPm25ByHour, todayBudgetActivities, editingId }:{
+  initial?:FormState;
+  onSave:(f:FormState)=>void;
+  onClose:()=>void;
+  saving:boolean;
+  forecastPm25ByHour: Record<number, number>;   // hour → PM2.5
+  todayBudgetActivities: DoseBudgetActivity[];
+  editingId?: number;
 }) {
   const [form, setForm] = useState<FormState>(initial ?? EMPTY);
   const [showIcons, setShowIcons] = useState(false);
@@ -75,6 +89,9 @@ function ActivityModal({ initial, onSave, onClose, saving }:{
     const next = cur.includes(n)?cur.filter(d=>d!==n):[...cur,n];
     setForm(f=>({...f,daysOfWeek:next.sort().join(",")||"1"}));
   };
+
+  // PM2.5 tại giờ user đang chọn (từ forecast cache)
+  const currentPm25 = forecastPm25ByHour[form.hourOfDay] ?? 25;
 
   return (
     <div className="ap-overlay" onClick={onClose}>
@@ -177,6 +194,18 @@ function ActivityModal({ initial, onSave, onClose, saving }:{
           </div>
         </div>
 
+        {/* ── Dose Budget Meter ── */}
+        <div className="ap-modal__budget">
+          <DoseBudgetMeter
+            formDuration={form.durationMinutes}
+            formIntensity={form.intensity}
+            formIsOutdoor={form.isOutdoor}
+            formPm25={currentPm25}
+            todayActivities={todayBudgetActivities}
+            editingId={editingId}
+          />
+        </div>
+
         <div className="ap-modal__ft">
           <button className="btn btn-secondary" onClick={onClose} type="button">Hủy</button>
           <button className="btn btn-primary" type="button"
@@ -189,6 +218,9 @@ function ActivityModal({ initial, onSave, onClose, saving }:{
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  RISK CARD
+// ══════════════════════════════════════════════════════════════════════════════
 function RiskCard({ a, onEdit, onDelete, onGoldenHour, userGroup }:{
   a:ActivityRisk; onEdit:()=>void; onDelete:()=>void; onGoldenHour:()=>void; userGroup: UserGroup;
 }) {
@@ -274,6 +306,9 @@ function RiskCard({ a, onEdit, onDelete, onGoldenHour, userGroup }:{
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  SCHEDULE ROW
+// ══════════════════════════════════════════════════════════════════════════════
 function SchedRow({ s, onEdit, onDelete }:{ s:ActivitySchedule; onEdit:()=>void; onDelete:()=>void }) {
   const days = s.daysOfWeek.split(",").map(Number).filter(Boolean)
     .map(n=>DAYS.find(d=>d.num===n)?.label??"").join(" · ");
@@ -293,6 +328,9 @@ function SchedRow({ s, onEdit, onDelete }:{ s:ActivitySchedule; onEdit:()=>void;
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════════════
+//  PAGE
+// ══════════════════════════════════════════════════════════════════════════════
 export default function ActivityPage() {
   const [schedules,    setSchedules]    = useState<ActivitySchedule[]>([]);
   const [forecast,     setForecast]     = useState<ForecastResponse|null>(null);
@@ -303,6 +341,7 @@ export default function ActivityPage() {
   const [editTarget,   setEditTarget]   = useState<ActivitySchedule|null>(null);
   const [tab, setTab] = useState<"today"|"manage"|"planner">("today");
   const [error,        setError]        = useState("");
+  // Golden Hour Picker state
   const [goldenTarget, setGoldenTarget] = useState<ActivityRisk|null>(null);
 
   const loadSched = useCallback(async()=>{
@@ -333,6 +372,7 @@ export default function ActivityPage() {
     await loadSched(); await loadFore();
   }
 
+  // Áp dụng giờ mới từ Golden Hour Picker → cập nhật schedule
   async function handleApplyHour(activity: ActivityRisk, newHour: number) {
     try {
       await http(`/api/activity/${activity.id}`, {
@@ -353,6 +393,7 @@ export default function ActivityPage() {
     } catch { /* silent */ }
   }
 
+  // Pattern Insight: áp dụng giờ mới từ AI gợi ý
   async function handleInsightApplyHour(id: number, newHour: number) {
     const s = schedules.find(x => x.id === id);
     if (!s) return;
@@ -363,12 +404,13 @@ export default function ActivityPage() {
     await loadSched(); await loadFore();
   }
 
+  // Pattern Insight: bỏ ngày bất lợi khỏi daysOfWeek
   async function handleInsightRemoveDays(id: number, removeDays: number[]) {
     const s = schedules.find(x => x.id === id);
     if (!s) return;
     const cur     = (s.daysOfWeek ?? "").split(",").map(Number).filter(Boolean);
     const newDays = cur.filter(d => !removeDays.includes(d));
-    if (newDays.length === 0) return; 
+    if (newDays.length === 0) return; // không xóa hết
     await http(`/api/activity/${id}`, {
       method: "PUT", auth: true,
       body: { ...s, daysOfWeek: newDays.join(",") },
@@ -376,6 +418,7 @@ export default function ActivityPage() {
     await loadSched(); await loadFore();
   }
 
+  // Cập nhật giờ từ WeeklyPlannerView (drag & drop)
   async function handlePlannerUpdate(id: number, hourOfDay: number, daysOfWeek: string) {
     const s = schedules.find(x => x.id === id);
     if (!s) return;
@@ -386,6 +429,7 @@ export default function ActivityPage() {
     await loadSched(); await loadFore();
   }
 
+  // Nhan ket qua tu SmartScheduleOptimizer
   async function handleOptimize(payload: {
     name: string; icon: string; hourOfDay: number; minute: number;
     durationMinutes: number; isOutdoor: boolean;
@@ -399,6 +443,24 @@ export default function ActivityPage() {
   const oc = riskColor(forecast?.overallRisk??"GOOD");
   const goodCnt = forecast?.activities.filter(a=>["GOOD","MODERATE"].includes(a.riskLevel)).length??0;
   const badCnt  = forecast?.activities.filter(a=>["UNHEALTHY","VERY_UNHEALTHY","HAZARDOUS"].includes(a.riskLevel)).length??0;
+
+  // PM2.5 theo giờ từ forecast hiện tại (cho DoseBudgetMeter)
+  const forecastPm25ByHour = useMemo<Record<number,number>>(() => {
+    const map: Record<number,number> = {};
+    forecast?.activities.forEach(a => { map[a.hourOfDay] = a.forecastPm25; });
+    return map;
+  }, [forecast]);
+
+  // Hoạt động hôm nay dạng DoseBudgetActivity
+  const todayBudgetActivities = useMemo<DoseBudgetActivity[]>(() => {
+    return (forecast?.activities ?? []).map(a => ({
+      id:              a.id,
+      durationMinutes: a.durationMinutes,
+      isOutdoor:       a.isOutdoor,
+      intensity:       a.intensity,
+      forecastPm25:    a.forecastPm25,
+    }));
+  }, [forecast]);
 
   return (
     <div className="ap-page">
@@ -436,6 +498,7 @@ export default function ActivityPage() {
         </div>
       )}
 
+      {/* ── Health Profile Summary ── */}
       {forecast && (
         <HealthProfileSummary
           userGroup={(forecast.userGroup as UserGroup) ?? "normal"}
@@ -444,6 +507,7 @@ export default function ActivityPage() {
         />
       )}
 
+      {/* ── Smart Schedule Optimizer ── */}
       <SmartScheduleOptimizer
         existingSchedules={schedules}
         groupMultiplier={forecast?.activities[0]?.groupMultiplier ?? 1.0}
@@ -490,6 +554,7 @@ export default function ActivityPage() {
                 ))}
               </div>
 
+              {/* ── Exposure Score ── */}
               <div style={{ marginTop: 20 }}>
                 <ExposureScoreWidget
                   activities={forecast.activities}
@@ -497,10 +562,12 @@ export default function ActivityPage() {
                 />
               </div>
 
+              {/* ── Weekly Risk Matrix ── */}
               <div style={{ marginTop: 16 }}>
                 <WeeklyRiskMatrix activities={forecast.activities} />
               </div>
 
+              {/* ── Pattern Insight ── */}
               <div style={{ marginTop: 16 }}>
                 <PatternInsightWidget
                   schedules={schedules}
@@ -509,6 +576,7 @@ export default function ActivityPage() {
                 />
               </div>
 
+              {/* ── Exposure Log ── */}
               <div style={{ marginTop: 16 }}>
                 <ExposureLogWidget schedules={schedules} />
               </div>
@@ -558,7 +626,8 @@ export default function ActivityPage() {
               setEditTarget(null);
               setShowModal(true);
               setTab("planner");
-              void dayIndex; void hour;
+              // Pre-fill hour — modal sẽ mở với giờ này
+              void dayIndex; void hour; // hint for quick-add integration
             }}
             onDelete={handleDelete}
           />
@@ -571,6 +640,9 @@ export default function ActivityPage() {
           onSave={handleSave}
           onClose={()=>{setShowModal(false);setEditTarget(null);}}
           saving={saving}
+          forecastPm25ByHour={forecastPm25ByHour}
+          todayBudgetActivities={todayBudgetActivities}
+          editingId={editTarget?.id}
         />
       )}
 
