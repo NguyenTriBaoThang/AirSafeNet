@@ -14,6 +14,7 @@ import type { UserGroup } from "../components/dashboard/HealthProfilePanel";
 import DoseBudgetMeter from "../components/dashboard/DoseBudgetMeter";
 import type { DoseBudgetActivity } from "../components/dashboard/DoseBudgetMeter";
 import SafetyStreakWidget from "../components/dashboard/SafetyStreakWidget";
+import SpikeInterruptAlert from "../components/dashboard/SpikeInterruptAlert";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ActivitySchedule = {
@@ -513,6 +514,12 @@ export default function ActivityPage() {
         existingSchedules={schedules}
         groupMultiplier={forecast?.activities[0]?.groupMultiplier ?? 1.0}
         onApply={handleOptimize}
+      />
+
+      {/* ── Spike Interrupt Alert (real-time) ── */}
+      <SpikeInterruptAlert
+        schedules={schedules}
+        onCancelActivity={handleDelete}
       />
 
       <div className="ap-tabs">
