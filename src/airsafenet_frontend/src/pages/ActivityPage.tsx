@@ -13,6 +13,7 @@ import { HealthProfilePanel, HealthProfileSummary } from "../components/dashboar
 import type { UserGroup } from "../components/dashboard/HealthProfilePanel";
 import DoseBudgetMeter from "../components/dashboard/DoseBudgetMeter";
 import type { DoseBudgetActivity } from "../components/dashboard/DoseBudgetMeter";
+import SafetyStreakWidget from "../components/dashboard/SafetyStreakWidget";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ActivitySchedule = {
@@ -579,6 +580,11 @@ export default function ActivityPage() {
               {/* ── Exposure Log ── */}
               <div style={{ marginTop: 16 }}>
                 <ExposureLogWidget schedules={schedules} />
+              </div>
+
+              {/* ── Safety Streak & Badges ── */}
+              <div style={{ marginTop: 16 }}>
+                <SafetyStreakWidget schedules={schedules} />
               </div>
             </>
           )}
