@@ -15,6 +15,7 @@ import DoseBudgetMeter from "../components/dashboard/DoseBudgetMeter";
 import type { DoseBudgetActivity } from "../components/dashboard/DoseBudgetMeter";
 import SafetyStreakWidget from "../components/dashboard/SafetyStreakWidget";
 import SpikeInterruptAlert from "../components/dashboard/SpikeInterruptAlert";
+import CompoundRiskPanel from "../components/dashboard/CompoundRiskPanel";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type ActivitySchedule = {
@@ -567,6 +568,13 @@ export default function ActivityPage() {
                 <ExposureScoreWidget
                   activities={forecast.activities}
                   backgroundPm25={forecast.activities[0]?.forecastPm25 ?? 25}
+                />
+              </div>
+
+              {/* ── Compound Risk ── */}
+              <div style={{ marginTop: 16 }}>
+                <CompoundRiskPanel
+                  userGroup={(forecast.userGroup as UserGroup) ?? "normal"}
                 />
               </div>
 
