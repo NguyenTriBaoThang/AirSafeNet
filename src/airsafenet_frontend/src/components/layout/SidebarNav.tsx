@@ -26,6 +26,7 @@ export default function SidebarNav() {
     { to: "/impact",      label: "Chi phí & WHO" },
     { to: "/activity",    label: "Lịch hoạt động" },
     { to: "/assistant",   label: "Trợ lý ảo" },
+    { to: "/guide",       label: "Hướng dẫn PM2.5" },
     { to: "/preferences", label: "Cài đặt người dùng" },
   ];
 
