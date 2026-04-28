@@ -4,6 +4,7 @@ import SidebarNav from "./SidebarNav";
 
 type Props = {
   children: ReactNode;
+  title?: string;
 };
 
 export default function AppShell({ children }: Props) {
