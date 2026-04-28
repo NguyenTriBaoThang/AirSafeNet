@@ -22,7 +22,7 @@ jobs:
         working-directory: src/airsafenet_frontend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: ⚙️ Setup Node.js 20
         uses: actions/setup-node@v4
@@ -64,10 +64,10 @@ jobs:
         working-directory: src/airsafenet_backend
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: ⚙️ Setup .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "8.0.x"
 
@@ -92,7 +92,7 @@ jobs:
         working-directory: src/airsafenet_ai
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: ⚙️ Setup Python 3.11
         uses: actions/setup-python@v5
@@ -127,13 +127,13 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: 🐳 Build frontend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: src/airsafenet_frontend
           push: false
@@ -142,7 +142,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: 🐳 Build backend image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: src/airsafenet_backend
           push: false
@@ -151,7 +151,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: 🐳 Build AI server image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v7
         with:
           context: src/airsafenet_ai
           push: false
