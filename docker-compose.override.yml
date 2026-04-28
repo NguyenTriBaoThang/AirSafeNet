@@ -1,0 +1,44 @@
+# docker-compose.override.yml
+# Tự động được load khi chạy: docker compose up
+# Cung cấp hot-reload và dev settings cho development
+#
+# Production không dùng file này:
+#   docker compose -f docker-compose.yml up -d
+
+version: "3.9"
+
+services:
+  # ── Frontend: hot reload với Vite dev server ───────────────────────
+  frontend:
+    build:
+      target: deps          # Dừng ở stage deps (không build prod)
+    ports:
+      - "5173:5173"         # Vite dev port (override 5173:80)
+    volumes:
+      - ./src/airsafenet_frontend:/app    # Mount source code
+      - /app/node_modules                  # Preserve node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:7276
+    command: npm run dev -- --host 0.0.0.0
+
+  # ── Backend: auto-restart khi code thay đổi ───────────────────────
+  backend:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:7276
+    volumes:
+      - ./src/airsafenet_backend:/src     # Mount source for hot reload
+    command: dotnet watch --project /src/airsafenet_backend run --urls http://+:7276
+
+  # ── AI Server: reload khi code thay đổi ───────────────────────────
+  ai_server:
+    volumes:
+      - ./src/airsafenet_ai:/app          # Mount source
+      - ./src/airsafenet_ai/models:/app/models  # Model files
+      - ./src/airsafenet_ai/data:/app/data      # Cache data
+    command: uvicorn app.api:app --reload --host 0.0.0.0 --port 8000 --log-level debug
+
+  # ── Database: expose port for direct access (pgAdmin, DBeaver) ────
+  db:
+    ports:
+      - "5432:5432"         # Expose DB port in dev only

@@ -1,0 +1,39 @@
+name-template: "AirSafeNet v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+template: |
+  ## 🌍 AirSafeNet $RESOLVED_VERSION
+
+  $CHANGES
+
+  ### 🐳 Docker Images
+  ```bash
+  docker pull ghcr.io/nguyentribaothang/airsafenet-frontend:$RESOLVED_VERSION
+  docker pull ghcr.io/nguyentribaothang/airsafenet-backend:$RESOLVED_VERSION
+  docker pull ghcr.io/nguyentribaothang/airsafenet-ai-server:$RESOLVED_VERSION
+  ```
+
+categories:
+  - title: "🚀 New Features"
+    labels: ["feature", "feat", "enhancement"]
+  - title: "🐛 Bug Fixes"
+    labels: ["fix", "bug", "bugfix"]
+  - title: "🤖 AI & Model"
+    labels: ["ai", "model", "ml"]
+  - title: "📖 Documentation"
+    labels: ["documentation", "docs"]
+  - title: "🔧 Maintenance"
+    labels: ["chore", "refactor", "dependencies"]
+
+version-resolver:
+  major:
+    labels: ["major", "breaking"]
+  minor:
+    labels: ["minor", "feature", "feat"]
+  patch:
+    labels: ["patch", "fix", "bug"]
+  default: patch
+
+exclude-labels:
+  - "skip-changelog"
+  - "duplicate"
+  - "question"

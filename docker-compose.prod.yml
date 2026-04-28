@@ -1,0 +1,60 @@
+# docker-compose.prod.yml
+# Production overrides — không có hot reload, dùng image từ registry
+#
+# Chạy:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+version: "3.9"
+
+services:
+  frontend:
+    # Dùng image từ GitHub Container Registry thay vì build local
+    image: ghcr.io/nguyentribaothang/airsafenet-frontend:${TAG:-latest}
+    build: !reset null
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  backend:
+    image: ghcr.io/nguyentribaothang/airsafenet-backend:${TAG:-latest}
+    build: !reset null
+    restart: always
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ai_server:
+    image: ghcr.io/nguyentribaothang/airsafenet-ai-server:${TAG:-latest}
+    build: !reset null
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  db:
+    restart: always
+    # Không expose port 5432 ra ngoài trong prod
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  nginx:
+    restart: always
+    profiles: []              # Override profile → luôn chạy trong prod

@@ -1,0 +1,121 @@
+version: "3.9"
+
+services:
+  # ── Frontend: React + Vite ─────────────────────────────────────────
+  frontend:
+    build:
+      context: ./src/airsafenet_frontend
+      dockerfile: Dockerfile
+    container_name: airsafenet_frontend
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_BASE_URL=http://backend:7276
+    depends_on:
+      - backend
+    networks:
+      - airsafenet_net
+    restart: unless-stopped
+
+  # ── Backend: ASP.NET Core ──────────────────────────────────────────
+  backend:
+    build:
+      context: ./src/AirSafeNet.Api
+      dockerfile: Dockerfile
+    container_name: airsafenet_backend
+    ports:
+      - "7276:7276"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:7276
+      - ConnectionStrings__DefaultConnection=Host=db;Database=airsafenet;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - JwtSettings__Secret=${JWT_SECRET}
+      - AdminKey=${ADMIN_KEY}
+      - AiServer__BaseUrl=http://ai_server:8000
+      - Telegram__BotToken=${TELEGRAM_BOT_TOKEN}
+      - Email__SmtpHost=${SMTP_HOST}
+      - Email__SmtpUser=${SMTP_USER}
+      - Email__SmtpPass=${SMTP_PASS}
+    depends_on:
+      db:
+        condition: service_healthy
+      ai_server:
+        condition: service_started
+    networks:
+      - airsafenet_net
+    volumes:
+      - backend_data:/app/data
+    restart: unless-stopped
+
+  # ── AI Server: FastAPI Python ──────────────────────────────────────
+  ai_server:
+    build:
+      context: ./src/airsafenet_ai
+      dockerfile: Dockerfile
+    container_name: airsafenet_ai
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAQ_API_KEY=${OPENAQ_API_KEY}
+      - ADMIN_KEY=${ADMIN_KEY}
+      - BACKEND_URL=http://backend:7276
+    volumes:
+      - ai_data:/app/data          # forecast/history cache CSVs
+      - ai_models:/app/models      # trained model files
+    networks:
+      - airsafenet_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── Database: PostgreSQL ───────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: airsafenet_db
+    environment:
+      - POSTGRES_DB=airsafenet
+      - POSTGRES_USER=${POSTGRES_USER:-airsafenet}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - airsafenet_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-airsafenet}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # Không expose port 5432 ra ngoài trong prod
+
+  # ── Reverse Proxy: Nginx (optional) ───────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: airsafenet_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/ssl:/etc/nginx/ssl:ro       # SSL certs nếu có
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - airsafenet_net
+    restart: unless-stopped
+    profiles:
+      - prod     # chỉ chạy khi: docker compose --profile prod up
+
+networks:
+  airsafenet_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  backend_data:
+  ai_data:
+  ai_models:

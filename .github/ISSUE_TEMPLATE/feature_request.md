@@ -1,19 +1,38 @@
 ---
-name: Feature request
-about: Suggest an improvement
-title: "[FEATURE] "
-labels: enhancement
-assignees: ""
+name: 🚀 Feature Request
+about: Suggest a new feature for AirSafeNet
+title: "[FEAT] "
+labels: ["enhancement"]
+assignees: NguyenTriBaoThang
 ---
 
-## Feature Summary
+## 🚀 Feature Description
 
-Describe the requested feature.
+<!-- Clear description of the feature you'd like -->
 
-## Why It Matters
+## 💡 Motivation
 
-Explain the value for the project.
+<!-- Why is this feature needed? What problem does it solve? -->
 
-## Suggested Approach
+## 🎯 Proposed Solution
 
-Optional implementation idea.
+<!-- How should this feature work? -->
+
+## 🏗️ Layer(s) Involved
+
+- [ ] Frontend (React)
+- [ ] Backend (ASP.NET Core)
+- [ ] AI Server (FastAPI / ML)
+- [ ] Docker / Infrastructure
+- [ ] Documentation
+
+## 📊 Priority
+
+- [ ] 🔴 Critical (blocks usage)
+- [ ] 🟠 High (important for core functionality)
+- [ ] 🟡 Medium (nice to have)
+- [ ] 🟢 Low (minor improvement)
+
+## 📝 Additional Context
+
+<!-- Add any mockups, references, or extra context -->

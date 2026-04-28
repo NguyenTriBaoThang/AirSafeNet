@@ -1,0 +1,115 @@
+name: CD — Docker Publish & Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/airsafenet
+
+jobs:
+  publish:
+    name: 🚀 Build & Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        include:
+          - service: frontend
+            context: src/airsafenet_frontend
+            image: frontend
+          - service: backend
+            context: src/airsafenet_backend
+            image: backend
+          - service: ai-server
+            context: src/airsafenet_ai
+            image: ai-server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🔑 Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🏷️ Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_PREFIX }}-${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: 🐳 Build and push ${{ matrix.service }}
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+  release:
+    name: 📦 Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: publish
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 📝 Generate changelog
+        id: changelog
+        run: |
+          PREV=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$PREV" ]; then
+            LOG=$(git log --pretty=format:"- %s (%an)" -20)
+          else
+            LOG=$(git log --pretty=format:"- %s (%an)" ${PREV}..HEAD)
+          fi
+          echo "log<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: 🎉 Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body: |
+            ## 🌍 AirSafeNet ${{ github.ref_name }}
+
+            ### 🐳 Docker Images
+            ```bash
+            docker pull ghcr.io/${{ github.repository_owner }}/airsafenet-frontend:${{ github.ref_name }}
+            docker pull ghcr.io/${{ github.repository_owner }}/airsafenet-backend:${{ github.ref_name }}
+            docker pull ghcr.io/${{ github.repository_owner }}/airsafenet-ai-server:${{ github.ref_name }}
+            ```
+
+            ### ⚡ Quick Start
+            ```bash
+            git clone https://github.com/NguyenTriBaoThang/AirSafeNet.git
+            cd AirSafeNet && cp .env.example .env
+            docker compose up -d
+            ```
+
+            ### 📋 Changes
+            ${{ steps.changelog.outputs.log }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}

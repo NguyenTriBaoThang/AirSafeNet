@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # Frontend: npm
+  - package-ecosystem: "npm"
+    directory: "/src/airsafenet_frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["dependencies", "frontend"]
+    open-pull-requests-limit: 5
+
+  # Backend: NuGet
+  - package-ecosystem: "nuget"
+    directory: "/src/airsafenet_backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["dependencies", "backend"]
+    open-pull-requests-limit: 5
+
+  # AI Server: pip
+  - package-ecosystem: "pip"
+    directory: "/src/airsafenet_ai"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["dependencies", "ai-server"]
+    open-pull-requests-limit: 5
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    labels: ["dependencies", "github-actions"]
