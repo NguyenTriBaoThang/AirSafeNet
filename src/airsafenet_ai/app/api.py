@@ -399,6 +399,8 @@ def admin_districts_status(
 
 @app.get("/anomaly/latest")
 def anomaly_latest():
+    run_anomaly_detection()
+
     anomaly = get_latest_anomaly(hours=24)
     return {
         "has_anomaly": anomaly is not None,
