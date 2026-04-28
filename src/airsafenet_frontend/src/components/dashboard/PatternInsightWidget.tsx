@@ -370,6 +370,15 @@ export default function PatternInsightWidget({ schedules, onApplyHour, onRemoveD
   const [expanded,    setExpanded]    = useState(true);
   const analyzedRef = useRef(false);
 
+  function getDismissed(): string[] {
+    try { return JSON.parse(localStorage.getItem("airsafenet_dismissed_insights") ?? "[]"); }
+    catch { return []; }
+  }
+  function addDismissed(id: string) {
+    const cur = getDismissed();
+    localStorage.setItem("airsafenet_dismissed_insights", JSON.stringify([...cur, id]));
+  }
+
   useEffect(() => {
     if (schedules.length === 0) { setLoading(false); return; }
     if (analyzedRef.current) return;
@@ -427,15 +436,6 @@ export default function PatternInsightWidget({ schedules, onApplyHour, onRemoveD
     doAnalyze();
     return () => { cancelled = true; };
   }, [schedules]);
-
-  function getDismissed(): string[] {
-    try { return JSON.parse(localStorage.getItem("airsafenet_dismissed_insights") ?? "[]"); }
-    catch { return []; }
-  }
-  function addDismissed(id: string) {
-    const cur = getDismissed();
-    localStorage.setItem("airsafenet_dismissed_insights", JSON.stringify([...cur, id]));
-  }
 
   function handleDismiss(insightId: string) {
     addDismissed(insightId);
