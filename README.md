@@ -54,10 +54,10 @@
 
 ---
 
-## 🏆 Competition Submission Edition
+## 🏆 Edition
 
 <p align="center">
-  <b>WEBSITE & AI INNOVATION CONTEST 2026</b>
+  <b>WEBSITE & AI INNOVATION</b>
 </p>
 
 **Objective:** Build an AI-powered platform that monitors, forecasts, and delivers personalized air quality warnings for citizens of Ho Chi Minh City — especially vulnerable groups including children, the elderly, pregnant women, and people with respiratory conditions.
@@ -623,7 +623,7 @@ MIT License — see [LICENSE](./LICENSE) for details.
 <b>Team</b>
 </td>
 <td>
-TKT Team — WEBSITE & AI INNOVATION CONTEST 2026
+KTT.HUTECH
 </td>
 </tr>
 <tr>
