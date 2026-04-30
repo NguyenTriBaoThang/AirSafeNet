@@ -177,34 +177,34 @@ AirSafeNet moves from **reactive observation → proactive early warning**:
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                      CLIENT LAYER                             │
+│                      CLIENT LAYER                            │
 │   React 18 + TypeScript + Vite  (port 5173)                  │
-│   Recharts · ReactMarkdown · react-router-dom · Tailwind CSS  │
+│   Recharts · ReactMarkdown · react-router-dom · Tailwind CSS │
 └───────────────────────┬──────────────────────────────────────┘
                         │ REST API (JWT Bearer)
 ┌───────────────────────▼──────────────────────────────────────┐
-│                    BACKEND LAYER                              │
+│                    BACKEND LAYER                             │
 │   ASP.NET Core 8.0  (port 7276)                              │
 │   Entity Framework Core · JWT Auth · APScheduler proxy       │
 │   Controllers: Air · Dashboard · Activity · Anomaly          │
 │                Admin · Notification · Assistant              │
 └──────────┬────────────────────────────┬──────────────────────┘
-           │ HTTP                        │ HTTP
+           │ HTTP                       │ HTTP
 ┌──────────▼──────────┐    ┌────────────▼────────────────────┐
-│    AI SERVER         │    │       EXTERNAL APIs              │
-│   FastAPI Python     │    │  Open-Meteo Weather API          │
-│   (port 8000)        │    │  OpenAQ Air Quality API          │
-│                      │    │  Telegram Bot API                │
-│  Ensemble Model      │    └─────────────────────────────────┘
-│  ├─ Random Forest    │
-│  ├─ ARIMA (auto AIC) │    ┌─────────────────────────────────┐
-│  └─ XGBoost Lite     │    │          DATABASE               │
-│                      │    │   PostgreSQL 16 (prod)          │
-│  APScheduler 60min   │    │   SQLite (dev/test)             │
-│  Anomaly Detector    │    └─────────────────────────────────┘
-│  Cache Manager       │
-│  District Heatmap    │
-│  22 quận/huyện       │
+│    AI SERVER        │    │       EXTERNAL APIs             │
+│   FastAPI Python    │    │  Open-Meteo Weather API         │
+│   (port 8000)       │    │  OpenAQ Air Quality API         │
+│                     │    │  Telegram Bot API               │
+│ Ensemble Model      │    └─────────────────────────────────┘
+│ ├─ Random Forest    │
+│ ├─ ARIMA (auto AIC) │    ┌─────────────────────────────────┐
+│ └─ XGBoost Lite     │    │          DATABASE               │
+│                     │    │   PostgreSQL 16 (prod)          │
+│  APScheduler 60min  │    │   SQLite (dev/test)             │
+│  Anomaly Detector   │    └─────────────────────────────────┘
+│  Cache Manager      │
+│  District Heatmap   │
+│  22 quận/huyện      │
 └─────────────────────┘
 ```
 
@@ -631,7 +631,7 @@ TKT Team — WEBSITE & AI INNOVATION CONTEST 2026
 <b>Instructor</b>
 </td>
 <td>
-ThS. Nguyễn Trọng Minh Hồng Phước
+ThS. Nguyễn Huy Cường
 </td>
 </tr>
 <tr>
@@ -639,7 +639,7 @@ ThS. Nguyễn Trọng Minh Hồng Phước
 <b>Contributors</b>
 </td>
 <td>
-Nguyễn Tri Bão Thắng &nbsp;·&nbsp; Lê Trung Kiên &nbsp;·&nbsp; Võ Thanh Trung
+Nguyễn Tri Bão Thắng &nbsp;·&nbsp; Lê Trung Kiên &nbsp;·&nbsp; Đỗ Chí Thành &nbsp;·&nbsp; Võ Thành Trung
 </td>
 </tr>
 </table>
