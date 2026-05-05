@@ -5,7 +5,7 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
-# Install build tools (needed for numpy/scipy compilation)
+# Install build tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc g++ libgomp1 \
     && rm -rf /var/lib/apt/lists/*
@@ -14,47 +14,44 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Install Python dependencies
+# Install dependencies
 COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 # ══════════════════════════════════════════════════════════════
-# Stage 2 — Runtime (minimal image)
+# Stage 2 — Runtime
 # ══════════════════════════════════════════════════════════════
 FROM python:3.11-slim AS runner
 
 WORKDIR /app
 
-# Runtime system deps
+# Runtime deps
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy virtual env from builder
+# Copy venv
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Non-root user
+# Create user + folders
 RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/data /app/models && \
+    mkdir -p /app/src/airsafenet_ai/models && \
     chown -R appuser:appuser /app
 
 USER appuser
 
-# Copy application code
+# Copy source code
 COPY --chown=appuser:appuser . .
+
+# Copy entrypoint
+COPY --chown=appuser:appuser entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
-# Use multiple workers in prod for better throughput
-# AI model is loaded once per worker (memory-efficient with preload)
-CMD ["uvicorn", "app.api:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "2", \
-     "--log-level", "info", \
-     "--access-log"]
+CMD ["/app/entrypoint.sh"]
