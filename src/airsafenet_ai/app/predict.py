@@ -16,7 +16,20 @@ from app.profiles import aqi_to_category, recommendation_from_aqi, risk_for_prof
 
 logger = logging.getLogger(__name__)
 
-MODEL = joblib.load(MODEL_PATH)
+_MODEL = None  # lazy-loaded on first use
+
+
+def _get_model():
+    """Load model lazily — only when first prediction is needed."""
+    global _MODEL
+    if _MODEL is None:
+        if not MODEL_PATH.exists():
+            raise FileNotFoundError(
+                f"Model not found at {MODEL_PATH}. "
+                "Run POST /admin/compute or place model.pkl in the models/ directory."
+            )
+        _MODEL = joblib.load(MODEL_PATH)
+    return _MODEL
 
 MAX_HOURLY_DELTA = 12.0
 
@@ -36,7 +49,7 @@ def load_metadata() -> dict[str, Any]:
 
 def _predict_pm25_from_history(history_df: pd.DataFrame) -> float:
     X = latest_feature_vector(history_df)
-    pred = float(MODEL.predict(X)[0])
+    pred = float(_get_model().predict(X)[0])
     return float(np.clip(pred, PM25_MIN, PM25_MAX))
 
 
@@ -47,7 +60,7 @@ def _predict_pm25_with_exogenous(
     prev_pred_pm25: float | None = None,
 ) -> float:
     X = build_feature_vector_for_step(working_history, future_row, step_index)
-    raw_pred = float(MODEL.predict(X)[0])
+    raw_pred = float(_get_model().predict(X)[0])
 
     if prev_pred_pm25 is not None:
         delta = raw_pred - prev_pred_pm25
