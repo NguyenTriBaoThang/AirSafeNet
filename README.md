@@ -173,7 +173,7 @@ AirSafeNet moves from **reactive observation → proactive early warning**:
 
 ## 🏗️ System Architecture
 
-<img src="./assets/diagrams/system_architecture.png" alt="System Architecture" width="100%"/>
+<img src="./assets/diagrams/airsafenet_system_architecture.png" alt="System Architecture" width="100%"/>
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -473,8 +473,8 @@ VITE_API_BASE_URL=http://localhost:7276
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| `POST` | `/api/auth/register` | ❌ | Register account |
-| `POST` | `/api/auth/login` | ❌ | Login → JWT token |
+| `POST` | `/api/auth/register` | ✅ | Register account |
+| `POST` | `/api/auth/login` | ✅ | Login → JWT token |
 | `GET` | `/api/air/current` | ✅ | Current AQI + weather |
 | `GET` | `/api/air/forecast?days=7` | ✅ | Forecast (from cache) |
 | `GET` | `/api/air/history?days=30` | ✅ | History (from cache) |
@@ -520,7 +520,7 @@ VITE_API_BASE_URL=http://localhost:7276
 
 ## 🗺️ CI/CD Pipeline
 
-<img src="./assets/diagrams/cicd.png" alt="CI/CD Pipeline" width="100%"/>
+<img src="./assets/diagrams/airsafenet_cicd.png" alt="CI/CD Pipeline" width="100%"/>
 
 - **CI** (every push/PR to `main`): TypeScript check → ESLint → .NET build → Python lint → Docker build verification
 - **CD** (every semver tag `v*.*.*`): Build multi-arch images → push to GitHub Container Registry → auto-generate release notes
