@@ -12,7 +12,7 @@ import pandas as pd
 
 from app.config import DATA_DIR, HISTORY_HOURS
 from app.data_loader import load_merged_dataset
-from app.predict import _predict_pm25_from_history, latest_feature_vector, MODEL
+from app.predict import _predict_pm25_from_history, latest_feature_vector, _get_model
 from app.aqi import pm25_to_aqi
 from app.profiles import risk_for_profile, recommendation_from_aqi
 
@@ -34,12 +34,12 @@ def _explain_spike(
         X_before = latest_feature_vector(history_before)
         X_after  = latest_feature_vector(history_after)
 
-        feat_names = MODEL.feature_names_in_ if hasattr(MODEL, "feature_names_in_") else []
+        feat_names = _get_model().feature_names_in_ if hasattr(_get_model(), "feature_names_in_") else []
 
         importances: dict[str, float] = {}
-        if hasattr(MODEL, "feature_importances_"):
+        if hasattr(_get_model(), "feature_importances_"):
             for i, name in enumerate(feat_names):
-                importances[name] = float(MODEL.feature_importances_[i])
+                importances[name] = float(_get_model().feature_importances_[i])
 
         deltas: list[dict] = []
         x_b = X_before.iloc[0] if hasattr(X_before, "iloc") else X_before[0]
