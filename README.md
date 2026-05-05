@@ -631,7 +631,7 @@ KTT.HUTECH
 <b>Instructor</b>
 </td>
 <td>
-ThS. Nguyễn Huy Cường
+MSc. Nguyen Huy Cuong
 </td>
 </tr>
 <tr>
@@ -639,7 +639,7 @@ ThS. Nguyễn Huy Cường
 <b>Contributors</b>
 </td>
 <td>
-Nguyễn Tri Bão Thắng &nbsp;·&nbsp; Lê Trung Kiên &nbsp;·&nbsp; Đỗ Chí Thành &nbsp;·&nbsp; Võ Thành Trung
+Nguyen Tri Bao Thang &nbsp;·&nbsp; Le Trung Kien &nbsp;·&nbsp; Do Chi Thanh &nbsp;·&nbsp; Vo Thanh Trung
 </td>
 </tr>
 </table>
