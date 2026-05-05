@@ -217,7 +217,7 @@ function getMaxOutdoorTime(
   group:    UserGroup,
   intensity:string,
 ): MaxTimeResult {
-  let base = 0;
+  let base: number;
   if (aqi <=  50) base = 480;  
   else if (aqi <= 100) base = 240;  
   else if (aqi <= 150) base = 90;
@@ -238,8 +238,8 @@ function getMaxOutdoorTime(
   const minutes    = Math.round(base * (groupFactor[group] ?? 1.0));
   const withMask   = Math.min(minutes * 1.6, base); 
 
-  let label = "";
-  let color = "";
+  let label: string;
+  let color: string;
   if (minutes === 0)       { label = "Không nên ra ngoài";        color = "#7f1d1d"; }
   else if (minutes <= 15)  { label = `Tối đa ${minutes} phút`;    color = "#b91c1c"; }
   else if (minutes <= 30)  { label = `Tối đa ${minutes} phút`;    color = "#ef4444"; }

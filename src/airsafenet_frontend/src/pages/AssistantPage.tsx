@@ -646,6 +646,7 @@ export default function AssistantPage() {
 
   useEffect(() => {
     loadConversations(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

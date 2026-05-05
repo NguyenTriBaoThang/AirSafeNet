@@ -89,7 +89,7 @@ function aqiToBaseScore(aqi: number): number {
 }
 
 function calcTempMultiplier(tempC: number, sensitivity: number): { mult: number; desc: string; color: string } {
-  let mult = 1.0, desc = "", color = "#22c55e";
+  let mult: number, desc: string, color: string;
 
   if (tempC >= 38) {
     mult  = 1.45 * sensitivity;
@@ -121,7 +121,7 @@ function calcTempMultiplier(tempC: number, sensitivity: number): { mult: number;
 }
 
 function calcHumidityMultiplier(humidity: number, sensitivity: number): { mult: number; desc: string; color: string } {
-  let mult = 1.0, desc = "", color = "#22c55e";
+  let mult: number, desc: string, color: string;
 
   if (humidity > 85) {
     mult  = 1.25 * sensitivity;
@@ -149,7 +149,7 @@ function calcHumidityMultiplier(humidity: number, sensitivity: number): { mult: 
 }
 
 function calcUvMultiplier(uv: number, sensitivity: number): { mult: number; desc: string; color: string } {
-  let mult = 1.0, desc = "", color = "#22c55e";
+  let mult: number, desc: string, color: string;
 
   if (uv >= 11) {
     mult  = 1.30 * sensitivity;
@@ -177,7 +177,7 @@ function calcUvMultiplier(uv: number, sensitivity: number): { mult: number; desc
 }
 
 function calcWindMultiplier(windSpeedKmh: number): { mult: number; desc: string; color: string } {
-  let mult = 1.0, desc = "", color = "#22c55e";
+  let mult: number, desc: string, color: string;
 
   if (windSpeedKmh < 5) {
     mult  = 1.15;
@@ -201,7 +201,7 @@ function calcWindMultiplier(windSpeedKmh: number): { mult: number; desc: string;
 }
 
 function calcPressureMultiplier(pressure: number): { mult: number; desc: string; color: string } {
-  let mult = 1.0, desc = "", color = "#22c55e";
+  let mult: number, desc: string, color: string;
 
   if (pressure < 1005) {
     mult  = 1.12;
@@ -279,7 +279,7 @@ function calcCompoundRisk(weather: WeatherData, userGroup: UserGroup): CompoundR
     },
   ];
 
-  let label = "", color = "";
+  let label: string, color: string;
   if (compound <= 20) { label = "Rất tốt";        color = "#22c55e"; }
   else if (compound <= 40) { label = "Tốt";        color = "#86efac"; }
   else if (compound <= 55) { label = "Trung bình"; color = "#eab308"; }
@@ -291,7 +291,7 @@ function calcCompoundRisk(weather: WeatherData, userGroup: UserGroup): CompoundR
     .sort((a,b) => b.multiplier - a.multiplier)[0];
   const bestFactor  = factors.filter(f => f.impact === "positive")[0];
 
-  let summary = "";
+  let summary: string;
   if (amplif > 30) {
     summary = `⚠️ Điều kiện thời tiết khuếch đại rủi ro PM2.5 lên ${amplif}% so với chỉ số AQI đơn thuần.`;
   } else if (amplif > 10) {
