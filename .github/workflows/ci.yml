@@ -46,7 +46,7 @@ jobs:
           VITE_API_BASE_URL: http://localhost:7276
 
       - name: 📤 Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: github.ref == 'refs/heads/main'
         with:
           name: frontend-dist
