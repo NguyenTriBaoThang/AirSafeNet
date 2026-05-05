@@ -4,6 +4,7 @@ import type {
   AdminComputeResult,
   AdminDistrictStatus,
   AdminDistrictResult,
+  AdminAnomalyResult,
 } from "../types/admin";
 
 export async function getCacheStatusApi(): Promise<AdminCacheStatus> {
@@ -24,4 +25,11 @@ export async function triggerDistrictComputeApi(): Promise<AdminDistrictResult> 
 
 export async function getDistrictStatusApi(): Promise<AdminDistrictStatus> {
   return http<AdminDistrictStatus>("/api/admin/districts/status", { method: "GET", auth: true });
+}
+
+export async function triggerAnomalyApi(force = false): Promise<AdminAnomalyResult> {
+  return http<AdminAnomalyResult>(
+    `/api/anomaly/check${force ? "?force=true" : ""}`,
+    { method: "POST", auth: true }
+  );
 }

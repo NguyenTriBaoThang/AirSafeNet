@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useAdminCache } from "../hooks/useAdminCache";
-import { triggerDistrictComputeApi, getDistrictStatusApi } from "../api/admin";
+import { triggerDistrictComputeApi, getDistrictStatusApi, triggerAnomalyApi } from "../api/admin";
 import type { CacheFileDetail, ComputeStatus, AdminDistrictStatus } from "../types/admin";
 import SectionHeader from "../components/common/SectionHeader";
 import { useToast } from "../components/common/useToast";
@@ -117,6 +117,41 @@ export default function AdminPage() {
   const [districtStatus,    setDistrictStatus]    = useState<AdminDistrictStatus | null>(null);
   const [districtComputing, setDistrictComputing] = useState(false);
   const [districtMsg,       setDistrictMsg]       = useState<string | null>(null);
+
+  const [anomalyRunning,  setAnomalyRunning]  = useState(false);
+  const [anomalyMsg,      setAnomalyMsg]      = useState<string | null>(null);
+  const [anomalySeverity, setAnomalySeverity] = useState<"critical" | "warning" | null>(null);
+  const [anomalySpike,    setAnomalySpike]    = useState<number | null>(null);
+  const [anomalySpikeTime,setAnomalySpikeTime]= useState<string | null>(null);
+  const [anomalyDetected, setAnomalyDetected] = useState(false);
+
+  async function handleAnomalyDetect() {
+    setAnomalyRunning(true);
+    setAnomalyMsg(null);
+    setAnomalySeverity(null);
+    setAnomalySpike(null);
+    setAnomalySpikeTime(null);
+    setAnomalyDetected(false);
+    try {
+      const r = await triggerAnomalyApi();
+      if ("skipped" in r && r.skipped) {
+        setAnomalyMsg(`⏳ Trong cooldown — ${r.reason ?? "đợi thêm"}`);
+      } else if ("detected" in r && r.detected) {
+        const ev = r.anomaly;
+        setAnomalyDetected(true);
+        setAnomalySeverity(r.severity);
+        setAnomalySpike(ev.spike_pm25);
+        setAnomalySpikeTime(ev.spike_time);
+        setAnomalyMsg(`⚠️ Phát hiện spike ${ev.spike_pm25} µg/m³ [${r.severity}]`);
+      } else {
+        setAnomalyMsg("✓ Không phát hiện bất thường");
+      }
+    } catch (err) {
+      setAnomalyMsg(err instanceof Error ? err.message : "Lỗi kích hoạt");
+    } finally {
+      setAnomalyRunning(false);
+    }
+  }
 
   async function handleDistrictCompute() {
     setDistrictComputing(true);
@@ -420,6 +455,53 @@ export default function AdminPage() {
           </button>
           <p className="admin-compute-card__note" style={{ marginTop: 6 }}>
             ~5-10s · 22 quận
+          </p>
+        </div>
+      </div>
+
+      {/* ── Anomaly Detection Card ── */}
+      <div className="admin-district-card" style={{ borderColor: "rgba(249,115,22,.25)", background: "rgba(249,115,22,.04)" }}>
+        <div className="admin-district-card__left">
+          <span className="admin-district-card__icon">🔍</span>
+          <div>
+            <h3>Phát hiện Bất thường (Anomaly Detection)</h3>
+            <p className="admin-compute-card__desc">
+              Kiểm tra spike PM2.5 trong 6 giờ gần nhất → ghi{" "}
+              <code>anomaly_log.json</code> → frontend đọc tại <code>/dashboard</code>
+            </p>
+            {anomalyDetected && anomalySeverity && (
+              <div className="admin-district-card__meta" style={{ marginTop: 8 }}>
+                <span style={{ color: anomalySeverity === "critical" ? "#ef4444" : "#f97316", fontWeight: 700 }}>
+                  {anomalySeverity === "critical" ? "🚨 Critical" : "⚠️ Warning"}
+                </span>
+                {anomalySpike !== null && <><span>·</span><span>Spike: {anomalySpike} µg/m³</span></>}
+                {anomalySpikeTime && <><span>·</span><span>{timeAgo(anomalySpikeTime)}</span></>}
+              </div>
+            )}
+            {anomalyMsg && (
+              <div className={`admin-district-card__msg ${anomalyMsg.startsWith("✓") ? "admin-district-card__msg--ok" : ""}`}
+                style={{ marginTop: 6 }}>
+                {anomalyMsg}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="admin-district-card__right">
+          <button
+            className={`admin-compute-btn ${anomalyRunning ? "admin-compute-btn--loading" : ""}`}
+            onClick={handleAnomalyDetect}
+            disabled={anomalyRunning || computing || computeStatus === "running"}
+            type="button"
+            style={{ minWidth: 160 }}
+          >
+            {anomalyRunning ? (
+              <><span className="admin-compute-btn__spinner" />Đang kiểm tra...</>
+            ) : (
+              <><span>🔍</span> Kiểm tra ngay</>
+            )}
+          </button>
+          <p className="admin-compute-card__note" style={{ marginTop: 6 }}>
+            Cooldown 2h · Lookback 6h
           </p>
         </div>
       </div>

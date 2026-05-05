@@ -9,6 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.cache_manager import run_compute
+from app.anomaly_detector import run_anomaly_detection
 from app.districts import compute_district_heatmap
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,23 @@ def _scheduled_job() -> None:
                 result.get("elapsed_seconds", 0),
                 result.get("forecast_rows", 0),
             )
+            # ── Anomaly detection ─────────────────────────────
+            try:
+                anomaly_result = run_anomaly_detection(force=False)
+                if anomaly_result.get("skipped"):
+                    logger.info("[Scheduler] Anomaly detection trong cooldown, bỏ qua.")
+                elif anomaly_result.get("detected"):
+                    logger.warning(
+                        "[Scheduler] ⚠ Anomaly detected: severity=%s spike=%.2f µg/m³",
+                        anomaly_result.get("severity", "?"),
+                        anomaly_result.get("anomaly", {}).get("spike_pm25", 0),
+                    )
+                else:
+                    logger.info("[Scheduler] Anomaly check: không phát hiện bất thường.")
+            except Exception as exc:
+                logger.warning("[Scheduler] Anomaly detection lỗi (non-critical): %s", exc)
+
+            # ── Alert check (sau anomaly để backend dùng data mới) ──
             _trigger_alert_check()
             try:
                 compute_district_heatmap(max_workers=8)
