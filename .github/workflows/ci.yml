@@ -114,15 +114,8 @@ jobs:
       - name: ✅ Import check
         run: |
           mkdir -p models
-          python -c "
-import joblib, numpy as np
-from sklearn.ensemble import RandomForestRegressor
-m = RandomForestRegressor(n_estimators=2, max_depth=2)
-m.fit(np.zeros((10,5)), np.zeros(10))
-joblib.dump(m, 'models/airsafenet_best_model.pkl')
-print('Dummy model created')
-"
-          python -c "from app.api import app; print('✅ FastAPI app imports OK')"
+          python create_dummy_model.py
+          python -c "from app.api import app; print('FastAPI app imports OK')"
         env:
           OPENAQ_API_KEY: test_key
           ADMIN_KEY: test_admin_key
