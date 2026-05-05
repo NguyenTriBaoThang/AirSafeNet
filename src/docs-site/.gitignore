@@ -1,0 +1,9 @@
+# Docusaurus
+.docusaurus/
+build/
+node_modules/
+.cache/
+
+# Env
+.env
+.env.local
