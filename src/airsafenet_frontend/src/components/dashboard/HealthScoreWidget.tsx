@@ -7,7 +7,7 @@ type Props = {
 };
 
 function calcScore(aqi: number, warningCount: number, dangerCount: number): number {
-  let score = 100;
+  let score: number;
 
   if (aqi <= 50)       score = 100;
   else if (aqi <= 100) score = Math.round(100 - ((aqi - 50) / 50) * 30);   // 100→70

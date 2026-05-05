@@ -83,7 +83,7 @@ export default function ImpactEstimateWidget({ currentRisk, currentAqi, currentP
       whoMultiple:    currentPm25 > 0 ? (currentPm25 / 5).toFixed(1) : "—",
       breakdown:      getBreakdown(totalUsd),
     };
-  }, [currentAqi, currentPm25, days]);
+  }, [currentAqi, currentPm25, days, warningCount]);
 
   const rc = currentRisk === "GOOD"                ? "#16a34a"
     : currentRisk === "MODERATE"                   ? "#ca8a04"
