@@ -3,7 +3,7 @@ uvicorn[standard]==0.46.0
 joblib==1.5.3
 numpy==2.4.4
 pandas==3.0.2
-requests==2.33.1
+requests==2.34.0
 scikit-learn==1.8.0
 statsmodels>=0.14.6
 APScheduler==3.10.4
