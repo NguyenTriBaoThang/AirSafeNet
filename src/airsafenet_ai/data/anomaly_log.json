@@ -41,5 +41,91 @@
     },
     "created_at": "2026-04-29T10:00:00+00:00",
     "alerted": false
+  },
+  {
+    "detected": true,
+    "spike_pm25": 14.3,
+    "from_pm25": 52.0,
+    "to_pm25": 37.7,
+    "spike_time": "2026-05-14T07:00:00",
+    "severity": "warning",
+    "aqi_after": 106,
+    "risk_after": "UNHEALTHY_SENSITIVE",
+    "recommendation": "Chất lượng không khí ở mức chấp nhận được. Nhóm nhạy cảm như người dùng nên cân nhắc hạn chế hoạt động ngoài trời kéo dài.",
+    "xai": {
+      "top_factors": [
+        {
+          "feature": "pm10",
+          "label": "pm10",
+          "delta": -13.8,
+          "direction": "giảm",
+          "explanation": "Thay đổi 13.80 units",
+          "importance": 0.0
+        },
+        {
+          "feature": "co",
+          "label": "co",
+          "delta": 42.0,
+          "direction": "tăng",
+          "explanation": "Thay đổi 42.00 units",
+          "importance": 0.0
+        },
+        {
+          "feature": "no2",
+          "label": "no2",
+          "delta": -5.3,
+          "direction": "giảm",
+          "explanation": "Thay đổi 5.30 units",
+          "importance": 0.0
+        }
+      ],
+      "summary": "Spike chủ yếu do pm10. Đồng thời co cũng góp phần.",
+      "confidence": 100
+    },
+    "created_at": "2026-05-14T04:20:47.137964+00:00",
+    "alerted": false
+  },
+  {
+    "detected": true,
+    "spike_pm25": 14.3,
+    "from_pm25": 52.0,
+    "to_pm25": 37.7,
+    "spike_time": "2026-05-14T07:00:00",
+    "severity": "warning",
+    "aqi_after": 106,
+    "risk_after": "UNHEALTHY_SENSITIVE",
+    "recommendation": "Chất lượng không khí ở mức chấp nhận được. Nhóm nhạy cảm như người dùng nên cân nhắc hạn chế hoạt động ngoài trời kéo dài.",
+    "xai": {
+      "top_factors": [
+        {
+          "feature": "pm10",
+          "label": "pm10",
+          "delta": -13.8,
+          "direction": "giảm",
+          "explanation": "Thay đổi 13.80 units",
+          "importance": 0.0
+        },
+        {
+          "feature": "co",
+          "label": "co",
+          "delta": 42.0,
+          "direction": "tăng",
+          "explanation": "Thay đổi 42.00 units",
+          "importance": 0.0
+        },
+        {
+          "feature": "no2",
+          "label": "no2",
+          "delta": -5.3,
+          "direction": "giảm",
+          "explanation": "Thay đổi 5.30 units",
+          "importance": 0.0
+        }
+      ],
+      "summary": "Spike chủ yếu do pm10. Đồng thời co cũng góp phần.",
+      "confidence": 100
+    },
+    "created_at": "2026-05-14T04:25:16.752161+00:00",
+    "alerted": false
   }
 ]

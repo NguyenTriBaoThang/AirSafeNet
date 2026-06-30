@@ -17,6 +17,8 @@ import StatusChip from "../components/common/StatusChip";
 import EnsembleBadge from "../components/dashboard/EnsembleBadge";
 import AppIcon from "../components/common/AppIcon";
 import AnomalyBanner from "../components/dashboard/AnomalyBanner";
+import DailySafetyBriefing from "../components/dashboard/DailySafetyBriefing";
+import WhatIfActivitySimulator from "../components/dashboard/WhatIfActivitySimulator";
 
 function CacheInitializingState({ onRetry }: { onRetry: () => void }) {
   const [dots, setDots] = useState(".");
@@ -115,6 +117,14 @@ export default function Dashboard() {
         <SummaryCard title="AQI cao nhất"   value={summary.maxAqiNext24h}          subtext={summary.peakTime ? new Date(summary.peakTime).toLocaleTimeString("vi-VN") : undefined} icon={<AppIcon name="trend" />} tone="warning" />
         <SummaryCard title="Giờ cảnh báo"   value={summary.dangerCount}            subtext={`Warning: ${summary.warningCount}`}                                                     icon={<AppIcon name="alert" />} tone="danger" />
       </div>
+
+      {mode === "forecast" && (
+        <DailySafetyBriefing summary={summary} points={chart.points} />
+      )}
+
+      {mode === "forecast" && (
+        <WhatIfActivitySimulator summary={summary} points={chart.points} />
+      )}
 
       {mode === "forecast" && <GoldenHoursWidget points={chart.points} />}
 
