@@ -1,3 +1,16 @@
+export type AirEnsembleMeta = {
+  method: "weighted_average" | "main_only";
+  main_pm25: number;
+  arima_pm25: number | null;
+  xgb_pm25: number | null;
+  weights: { main: number; arima: number; xgb: number };
+  confidence: number;
+  uncertainty_band: number;
+  agreement: "high" | "medium" | "low" | "unknown";
+  model_std: number;
+  arima_available: boolean;
+  xgb_available: boolean;
+};
 export type AirPredictResponse = {
   pm25: number;
   aqi: number;
@@ -5,6 +18,7 @@ export type AirPredictResponse = {
   recommendation: string;
   userGroup: string;
   generatedAt: string;
+  ensemble?: AirEnsembleMeta | null;
 };
 
 export type AirForecastItemResponse = {

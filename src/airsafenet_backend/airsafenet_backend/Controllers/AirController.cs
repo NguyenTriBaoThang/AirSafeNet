@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Air;
 using airsafenet_backend.Services;
@@ -67,6 +67,7 @@ namespace AirSafeNet.Api.Controllers
                 Recommendation = current.RecommendationProfile,
                 UserGroup = userGroup,
                 GeneratedAt = DateTime.UtcNow,
+                Ensemble = current.Ensemble,
             });
         }
 

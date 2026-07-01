@@ -1,4 +1,4 @@
-﻿using airsafenet_backend.Models;
+using airsafenet_backend.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace airsafenet_backend.Data
@@ -16,6 +16,7 @@ namespace airsafenet_backend.Data
         public DbSet<ChatConversation> ChatConversations => Set<ChatConversation>();
         public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
         public DbSet<UserActivitySchedule> UserActivitySchedules => Set<UserActivitySchedule>();
+        public DbSet<FamilyProfile> FamilyProfiles => Set<FamilyProfile>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -42,6 +43,15 @@ namespace airsafenet_backend.Data
                 .WithMany(x => x.Messages)
                 .HasForeignKey(x => x.ConversationId)
                 .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<FamilyProfile>()
+                .HasOne(x => x.User)
+                .WithMany()
+                .HasForeignKey(x => x.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<FamilyProfile>()
+                .HasIndex(x => new { x.UserId, x.DisplayName });
         }
     }
 }

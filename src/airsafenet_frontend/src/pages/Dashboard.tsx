@@ -19,6 +19,7 @@ import AppIcon from "../components/common/AppIcon";
 import AnomalyBanner from "../components/dashboard/AnomalyBanner";
 import DailySafetyBriefing from "../components/dashboard/DailySafetyBriefing";
 import WhatIfActivitySimulator from "../components/dashboard/WhatIfActivitySimulator";
+import TrustExplainabilityPanel from "../components/dashboard/TrustExplainabilityPanel";
 
 function CacheInitializingState({ onRetry }: { onRetry: () => void }) {
   const [dots, setDots] = useState(".");
@@ -124,6 +125,10 @@ export default function Dashboard() {
 
       {mode === "forecast" && (
         <WhatIfActivitySimulator summary={summary} points={chart.points} />
+      )}
+
+      {mode === "forecast" && (
+        <TrustExplainabilityPanel summary={summary} points={chart.points} />
       )}
 
       {mode === "forecast" && <GoldenHoursWidget points={chart.points} />}

@@ -1,4 +1,6 @@
-﻿namespace airsafenet_backend.DTOs.Air
+using System.Text.Json;
+
+namespace airsafenet_backend.DTOs.Air
 {
     public class AirPredictResponse
     {
@@ -8,5 +10,6 @@
         public string Recommendation { get; set; } = string.Empty;
         public string UserGroup { get; set; } = "normal";
         public DateTime GeneratedAt { get; set; }
+        public JsonElement? Ensemble { get; set; }
     }
 }

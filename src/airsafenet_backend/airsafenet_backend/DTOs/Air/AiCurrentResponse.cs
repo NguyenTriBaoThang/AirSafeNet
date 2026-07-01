@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
+using System.Text.Json;
 
 namespace airsafenet_backend.DTOs.Air
 {
@@ -42,5 +43,8 @@ namespace airsafenet_backend.DTOs.Air
 
         [JsonPropertyName("cloud_cover")]
         public double? CloudCover { get; set; }
+
+        [JsonPropertyName("ensemble")]
+        public JsonElement? Ensemble { get; set; }
     }
 }
