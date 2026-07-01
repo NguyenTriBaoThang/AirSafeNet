@@ -6,6 +6,7 @@ import SummaryCard from "../components/dashboard/SummaryCard";
 import ForecastChart from "../components/dashboard/ForecastChart";
 import ForecastTable from "../components/dashboard/ForecastTable";
 import ForecastVsActualChart from "../components/dashboard/ForecastVsActualChart";
+import ForecastAccuracyScore from "../components/dashboard/ForecastAccuracyScore";
 import GoldenHoursWidget from "../components/dashboard/GoldenHoursWidget";
 import AiExplainPanel from "../components/dashboard/AiExplainPanel";
 import RiskBadge from "../components/dashboard/RiskBadge";
@@ -157,6 +158,7 @@ export default function Dashboard() {
       </div>
 
       <ForecastVsActualChart forecastPoints={chart.points} historyPoints={historyPoints} />
+      {mode === "forecast" && <ForecastAccuracyScore />}
       <AiExplainPanel />
       <ForecastTable points={chart.points} mode={mode} />
 

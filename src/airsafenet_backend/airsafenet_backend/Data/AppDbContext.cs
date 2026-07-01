@@ -17,6 +17,7 @@ namespace airsafenet_backend.Data
         public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
         public DbSet<UserActivitySchedule> UserActivitySchedules => Set<UserActivitySchedule>();
         public DbSet<FamilyProfile> FamilyProfiles => Set<FamilyProfile>();
+        public DbSet<ForecastSnapshot> ForecastSnapshots => Set<ForecastSnapshot>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -52,6 +53,12 @@ namespace airsafenet_backend.Data
 
             modelBuilder.Entity<FamilyProfile>()
                 .HasIndex(x => new { x.UserId, x.DisplayName });
+
+            modelBuilder.Entity<ForecastSnapshot>()
+                .HasIndex(x => new { x.UserGroup, x.IssuedAt, x.TargetTime });
+
+            modelBuilder.Entity<ForecastSnapshot>()
+                .HasIndex(x => new { x.UserGroup, x.TargetTime });
         }
     }
 }

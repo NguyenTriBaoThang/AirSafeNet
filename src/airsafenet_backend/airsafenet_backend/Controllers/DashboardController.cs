@@ -14,12 +14,17 @@ namespace airsafenet_backend.Controllers
     public class DashboardController : ControllerBase
     {
         private readonly AppDbContext _db;
-        private readonly AiCachedService _aiService; 
+        private readonly AiCachedService _aiService;
+        private readonly ForecastAccuracyService _accuracyService;
 
-        public DashboardController(AppDbContext db, AiCachedService aiService)
+        public DashboardController(
+            AppDbContext db,
+            AiCachedService aiService,
+            ForecastAccuracyService accuracyService)
         {
             _db = db;
             _aiService = aiService;
+            _accuracyService = accuracyService;
         }
 
         [HttpGet("summary")]
@@ -33,6 +38,8 @@ namespace airsafenet_backend.Controllers
 
             if (current == null || forecast == null)
                 return StatusCode(503, new { message = "Cache chưa sẵn sàng. Vui lòng chờ admin tính toán." });
+
+            await _accuracyService.RecordSnapshotAsync(userGroup, forecast);
 
             var peak = forecast.Forecast.OrderByDescending(x => x.PredAqi).FirstOrDefault();
             var warningCount = forecast.Forecast.Count(x =>
@@ -92,6 +99,8 @@ namespace airsafenet_backend.Controllers
                 var forecast = await _aiService.GetForecastRangeAsync(userGroup, days);
                 if (forecast == null)
                     return StatusCode(503, new { message = "Cache chưa sẵn sàng." });
+
+            await _accuracyService.RecordSnapshotAsync(userGroup, forecast);
 
                 return Ok(new DashboardChartResponse
                 {
@@ -153,6 +162,8 @@ namespace airsafenet_backend.Controllers
                 if (forecast == null)
                     return StatusCode(503, new { message = "Cache chưa sẵn sàng." });
 
+            await _accuracyService.RecordSnapshotAsync(userGroup, forecast);
+
                 chart = new DashboardChartResponse
                 {
                     UserGroup = userGroup,
@@ -195,6 +206,16 @@ namespace airsafenet_backend.Controllers
             return Ok(new DashboardFullResponse { Summary = summary, Chart = chart });
         }
 
+
+        [HttpGet("forecast-accuracy")]
+        public async Task<IActionResult> GetForecastAccuracy()
+        {
+            var userGroup = await GetCurrentUserGroupAsync();
+            if (userGroup == null) return Unauthorized();
+
+            var accuracy = await _accuracyService.GetAccuracyAsync(userGroup);
+            return Ok(accuracy);
+        }
         private async Task<string?> GetCurrentUserGroupAsync()
         {
             var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);

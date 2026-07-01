@@ -39,3 +39,37 @@ export type DashboardFullResponse = {
 
 export type DashboardMode = "forecast" | "history";
 export type DashboardDays = 1 | 3 | 7;
+export type ForecastAccuracyPointResponse = {
+  targetTime: string;
+  forecastIssuedAt: string;
+  leadHours: number;
+  predictedPm25: number;
+  actualPm25: number;
+  pm25Error: number;
+  predictedAqi: number;
+  actualAqi: number;
+  aqiError: number;
+  withinTolerance: boolean;
+};
+
+export type ForecastAccuracyResponse = {
+  hasEnoughData: boolean;
+  userGroup: string;
+  generatedAt: string;
+  comparisonStart?: string | null;
+  comparisonEnd?: string | null;
+  matchedHours: number;
+  snapshotCount: number;
+  accuracyScore: number;
+  pm25Mae: number;
+  pm25Rmse: number;
+  aqiMae: number;
+  withinTolerancePct: number;
+  biasPm25: number;
+  reliabilityLabel: string;
+  reliabilityTone: "excellent" | "good" | "watch" | "low" | "collecting";
+  trend: "better" | "worse" | "stable";
+  summary: string;
+  method: string;
+  points: ForecastAccuracyPointResponse[];
+};

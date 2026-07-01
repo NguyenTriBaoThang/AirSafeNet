@@ -4,6 +4,7 @@ import type {
   DashboardDays,
   DashboardFullResponse,
   DashboardMode,
+  ForecastAccuracyResponse,
   DashboardSummaryResponse,
 } from "../types/dashboard";
 
@@ -47,4 +48,10 @@ export async function getDashboardFullApi(
       auth: true,
     }
   );
+}
+export async function getForecastAccuracyApi() {
+  return http<ForecastAccuracyResponse>("/api/dashboard/forecast-accuracy", {
+    method: "GET",
+    auth: true,
+  });
 }
