@@ -1,4 +1,4 @@
-﻿using System.Security.Claims;
+using System.Security.Claims;
 using airsafenet_backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -30,13 +30,15 @@ namespace airsafenet_backend.Controllers
         [HttpGet("history")]
         public async Task<IActionResult> GetHistory(
             [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 20)
+            [FromQuery] int pageSize = 20,
+            [FromQuery] string status = "all")
         {
             var userId = GetUserId();
             if (userId == null) return Unauthorized();
 
             pageSize = Math.Clamp(pageSize, 1, 50);
-            var logs = await _alertService.GetUserAlertHistoryAsync(userId.Value, page, pageSize);
+            var normalizedStatus = status.ToLower() is "unread" or "read" or "failed" ? status : "all";
+            var logs = await _alertService.GetUserAlertHistoryAsync(userId.Value, page, pageSize, normalizedStatus);
             return Ok(logs);
         }
 

@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace airsafenet_backend.Models
@@ -20,6 +20,12 @@ namespace airsafenet_backend.Models
         [MaxLength(500)]
         public string Message { get; set; } = string.Empty;
 
+        [MaxLength(250)]
+        public string AlertReason { get; set; } = string.Empty;
+
+        [MaxLength(300)]
+        public string RecommendedAction { get; set; } = string.Empty;
+
         /// "telegram" | "email" | "both"
         [MaxLength(20)]
         public string Channel { get; set; } = "email";
@@ -34,6 +40,8 @@ namespace airsafenet_backend.Models
 
         /// User đã đọc thông báo này chưa
         public bool IsRead { get; set; } = false;
+
+        public DateTime? ReadAt { get; set; }
 
         /// Gửi thành công không
         public bool Success { get; set; } = true;

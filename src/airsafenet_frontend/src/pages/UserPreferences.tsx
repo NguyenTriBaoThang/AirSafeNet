@@ -272,7 +272,7 @@ export default function UserPreferencesPage() {
 
       <div className="card" style={{ marginTop: 4 }}>
         <div className="card__header">
-          <h3>📬 Lịch sử cảnh báo đã gửi</h3>
+          <h3>📬 Alert Inbox</h3>
         </div>
         <div style={{ padding: "0 0 16px" }}>
           <AlertHistoryPanel />

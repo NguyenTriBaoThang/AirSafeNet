@@ -18,6 +18,7 @@ import EnsembleBadge from "../components/dashboard/EnsembleBadge";
 import AppIcon from "../components/common/AppIcon";
 import AnomalyBanner from "../components/dashboard/AnomalyBanner";
 import DailySafetyBriefing from "../components/dashboard/DailySafetyBriefing";
+import CommuteSafetyPlanner from "../components/dashboard/CommuteSafetyPlanner";
 import WhatIfActivitySimulator from "../components/dashboard/WhatIfActivitySimulator";
 import TrustExplainabilityPanel from "../components/dashboard/TrustExplainabilityPanel";
 
@@ -121,6 +122,10 @@ export default function Dashboard() {
 
       {mode === "forecast" && (
         <DailySafetyBriefing summary={summary} points={chart.points} />
+      )}
+
+      {mode === "forecast" && (
+        <CommuteSafetyPlanner summary={summary} points={chart.points} />
       )}
 
       {mode === "forecast" && (
