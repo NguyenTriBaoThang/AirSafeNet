@@ -21,6 +21,7 @@ import AnomalyBanner from "../components/dashboard/AnomalyBanner";
 import DailySafetyBriefing from "../components/dashboard/DailySafetyBriefing";
 import CommuteSafetyPlanner from "../components/dashboard/CommuteSafetyPlanner";
 import WhatIfActivitySimulator from "../components/dashboard/WhatIfActivitySimulator";
+import SchoolOutdoorEventMode from "../components/dashboard/SchoolOutdoorEventMode";
 import TrustExplainabilityPanel from "../components/dashboard/TrustExplainabilityPanel";
 
 function CacheInitializingState({ onRetry }: { onRetry: () => void }) {
@@ -131,6 +132,10 @@ export default function Dashboard() {
 
       {mode === "forecast" && (
         <WhatIfActivitySimulator summary={summary} points={chart.points} />
+      )}
+
+      {mode === "forecast" && (
+        <SchoolOutdoorEventMode summary={summary} points={chart.points} />
       )}
 
       {mode === "forecast" && (
