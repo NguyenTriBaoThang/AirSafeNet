@@ -21,5 +21,7 @@ namespace airsafenet_backend.DTOs.Dashboard
 
         public int WarningCount { get; set; }
         public int DangerCount { get; set; }
+
+        public DataSourceHealthResponse DataSource { get; set; } = new();
     }
 }

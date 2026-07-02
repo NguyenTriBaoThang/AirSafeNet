@@ -15,12 +15,18 @@ namespace AirSafeNet.Api.Controllers
         private readonly AppDbContext _db;
         private readonly AiCachedService _aiService;
         private readonly AirExplainService _explainService;
+        private readonly DataSourceHealthService _dataSourceService;
 
-        public AirController(AppDbContext db, AiCachedService aiService, AirExplainService explainService)
+        public AirController(
+            AppDbContext db,
+            AiCachedService aiService,
+            AirExplainService explainService,
+            DataSourceHealthService dataSourceService)
         {
             _db = db;
             _aiService = aiService;
             _explainService = explainService;
+            _dataSourceService = dataSourceService;
         }
 
         [HttpGet("public/current")]
@@ -127,6 +133,27 @@ namespace AirSafeNet.Api.Controllers
             });
         }
 
+        [HttpGet("sources")]
+        [Authorize]
+        public async Task<IActionResult> GetSources()
+        {
+            var userGroup = await GetCurrentUserGroupAsync();
+            if (userGroup == null) return Unauthorized();
+
+            var forecast = await _aiService.GetForecastRangeAsync(userGroup, 1);
+            DateTime? generatedAt = null;
+            var pointCount = 0;
+            if (forecast != null)
+            {
+                pointCount = forecast.Forecast.Count;
+                generatedAt = DateTime.TryParse(forecast.GeneratedAt, out var parsed)
+                    ? parsed
+                    : DateTime.UtcNow;
+            }
+
+            var sources = await _dataSourceService.BuildDashboardSourceAsync("forecast", generatedAt, pointCount);
+            return Ok(sources);
+        }
         [HttpGet("explain")]
         [Authorize]
         public async Task<IActionResult> GetExplain()

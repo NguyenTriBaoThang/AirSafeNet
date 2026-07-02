@@ -16,15 +16,18 @@ namespace airsafenet_backend.Controllers
         private readonly AppDbContext _db;
         private readonly AiCachedService _aiService;
         private readonly ForecastAccuracyService _accuracyService;
+        private readonly DataSourceHealthService _dataSourceService;
 
         public DashboardController(
             AppDbContext db,
             AiCachedService aiService,
-            ForecastAccuracyService accuracyService)
+            ForecastAccuracyService accuracyService,
+            DataSourceHealthService dataSourceService)
         {
             _db = db;
             _aiService = aiService;
             _accuracyService = accuracyService;
+            _dataSourceService = dataSourceService;
         }
 
         [HttpGet("summary")]
@@ -46,6 +49,8 @@ namespace airsafenet_backend.Controllers
                 AirRiskHelper.ToSeverity(x.RiskProfile) >= AirRiskHelper.ToSeverity("UNHEALTHY_SENSITIVE"));
             var dangerCount = forecast.Forecast.Count(x =>
                 AirRiskHelper.ToSeverity(x.RiskProfile) >= AirRiskHelper.ToSeverity("UNHEALTHY"));
+            var forecastGeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var fg) ? fg : DateTime.UtcNow;
+            var dataSource = await _dataSourceService.BuildDashboardSourceAsync("forecast", forecastGeneratedAt, forecast.Forecast.Count);
 
             return Ok(new DashboardSummaryResponse
             {
@@ -58,9 +63,10 @@ namespace airsafenet_backend.Controllers
                 PeakRiskNext24h = peak?.RiskProfile ?? current.RiskProfile,
                 PeakTime = DateTime.TryParse(peak?.Time, out var pt) ? pt : null,
                 UserGroup = userGroup,
-                GeneratedAt = DateTime.UtcNow,
+                GeneratedAt = forecastGeneratedAt,
                 WarningCount = warningCount,
                 DangerCount = dangerCount,
+                DataSource = dataSource,
             });
         }
 
@@ -83,6 +89,7 @@ namespace airsafenet_backend.Controllers
                     UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(history.GeneratedAt, out var g1) ? g1 : DateTime.UtcNow,
                     Hours = history.Hours,
+                    DataSource = await _dataSourceService.BuildDashboardSourceAsync("history", DateTime.TryParse(history.GeneratedAt, out var hds) ? hds : DateTime.UtcNow, history.History.Count),
                     Points = history.History.Select(x => new DashboardChartPointResponse
                     {
                         Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
@@ -107,6 +114,7 @@ namespace airsafenet_backend.Controllers
                     UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var g2) ? g2 : DateTime.UtcNow,
                     Hours = forecast.Hours,
+                    DataSource = await _dataSourceService.BuildDashboardSourceAsync("forecast", DateTime.TryParse(forecast.GeneratedAt, out var fds) ? fds : DateTime.UtcNow, forecast.Forecast.Count),
                     Points = forecast.Forecast.Select(x => new DashboardChartPointResponse
                     {
                         Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
@@ -145,6 +153,7 @@ namespace airsafenet_backend.Controllers
                     UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(history.GeneratedAt, out var gh) ? gh : DateTime.UtcNow,
                     Hours = history.Hours,
+                    DataSource = await _dataSourceService.BuildDashboardSourceAsync("history", DateTime.TryParse(history.GeneratedAt, out var hds) ? hds : DateTime.UtcNow, history.History.Count),
                     Points = history.History.Select(x => new DashboardChartPointResponse
                     {
                         Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
@@ -169,6 +178,7 @@ namespace airsafenet_backend.Controllers
                     UserGroup = userGroup,
                     GeneratedAt = DateTime.TryParse(forecast.GeneratedAt, out var gf) ? gf : DateTime.UtcNow,
                     Hours = forecast.Hours,
+                    DataSource = await _dataSourceService.BuildDashboardSourceAsync("forecast", DateTime.TryParse(forecast.GeneratedAt, out var fds) ? fds : DateTime.UtcNow, forecast.Forecast.Count),
                     Points = forecast.Forecast.Select(x => new DashboardChartPointResponse
                     {
                         Time = DateTime.TryParse(x.Time, out var t) ? t : DateTime.UtcNow,
@@ -198,9 +208,10 @@ namespace airsafenet_backend.Controllers
                 PeakRiskNext24h = peak?.Risk ?? current.RiskProfile,
                 PeakTime = peak?.Time,
                 UserGroup = userGroup,
-                GeneratedAt = DateTime.UtcNow,
+                GeneratedAt = chart.GeneratedAt,
                 WarningCount = warningCount,
                 DangerCount = dangerCount,
+                DataSource = chart.DataSource,
             };
 
             return Ok(new DashboardFullResponse { Summary = summary, Chart = chart });

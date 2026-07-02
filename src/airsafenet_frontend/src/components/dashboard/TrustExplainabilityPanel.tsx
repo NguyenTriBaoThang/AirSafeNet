@@ -9,6 +9,8 @@ import type {
 import type {
   DashboardChartPointResponse,
   DashboardSummaryResponse,
+  DataSourceHealthResponse,
+  DataSourceStatusResponse,
 } from "../../types/dashboard";
 
 type Props = {
@@ -90,6 +92,36 @@ function freshnessLabel(minutes: number | null): {
   if (minutes <= 90) return { label: `${minutes} phút trước`, tone: "watch" };
   return { label: `${Math.round(minutes / 60)} giờ trước`, tone: "stale" };
 }
+function dataLabelText(label: string): string {
+  if (label === "real-time") return "Real-time";
+  if (label === "forecast") return "Forecast";
+  if (label === "estimated") return "Estimated";
+  if (label === "stale") return "Stale";
+  return label;
+}
+
+function statusText(status: string): string {
+  if (status === "online") return "online";
+  if (status === "fallback") return "fallback";
+  if (status === "stale") return "stale";
+  if (status === "not-configured") return "chưa cấu hình";
+  if (status === "planned") return "tích hợp sau";
+  if (status === "error") return "lỗi";
+  return status;
+}
+
+function sourceTone(source: DataSourceStatusResponse): "good" | "watch" | "stale" | "neutral" {
+  if (source.status === "online") return source.dataLabel === "real-time" ? "good" : "watch";
+  if (source.status === "fallback" || source.status === "not-configured" || source.status === "planned") return "watch";
+  if (source.status === "stale" || source.status === "error") return "stale";
+  return "neutral";
+}
+
+function sourceValue(source: DataSourceStatusResponse): string {
+  const fresh = source.freshnessMinutes == null ? "" : ` · ${source.freshnessMinutes}p`;
+  return `${dataLabelText(source.dataLabel)} · ${statusText(source.status)}${fresh}`;
+}
+
 
 function confidenceColor(confidence: number): string {
   if (confidence >= 85) return "#22c55e";
@@ -129,11 +161,20 @@ function getAlertCause(
   anomaly: Anomaly | null,
   summary: DashboardSummaryResponse,
   explainError: string | null,
+  sourceHealth?: DataSourceHealthResponse,
 ): {
   cause: AlertCause;
   label: string;
   detail: string;
 } {
+  if (sourceHealth?.isStale || sourceHealth?.activeLabel === "stale") {
+    return {
+      cause: "fallback cache",
+      label: "Stale fallback cache",
+      detail: `Dữ liệu chính đang được gắn nhãn stale (${sourceHealth.freshnessLabel}); app vẫn hiển thị cache gần nhất thay vì ẩn dashboard.`,
+    };
+  }
+
   if (anomaly) {
     return {
       cause: "real-time spike",
@@ -338,12 +379,15 @@ export default function TrustExplainabilityPanel({ summary, points }: Props) {
   }, []);
 
   const ensemble: AirEnsembleMeta | null = current?.ensemble ?? null;
-  const modelConfidence = ensemble?.confidence ?? derivedConfidence(summary, explain);
-  const confidenceSource = ensemble ? "Ensemble metadata" : "Ước tính từ explain/cache";
+  const sourceHealth = summary.dataSource;
+  const modelConfidence = ensemble?.confidence ?? sourceHealth?.overallConfidence ?? derivedConfidence(summary, explain);
+  const confidenceSource = ensemble ? "Ensemble metadata" : sourceHealth ? "Data-source health" : "Ước tính từ explain/cache";
   const confidenceColorValue = confidenceColor(modelConfidence);
-  const dashboardFreshness = freshnessLabel(minutesAgo(summary.generatedAt));
+  const dashboardFreshness = sourceHealth
+    ? { label: sourceHealth.freshnessLabel, tone: sourceHealth.isStale ? "stale" as const : "good" as const }
+    : freshnessLabel(minutesAgo(summary.generatedAt));
   const weatherFreshness = freshnessLabel(minutesAgo(explain?.weatherObservedAt));
-  const alertCause = getAlertCause(anomaly, summary, explainError ?? currentError);
+  const alertCause = getAlertCause(anomaly, summary, explainError ?? currentError, sourceHealth);
   const factors = useMemo(() => buildFactors(explain, summary), [explain, summary]);
   const topFactor = explain?.topFactor ?? factors[0]?.label ?? "PM2.5";
   const latestForecastTime = points[0]?.time ?? summary.generatedAt;
@@ -386,16 +430,29 @@ export default function TrustExplainabilityPanel({ summary, points }: Props) {
       </div>
 
       <div className="trust-sources">
-        <SourceChip label="Dashboard cache" value={dashboardFreshness.label} tone={dashboardFreshness.tone} />
-        <SourceChip label="Weather source" value={explain?.weatherSource ?? "Fallback cache"} tone={weatherFreshness.tone} />
-        <SourceChip label="Weather observed" value={fmtDate(explain?.weatherObservedAt)} tone={weatherFreshness.tone} />
-        <SourceChip label="Forecast point" value={fmtDate(latestForecastTime)} tone="neutral" />
+        {sourceHealth?.sources?.length ? (
+          sourceHealth.sources.map((source) => (
+            <SourceChip
+              key={source.id}
+              label={source.name}
+              value={sourceValue(source)}
+              tone={sourceTone(source)}
+            />
+          ))
+        ) : (
+          <>
+            <SourceChip label="Dashboard cache" value={dashboardFreshness.label} tone={dashboardFreshness.tone} />
+            <SourceChip label="Weather source" value={explain?.weatherSource ?? "Fallback cache"} tone={weatherFreshness.tone} />
+            <SourceChip label="Weather observed" value={fmtDate(explain?.weatherObservedAt)} tone={weatherFreshness.tone} />
+            <SourceChip label="Forecast point" value={fmtDate(latestForecastTime)} tone="neutral" />
+          </>
+        )}
       </div>
 
       <div className="trust-model-row">
         <div>
-          <span>Model path</span>
-          <strong>{ensemble?.method === "weighted_average" ? "Main + ARIMA + XGBoost" : "Main model / fallback"}</strong>
+          <span>Data label</span>
+          <strong>{sourceHealth ? `${dataLabelText(sourceHealth.activeLabel)} · ${sourceHealth.overallConfidence}%` : "Main model / fallback"}</strong>
         </div>
         <div>
           <span>Uncertainty</span>

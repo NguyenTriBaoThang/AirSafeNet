@@ -42,6 +42,10 @@ builder.Services.AddHttpClient<OpenAiChatService>(client =>
 });
 builder.Services.AddHttpClient<GeminiChatService>();
 builder.Services.AddHttpClient<WeatherService>();
+builder.Services.AddHttpClient<DataSourceHealthService>(client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(6);
+});
 
 // ── JWT ───────────────────────────────────────────────────────────────────────
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Thiếu Jwt:Key");

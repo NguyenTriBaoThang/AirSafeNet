@@ -98,7 +98,7 @@ export default function Dashboard() {
       <SectionHeader
         eyebrow="Dashboard thông minh"
         title="Tổng quan chất lượng không khí"
-        description={`Cập nhật lúc ${new Date(summary.generatedAt).toLocaleString("vi-VN")} · Nhóm: ${summary.userGroup}`}
+        description={`Cập nhật lúc ${new Date(summary.generatedAt).toLocaleString("vi-VN")} · Nhóm: ${summary.userGroup} · Nguồn: ${summary.dataSource.primarySource} · ${summary.dataSource.activeLabel} · tin cậy ${summary.dataSource.overallConfidence}%`}
         rightSlot={
           <button className="btn btn-primary" onClick={() => loadData(days, mode, true)}>Làm mới dữ liệu</button>
         }

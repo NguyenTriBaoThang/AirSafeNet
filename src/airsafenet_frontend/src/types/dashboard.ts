@@ -1,3 +1,34 @@
+export type DataSourceStatusResponse = {
+  id: string;
+  name: string;
+  provider: string;
+  category: string;
+  dataLabel: "real-time" | "forecast" | "estimated" | "stale" | string;
+  status: "online" | "fallback" | "stale" | "not-configured" | "planned" | "error" | string;
+  updatedAt?: string | null;
+  checkedAt: string;
+  freshnessMinutes?: number | null;
+  confidence: number;
+  isPrimary: boolean;
+  isFallback: boolean;
+  isConfigured: boolean;
+  detail: string;
+  attribution: string;
+  endpoint: string;
+  nextStep: string;
+  variables: string[];
+};
+
+export type DataSourceHealthResponse = {
+  generatedAt: string;
+  overallStatus: string;
+  activeLabel: "real-time" | "forecast" | "estimated" | "stale" | string;
+  overallConfidence: number;
+  isStale: boolean;
+  freshnessLabel: string;
+  primarySource: string;
+  sources: DataSourceStatusResponse[];
+};
 export type DashboardSummaryResponse = {
   currentPm25: number;
   currentAqi: number;
@@ -14,6 +45,7 @@ export type DashboardSummaryResponse = {
 
   warningCount: number;
   dangerCount: number;
+  dataSource: DataSourceHealthResponse;
 };
 
 export type DashboardChartPointResponse = {
@@ -30,6 +62,7 @@ export type DashboardChartResponse = {
   generatedAt: string;
   hours: number;
   points: DashboardChartPointResponse[];
+  dataSource: DataSourceHealthResponse;
 };
 
 export type DashboardFullResponse = {
