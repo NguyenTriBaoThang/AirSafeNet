@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using airsafenet_backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,10 +11,14 @@ namespace airsafenet_backend.Controllers
     public class AlertController : ControllerBase
     {
         private readonly AlertService _alertService;
+        private readonly ContextualAlertService _contextualAlertService;
 
-        public AlertController(AlertService alertService)
+        public AlertController(
+            AlertService alertService,
+            ContextualAlertService contextualAlertService)
         {
             _alertService = alertService;
+            _contextualAlertService = contextualAlertService;
         }
 
         [HttpGet("summary")]
@@ -25,6 +29,18 @@ namespace airsafenet_backend.Controllers
 
             var summary = await _alertService.GetUserAlertSummaryAsync(userId.Value);
             return Ok(summary);
+        }
+
+        [HttpGet("contextual")]
+        public async Task<IActionResult> GetContextualAlerts(CancellationToken cancellationToken)
+        {
+            var userId = GetUserId();
+            if (userId == null) return Unauthorized();
+
+            var alerts = await _contextualAlertService.GetContextualAlertsAsync(
+                userId.Value,
+                cancellationToken);
+            return Ok(alerts);
         }
 
         [HttpGet("history")]
@@ -50,6 +66,18 @@ namespace airsafenet_backend.Controllers
 
             await _alertService.MarkAllReadAsync(userId.Value);
             return Ok(new { message = "Đã đánh dấu tất cả đã đọc." });
+        }
+
+        [HttpPost("{id:int}/read")]
+        public async Task<IActionResult> MarkOneRead(int id)
+        {
+            var userId = GetUserId();
+            if (userId == null) return Unauthorized();
+
+            var updated = await _alertService.MarkReadAsync(userId.Value, id);
+            if (!updated) return NotFound(new { message = "Không tìm thấy cảnh báo." });
+
+            return Ok(new { message = "Đã đánh dấu cảnh báo đã đọc." });
         }
 
         private int? GetUserId()

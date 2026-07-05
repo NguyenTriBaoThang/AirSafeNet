@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { getDashboardFullApi } from "../api/dashboard";
 import type { DashboardChartPointResponse, DashboardDays, DashboardFullResponse, DashboardMode } from "../types/dashboard";
 import { Link } from "react-router-dom";
@@ -18,6 +18,7 @@ import StatusChip from "../components/common/StatusChip";
 import EnsembleBadge from "../components/dashboard/EnsembleBadge";
 import AppIcon from "../components/common/AppIcon";
 import AnomalyBanner from "../components/dashboard/AnomalyBanner";
+import ContextualAlertsPanel from "../components/dashboard/ContextualAlertsPanel";
 import DailySafetyBriefing from "../components/dashboard/DailySafetyBriefing";
 import CommuteSafetyPlanner from "../components/dashboard/CommuteSafetyPlanner";
 import WhatIfActivitySimulator from "../components/dashboard/WhatIfActivitySimulator";
@@ -112,6 +113,8 @@ export default function Dashboard() {
       <DashboardFilters days={days} mode={mode} onDaysChange={setDays} onModeChange={setMode} />
 
       <AnomalyBanner />
+
+      {mode === "forecast" && <ContextualAlertsPanel />}
 
       <EnsembleBadge />
 

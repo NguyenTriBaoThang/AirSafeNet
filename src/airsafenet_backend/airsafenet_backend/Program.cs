@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using System.Threading.RateLimiting;
 using airsafenet_backend.Data;
 using airsafenet_backend.Models;
@@ -22,6 +22,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<AlertService>();
+builder.Services.AddScoped<ContextualAlertService>();
 builder.Services.AddScoped<AssistantDomainService>();
 builder.Services.AddScoped<AssistantTimeResolverService>();
 builder.Services.AddScoped<ForecastAccuracyService>();
