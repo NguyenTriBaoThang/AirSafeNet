@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createFamilyProfileApi,
   deleteFamilyProfileApi,
@@ -11,17 +11,15 @@ import type {
   FamilyProfileRiskResponse,
   UpsertFamilyProfileRequest,
 } from "../../types/preferences";
+import { getUserProfileRule, USER_PROFILE_RULES } from "../../data/userProfileRules";
 import AppIcon from "../common/AppIcon";
 import StatusChip from "../common/StatusChip";
 import { useToast } from "../common/useToast";
 
-const USER_GROUP_OPTIONS = [
-  { value: "child", label: "Trẻ em" },
-  { value: "elderly", label: "Người cao tuổi" },
-  { value: "respiratory", label: "Bệnh hô hấp" },
-  { value: "pregnant", label: "Phụ nữ mang thai" },
-  { value: "normal", label: "Người dùng phổ thông" },
-];
+const USER_GROUP_OPTIONS = USER_PROFILE_RULES.map((rule) => ({
+  value: rule.id,
+  label: rule.label,
+}));
 
 const RELATIONSHIP_OPTIONS = [
   { value: "child", label: "Con/em bé" },
@@ -31,20 +29,18 @@ const RELATIONSHIP_OPTIONS = [
   { value: "family", label: "Người thân" },
 ];
 
-const THRESHOLD_PRESETS = [
-  { value: 50, label: "AQI > 50" },
-  { value: 100, label: "AQI > 100" },
-  { value: 150, label: "AQI > 150" },
-  { value: 200, label: "AQI > 200" },
-];
+const THRESHOLD_PRESETS = [50, 75, 80, 90, 100, 150, 200].map((value) => ({
+  value,
+  label: `AQI > ${value}`,
+}));
 
 const EMPTY_FORM: UpsertFamilyProfileRequest = {
   displayName: "",
   relationship: "child",
-  userGroup: "child",
+  userGroup: "child_school",
   preferredLocation: "Ho Chi Minh City",
   notifyEnabled: true,
-  notifyThreshold: 100,
+  notifyThreshold: 75,
   notes: "",
 };
 
@@ -54,39 +50,75 @@ const PROFILE_PRESETS: Array<{
   form: UpsertFamilyProfileRequest;
 }> = [
   {
-    label: "Trẻ em",
-    description: "Nhạy với PM2.5, ưu tiên cảnh báo sớm.",
+    label: "Trẻ đi học",
+    description: "Cảnh báo sớm trước giờ đi học, ra chơi, thể dục.",
     form: {
       ...EMPTY_FORM,
-      displayName: "Con nhỏ",
+      displayName: "Con đi học",
       relationship: "child",
-      userGroup: "child",
+      userGroup: "child_school",
       notifyThreshold: 75,
-      notes: "Ưu tiên hạn chế vận động ngoài trời khi AQI tăng.",
+      notes: "Giảm ra chơi/thể dục ngoài trời khi AQI tăng.",
     },
   },
   {
-    label: "Người già",
-    description: "Theo dõi sát các khung AQI xấu.",
+    label: "Người cao tuổi",
+    description: "Giới hạn đi bộ/đi chợ khi AQI xấu.",
     form: {
       ...EMPTY_FORM,
       displayName: "Ba/Mẹ",
       relationship: "parent",
       userGroup: "elderly",
-      notifyThreshold: 100,
-      notes: "Nên tránh ra ngoài vào giờ cao điểm ô nhiễm.",
+      notifyThreshold: 80,
+      notes: "Ưu tiên đi bộ nhẹ ở giờ AQI thấp, tránh đứng ngoài trời lâu.",
     },
   },
   {
-    label: "Bệnh hô hấp",
-    description: "Cảnh báo mạnh hơn khi rủi ro tăng.",
+    label: "Hen/suyễn",
+    description: "Ngưỡng cảnh báo thấp hơn, ưu tiên N95/KN95.",
     form: {
       ...EMPTY_FORM,
-      displayName: "Người bệnh hô hấp",
+      displayName: "Người có hen/suyễn",
       relationship: "family",
-      userGroup: "respiratory",
+      userGroup: "asthma",
+      notifyThreshold: 50,
+      notes: "Mang thuốc theo chỉ định và hạn chế ra ngoài khi PM2.5 spike.",
+    },
+  },
+  {
+    label: "Thể thao ngoài trời",
+    description: "Gợi ý đổi giờ tập, giảm cường độ và thời lượng.",
+    form: {
+      ...EMPTY_FORM,
+      displayName: "Người tập ngoài trời",
+      relationship: "family",
+      userGroup: "outdoor_athlete",
+      notifyThreshold: 100,
+      notes: "Dời chạy bộ/đá bóng sang giờ AQI thấp hoặc chuyển indoor.",
+    },
+  },
+  {
+    label: "Đi xe máy",
+    description: "Tính rủi ro commute ngoài đường và khói xe.",
+    form: {
+      ...EMPTY_FORM,
+      displayName: "Người đi xe máy",
+      relationship: "family",
+      userGroup: "motorbike_commuter",
+      notifyThreshold: 90,
+      notes: "Đeo N95/KN95 ôm kín, tránh tuyến kẹt xe và giờ PM2.5 tăng.",
+    },
+  },
+  {
+    label: "Thai phụ",
+    description: "Giảm phơi nhiễm tích lũy, cảnh báo sớm hơn.",
+    form: {
+      ...EMPTY_FORM,
+      displayName: "Thai phụ",
+      relationship: "spouse",
+      userGroup: "pregnant",
       notifyThreshold: 75,
-      notes: "Chuẩn bị khẩu trang và thuốc hỗ trợ theo chỉ định cá nhân.",
+      notes: "Ưu tiên trong nhà, dời lịch ra ngoài sang giờ AQI thấp.",
     },
   },
 ];
@@ -144,8 +176,10 @@ function riskColor(risk: string): string {
 
 function maskAdvice(risk: string, userGroup: string): string {
   const severity = severityValue(risk);
-  if (severity >= 3) return "Nên đeo N95/KN95";
-  if (severity >= 2 || userGroup !== "normal") return "Nên có khẩu trang";
+  const rule = getUserProfileRule(userGroup);
+  if (severity >= 3) return rule.id === "outdoor_athlete" ? "Nên đổi giờ" : "Nên đeo N95/KN95";
+  if (rule.id === "asthma" && severity >= 1) return "N95/KN95 khuyến nghị";
+  if (severity >= 2 || rule.recommendedNotifyThreshold <= 80) return "Nên có khẩu trang";
   return "Không bắt buộc";
 }
 

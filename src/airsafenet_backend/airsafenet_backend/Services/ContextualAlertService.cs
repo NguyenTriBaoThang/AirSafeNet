@@ -1,4 +1,4 @@
-using airsafenet_backend.Data;
+﻿using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Air;
 using airsafenet_backend.DTOs.Alerts;
 using airsafenet_backend.DTOs.Dashboard;
@@ -37,7 +37,7 @@ namespace airsafenet_backend.Services
             var prefs = await _db.UserPreferences
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId, cancellationToken);
-            var userGroup = prefs?.UserGroup ?? "normal";
+            var userGroup = UserProfileRuleService.NormalizeGroup(prefs?.UserGroup);
 
             var schedules = await _db.UserActivitySchedules
                 .AsNoTracking()
@@ -167,21 +167,26 @@ namespace airsafenet_backend.Services
                 var point = NearestPoint(points, targetTime.Value);
                 if (point == null) continue;
 
+                var rule = UserProfileRuleService.GetRule(userGroup);
                 var score = ActivityRiskScore(point, schedule, userGroup);
-                var isSchool = IsSchoolActivity(schedule.Name) || userGroup.Equals("child", StringComparison.OrdinalIgnoreCase);
-                var isExercise = IsExerciseActivity(schedule.Name) || schedule.Intensity.Equals("high", StringComparison.OrdinalIgnoreCase);
-                var isRespiratory = userGroup.Equals("respiratory", StringComparison.OrdinalIgnoreCase);
+                var isSchool = IsSchoolActivity(schedule.Name) || rule.Id == "child_school";
+                var isExercise = IsExerciseActivity(schedule.Name) || rule.Id == "outdoor_athlete" || schedule.Intensity.Equals("high", StringComparison.OrdinalIgnoreCase);
+                var isMotorbike = IsMotorbikeActivity(schedule.Name) || rule.Id == "motorbike_commuter";
+                var isRespiratory = rule.Id == "asthma";
+                var alertThreshold = Math.Max(50, rule.RecommendedNotifyThreshold);
                 var shouldAlert =
                     schedule.IsOutdoor &&
                     targetTime.Value <= now.AddHours(8) &&
-                    (score >= 40 || point.Aqi >= 95 || point.Pm25 >= 30);
+                    (score >= 40 || point.Aqi >= alertThreshold || point.Pm25 >= 25);
 
-                if (!shouldAlert && !(isRespiratory && schedule.IsOutdoor && score >= 32)) continue;
+                if (!shouldAlert && !(isRespiratory && schedule.IsOutdoor && (score >= 32 || point.Aqi >= alertThreshold))) continue;
 
                 var category = isSchool
                     ? "school"
                     : isRespiratory
                         ? "respiratory-schedule"
+                        : isMotorbike
+                        ? "motorbike-commute"
                         : isExercise
                             ? "exercise"
                             : "outdoor-schedule";
@@ -235,17 +240,23 @@ namespace airsafenet_backend.Services
 
             foreach (var profile in familyProfiles.Take(4))
             {
-                var group = profile.UserGroup.ToLowerInvariant();
-                if (group is not ("child" or "elderly" or "respiratory" or "pregnant")) continue;
+                var rule = UserProfileRuleService.GetRule(profile.UserGroup);
+                var group = rule.Id;
+                if (group == "normal") continue;
 
-                var threshold = Math.Min(Math.Max(profile.NotifyThreshold, 75), 150);
-                if (peak.Aqi < threshold && peak.Pm25 < 30) continue;
+                var baseThreshold = profile.NotifyThreshold <= 0
+                    ? rule.RecommendedNotifyThreshold
+                    : profile.NotifyThreshold;
+                var threshold = Math.Min(Math.Max(baseThreshold, rule.RecommendedNotifyThreshold), 150);
+                if (peak.Aqi < threshold && peak.Pm25 < 25) continue;
 
                 var category = group switch
                 {
-                    "child" => "family-child-school",
-                    "respiratory" => "family-respiratory",
+                    "child_school" => "family-child-school",
+                    "asthma" => "family-respiratory",
                     "elderly" => "family-elderly",
+                    "outdoor_athlete" => "family-outdoor-athlete",
+                    "motorbike_commuter" => "family-motorbike-commuter",
                     "pregnant" => "family-pregnant",
                     _ => "family-sensitive",
                 };
@@ -256,7 +267,7 @@ namespace airsafenet_backend.Services
                     Severity = SeverityFor(peak.Aqi, peak.Pm25, peak.Aqi >= 150 ? 65 : 45),
                     Category = category,
                     Title = BuildFamilyTitle(profile),
-                    Reason = $"{profile.DisplayName} thuộc nhóm {GroupLabel(profile.UserGroup)}; forecast trong 6 giờ tới lên AQI {peak.Aqi}, PM2.5 {peak.Pm25:0.0} µg/m³.",
+                    Reason = $"{profile.DisplayName} thuộc nhóm {rule.Label}; forecast trong 6 giờ tới lên AQI {peak.Aqi}, PM2.5 {peak.Pm25:0.0} µg/m³.",
                     RecommendedAction = BuildFamilyAction(profile, best),
                     Trigger = "forecast",
                     TriggerLabel = "Forecast + Family Profile",
@@ -268,14 +279,14 @@ namespace airsafenet_backend.Services
                     DataLabel = source.ActiveLabel,
                     Evidence = new List<string>
                     {
-                        $"Hồ sơ: {profile.DisplayName} - {GroupLabel(profile.UserGroup)}.",
-                        $"Ngưỡng cá nhân: AQI {profile.NotifyThreshold}.",
+                        $"Hồ sơ: {profile.DisplayName} - {rule.ShortLabel}.",
+                        $"Ngưỡng cá nhân: AQI {threshold}.",
+                        $"Rule khẩu trang: {rule.MaskRule}",
                         $"Đỉnh 6 giờ tới: {FormatTime(peak.Time)}.",
                     },
                 });
             }
         }
-
         private static void AddPm25SpikeAlert(
             List<ContextualAlertItemResponse> alerts,
             IReadOnlyList<ForecastPoint> points,
@@ -490,14 +501,7 @@ namespace airsafenet_backend.Services
             string userGroup)
         {
             var baseScore = AqiToRiskScore(point.Aqi);
-            var groupMultiplier = userGroup.ToLowerInvariant() switch
-            {
-                "child" => 1.4,
-                "elderly" => 1.3,
-                "respiratory" => 1.5,
-                "pregnant" => 1.35,
-                _ => 1.0,
-            };
+            var groupMultiplier = UserProfileRuleService.GetRule(userGroup).SensitivityMultiplier;
             var intensityMultiplier = schedule.Intensity.ToLowerInvariant() switch
             {
                 "high" => 1.4,
@@ -546,7 +550,8 @@ namespace airsafenet_backend.Services
             return category switch
             {
                 "school" => "Trẻ em sắp đi học: cần đổi cách di chuyển",
-                "respiratory-schedule" => "Lịch ra ngoài của người bệnh hô hấp đang rủi ro",
+                "respiratory-schedule" => "Lịch ra ngoài của người có hen/suyễn đang rủi ro",
+                "motorbike-commute" => "Giờ đi xe máy đang có rủi ro phơi nhiễm cao",
                 "exercise" => $"{schedule.Name}: rủi ro phơi nhiễm khi vận động mạnh",
                 _ => $"{schedule.Name}: hoạt động ngoài trời cần điều chỉnh",
             };
@@ -586,6 +591,13 @@ namespace airsafenet_backend.Services
                 return $"Nếu bắt buộc ra ngoài lúc {FormatTime(targetTime)}, đeo N95/KN95 và giảm thời lượng còn {shortDuration} phút.";
             }
 
+            if (category == "motorbike-commute")
+            {
+                if (bestTime != null)
+                    return $"Dời giờ chạy xe sang {bestTime}; nếu vẫn đi lúc {FormatTime(targetTime)}, đeo N95/KN95 ôm kín, chọn tuyến ít kẹt xe và giữ thời gian trên đường dưới {shortDuration} phút.";
+                return $"Đeo N95/KN95 ôm kín, tránh dừng lâu sau xe tải/xe buýt và giữ thời gian trên đường dưới {shortDuration} phút.";
+            }
+
             if (category == "exercise")
             {
                 if (bestTime != null)
@@ -601,11 +613,14 @@ namespace airsafenet_backend.Services
 
         private static string BuildFamilyTitle(FamilyProfile profile)
         {
-            return profile.UserGroup.ToLowerInvariant() switch
+            var group = UserProfileRuleService.NormalizeGroup(profile.UserGroup);
+            return group switch
             {
-                "child" => $"{profile.DisplayName}: chú ý giờ đi học/hoạt động ngoài trời",
-                "respiratory" => $"{profile.DisplayName}: hạn chế lịch ra ngoài vì hô hấp nhạy cảm",
+                "child_school" => $"{profile.DisplayName}: chú ý giờ đi học/hoạt động ngoài trời",
+                "asthma" => $"{profile.DisplayName}: hạn chế lịch ra ngoài vì hen/suyễn nhạy cảm",
                 "elderly" => $"{profile.DisplayName}: nên đổi giờ đi bộ/đi chợ",
+                "outdoor_athlete" => $"{profile.DisplayName}: nên đổi giờ tập ngoài trời",
+                "motorbike_commuter" => $"{profile.DisplayName}: giờ đi xe máy cần bảo vệ hô hấp",
                 "pregnant" => $"{profile.DisplayName}: ưu tiên tránh khung AQI cao",
                 _ => $"{profile.DisplayName}: cảnh báo nhóm nhạy cảm",
             };
@@ -616,27 +631,34 @@ namespace airsafenet_backend.Services
             ForecastPoint? best)
         {
             var bestTime = best == null ? null : FormatTime(best.Time);
-            return profile.UserGroup.ToLowerInvariant() switch
+            var group = UserProfileRuleService.NormalizeGroup(profile.UserGroup);
+            return group switch
             {
-                "child" when bestTime != null =>
+                "child_school" when bestTime != null =>
                     $"Nếu sắp đi học, cho {profile.DisplayName} đeo N95/KF94, đi thẳng vào lớp; dời thể dục/đá bóng ngoài trời sang {bestTime}.",
-                "child" =>
+                "child_school" =>
                     $"Cho {profile.DisplayName} đeo N95/KF94 khi đi học và giảm ra chơi ngoài trời còn 15-20 phút.",
-                "respiratory" when bestTime != null =>
+                "asthma" when bestTime != null =>
                     $"Nếu {profile.DisplayName} có lịch ra ngoài, ở trong nhà đến {bestTime}; khi bắt buộc đi, đeo N95/KN95 và mang thuốc theo chỉ định.",
-                "respiratory" =>
-                    $"Giữ {profile.DisplayName} trong nhà nếu có thể; khi ra ngoài phải đeo N95/KN95 và đi dưới 30 phút.",
+                "asthma" =>
+                    $"Giữ {profile.DisplayName} trong nhà nếu có thể; khi ra ngoài phải đeo N95/KN95 và đi dưới 15-25 phút.",
                 "elderly" when bestTime != null =>
                     $"Dời việc đi bộ/đi chợ của {profile.DisplayName} sang {bestTime}; nếu phải đi ngay, đi chậm dưới 30 phút và đeo KF94/N95.",
+                "outdoor_athlete" when bestTime != null =>
+                    $"Dời buổi tập của {profile.DisplayName} sang {bestTime}; nếu vẫn tập, giảm còn 30 phút và giữ cường độ thấp.",
+                "motorbike_commuter" when bestTime != null =>
+                    $"Dời giờ chạy xe của {profile.DisplayName} sang {bestTime}; nếu không đổi được, đeo N95/KN95 ôm kín và chọn tuyến ít kẹt xe.",
                 "pregnant" when bestTime != null =>
                     $"Dời lịch ra ngoài sang {bestTime}; nếu phải đi, đeo N95/KF94 và tránh đứng ngoài trời lâu.",
                 _ =>
                     "Hạn chế ngoài trời, đeo N95/KF94 nếu phải di chuyển và theo dõi triệu chứng bất thường.",
             };
         }
-
         private static bool IsSchoolActivity(string value) =>
             ContainsAny(value, "đi học", "di hoc", "school", "lớp", "lop", "trường", "truong", "đón con", "don con");
+
+        private static bool IsMotorbikeActivity(string value) =>
+            ContainsAny(value, "xe máy", "xe may", "motorbike", "commute", "đi làm", "di lam", "đi học", "di hoc", "đường", "duong");
 
         private static bool IsExerciseActivity(string value) =>
             ContainsAny(value, "chạy", "chay", "run", "jog", "đá bóng", "da bong", "football", "soccer", "tập", "tap", "gym", "thể dục", "the duc");
@@ -646,14 +668,7 @@ namespace airsafenet_backend.Services
             return needles.Any(needle => value.Contains(needle, StringComparison.OrdinalIgnoreCase));
         }
 
-        private static string GroupLabel(string userGroup) => userGroup.ToLowerInvariant() switch
-        {
-            "child" => "trẻ em",
-            "elderly" => "người cao tuổi",
-            "respiratory" => "người bệnh hô hấp",
-            "pregnant" => "phụ nữ mang thai",
-            _ => "người dùng phổ thông",
-        };
+        private static string GroupLabel(string userGroup) => UserProfileRuleService.Label(userGroup);
 
         private static string IntensityLabel(string intensity) => intensity.ToLowerInvariant() switch
         {

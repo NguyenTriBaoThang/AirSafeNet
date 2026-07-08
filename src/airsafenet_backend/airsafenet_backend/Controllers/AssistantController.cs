@@ -1,4 +1,4 @@
-using airsafenet_backend.Data;
+﻿using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Air;
 using airsafenet_backend.DTOs.Assistant;
 using airsafenet_backend.Models;
@@ -302,13 +302,7 @@ CÁCH TRẢ LỜI (quan trọng):
                     _ => current.RiskProfile
                 };
 
-                var groupViet = userGroup switch
-                {
-                    "children" => "Trẻ em",
-                    "elderly" => "Người cao tuổi",
-                    "respiratory" => "Người có bệnh hô hấp",
-                    _ => "Người bình thường"
-                };
+                var groupViet = UserProfileRuleService.Label(userGroup);
 
                 var windDirText = current.WindDirection.HasValue
                     ? WindDirectionToText(current.WindDirection.Value)
@@ -493,7 +487,7 @@ Câu hỏi của người dùng:
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId);
 
-            return preferences?.UserGroup ?? "normal";
+            return UserProfileRuleService.NormalizeGroup(preferences?.UserGroup);
         }
 
         private async Task<ChatConversation> ResolveConversationAsync(int userId, int? conversationId)
@@ -684,13 +678,7 @@ Câu hỏi của người dùng:
                     .First();
             }
 
-            var groupVietRegen = userGroup switch
-            {
-                "children" => "Trẻ em",
-                "elderly" => "Người cao tuổi",
-                "respiratory" => "Người có bệnh hô hấp",
-                _ => "Người bình thường"
-            };
+            var groupVietRegen = UserProfileRuleService.Label(userGroup);
 
             var systemPromptRegen = $"""
 Bạn là AirSafeNet Assistant — trợ lý ảo thông minh về chất lượng không khí tại TP. Hồ Chí Minh.

@@ -131,13 +131,7 @@ namespace airsafenet_backend.Services
                 _ => risk
             };
 
-            var groupViet = userGroup switch
-            {
-                "children" => "Trẻ em",
-                "elderly" => "Người cao tuổi",
-                "respiratory" => "Người có bệnh hô hấp",
-                _ => "Người bình thường"
-            };
+            var groupViet = UserProfileRuleService.Label(userGroup);
 
             var time = DateTime.Now.ToString("HH:mm, dd/MM/yyyy");
 

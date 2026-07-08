@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Air;
 using airsafenet_backend.Services;
@@ -183,7 +183,7 @@ namespace AirSafeNet.Api.Controllers
 
             var prefs = await _db.UserPreferences.AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId);
-            return prefs?.UserGroup ?? "normal";
+            return UserProfileRuleService.NormalizeGroup(prefs?.UserGroup);
         }
 
         [HttpGet("districts")]

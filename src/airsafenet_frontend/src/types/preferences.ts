@@ -1,3 +1,23 @@
+﻿export type UserProfileRule = {
+  id: string;
+  label: string;
+  shortLabel: string;
+  description: string;
+  aiProfile: string;
+  recommendedNotifyThreshold: number;
+  sensitivityMultiplier: number;
+  maskRule: string;
+  outdoorRule: string;
+  alertRule: string;
+  activityAdvice: string;
+  maxOutdoorGoodMinutes: number;
+  maxOutdoorModerateMinutes: number;
+  maxOutdoorSensitiveMinutes: number;
+  maxOutdoorUnhealthyMinutes: number;
+  maxOutdoorVeryUnhealthyMinutes: number;
+  keyActions: string[];
+};
+
 export type UserPreferencesResponse = {
   userId: number;
   userGroup: string;
@@ -7,6 +27,8 @@ export type UserPreferencesResponse = {
   telegramChatId?: string | null;
   notifyEmail?: string | null;
   notifyThreshold: number;
+  profileRule?: UserProfileRule | null;
+  availableProfiles?: UserProfileRule[];
   lastAlertSentAt?: string | null;
   updatedAt: string;
 };
@@ -29,6 +51,7 @@ export type FamilyProfileResponse = {
   preferredLocation: string;
   notifyEnabled: boolean;
   notifyThreshold: number;
+  profileRule?: UserProfileRule | null;
   notes?: string | null;
   createdAt: string;
   updatedAt: string;

@@ -1,4 +1,4 @@
-using airsafenet_backend.Data;
+﻿using airsafenet_backend.Data;
 using airsafenet_backend.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -265,14 +265,7 @@ namespace airsafenet_backend.Services
             return "Theo dõi dashboard và giữ cảnh báo bật nếu chất lượng không khí tiếp tục xấu đi.";
         }
 
-        private static string GroupLabel(string userGroup) => userGroup.ToLower() switch
-        {
-            "child" => "trẻ em",
-            "elderly" => "người cao tuổi",
-            "respiratory" => "người bệnh hô hấp",
-            "pregnant" => "thai phụ",
-            _ => "người dùng phổ thông",
-        };
+        private static string GroupLabel(string userGroup) => UserProfileRuleService.Label(userGroup);
 
         private static string Capitalize(string value)
         {

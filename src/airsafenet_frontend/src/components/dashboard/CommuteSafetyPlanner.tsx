@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type {
   DashboardChartPointResponse,
   DashboardSummaryResponse,
 } from "../../types/dashboard";
+import { getUserProfileRule, USER_PROFILE_RULES } from "../../data/userProfileRules";
 
 type Props = {
   summary: DashboardSummaryResponse;
@@ -11,7 +12,7 @@ type Props = {
 };
 
 type Purpose = "school" | "work";
-type UserGroup = "normal" | "child" | "elderly" | "respiratory" | "pregnant";
+type UserGroup = string;
 type CommuteMode = "motorbike" | "car" | "bus" | "walk";
 
 type ForecastSample = {
@@ -61,28 +62,16 @@ const MODE_OPTIONS: Record<CommuteMode, {
   walk: { label: "Đi bộ", exposure: 1.25, breathing: 1.15, description: "Hít thở nhiều hơn khi đi ngoài trời" },
 };
 
-const GROUP_LABEL: Record<UserGroup, string> = {
-  normal: "Người dùng phổ thông",
-  child: "Trẻ em",
-  elderly: "Người cao tuổi",
-  respiratory: "Bệnh hô hấp",
-  pregnant: "Thai phụ",
-};
+function groupLabel(group: UserGroup): string {
+  return getUserProfileRule(group).label;
+}
 
-const GROUP_MULTIPLIER: Record<UserGroup, number> = {
-  normal: 1,
-  child: 1.16,
-  elderly: 1.25,
-  respiratory: 1.48,
-  pregnant: 1.22,
-};
+function groupMultiplier(group: UserGroup): number {
+  return getUserProfileRule(group).sensitivityMultiplier;
+}
 
 function normalizeGroup(value: string): UserGroup {
-  const normalized = value.trim().toLowerCase();
-  if (["normal", "child", "elderly", "respiratory", "pregnant"].includes(normalized)) {
-    return normalized as UserGroup;
-  }
-  return "normal";
+  return getUserProfileRule(value).id;
 }
 
 function pad2(value: number): string {
@@ -249,10 +238,10 @@ function recommendationForSlot(
 ): string {
   const purposeLabel = PURPOSES[purpose].label.toLowerCase();
   const modeLabel = MODE_OPTIONS[mode].label.toLowerCase();
-  const groupLabel = GROUP_LABEL[group].toLowerCase();
+  const profileLabel = groupLabel(group).toLowerCase();
 
   if (score >= 85) {
-    return `Không nên ${purposeLabel} ở khung này, đặc biệt với ${groupLabel}. Dời giờ hoặc đổi sang phương tiện kín hơn.`;
+    return `Không nên ${purposeLabel} ở khung này, đặc biệt với ${profileLabel}. Dời giờ hoặc đổi sang phương tiện kín hơn.`;
   }
   if (score >= 70) {
     return `${trafficLabel} làm phơi nhiễm tăng. Nếu phải đi bằng ${modeLabel}, nên đeo khẩu trang lọc tốt và rút ngắn thời gian ngoài đường.`;
@@ -284,7 +273,7 @@ function buildSlot(
   const durationFactor = Math.min(1.35, 0.78 + duration / 120);
   const riskScore = Math.min(
     100,
-    baseRiskFromAqi(adjustedAqi) * GROUP_MULTIPLIER[group] * durationFactor,
+    baseRiskFromAqi(adjustedAqi) * groupMultiplier(group) * durationFactor,
   );
   const dose = adjustedPm25 * (duration / 60) * modeOption.breathing;
   const dosePercent = (dose / WHO_DAILY_DOSE) * 100;
@@ -464,12 +453,12 @@ export default function CommuteSafetyPlanner({ summary, points }: Props) {
 
         <div className="commute-field">
           <label>Nhóm sức khỏe</label>
-          <select value={group} onChange={(event) => setGroup(event.target.value as UserGroup)}>
-            {(Object.keys(GROUP_LABEL) as UserGroup[]).map((key) => (
-              <option key={key} value={key}>{GROUP_LABEL[key]}</option>
+          <select value={group} onChange={(event) => setGroup(event.target.value)}>
+            {USER_PROFILE_RULES.map((rule) => (
+              <option key={rule.id} value={rule.id}>{rule.label}</option>
             ))}
           </select>
-          <span>Hệ số nhạy cảm ×{GROUP_MULTIPLIER[group].toFixed(2)}</span>
+          <span>Hệ số nhạy cảm ×{groupMultiplier(group).toFixed(2)}</span>
         </div>
       </div>
 

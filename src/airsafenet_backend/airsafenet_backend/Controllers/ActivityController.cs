@@ -127,7 +127,7 @@ namespace airsafenet_backend.Controllers
             var prefs = await _db.UserPreferences
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId.Value);
-            var userGroup = prefs?.UserGroup ?? "normal";
+            var userGroup = UserProfileRuleService.NormalizeGroup(prefs?.UserGroup);
 
             var today = (int)DateTime.Now.DayOfWeek;
             var dayNum = today == 0 ? 7 : today;
@@ -177,14 +177,7 @@ namespace airsafenet_backend.Controllers
 
                 double baseScore = AqiToRiskScore(aqi);
 
-                double groupMultiplier = userGroup switch
-                {
-                    "child" => 1.4,  
-                    "elderly" => 1.3,  
-                    "respiratory" => 1.5,  
-                    "pregnant" => 1.35, 
-                    _ => 1.0,  
-                };
+                double groupMultiplier = UserProfileRuleService.GetRule(userGroup).SensitivityMultiplier;
 
                 double intensityMultiplier = s.Intensity switch
                 {
@@ -296,14 +289,8 @@ namespace airsafenet_backend.Controllers
             double pm25, int aqi,
             string userGroup)
         {
-            var groupNote = userGroup switch
-            {
-                "child" => "Trẻ em rất nhạy cảm với bụi mịn. ",
-                "elderly" => "Người cao tuổi cần thận trọng hơn. ",
-                "respiratory" => "Người bệnh hô hấp nên hạn chế tối đa. ",
-                "pregnant" => "Phụ nữ mang thai cần bảo vệ đặc biệt. ",
-                _ => "",
-            };
+            var rule = UserProfileRuleService.GetRule(userGroup);
+            var groupNote = userGroup == "normal" ? "" : $"{rule.ShortLabel}: {rule.ActivityAdvice} ";
 
             var intensityNote = schedule.Intensity == "high" && riskLevel != "GOOD"
                 ? "Hoạt động cường độ cao → hít nhiều PM2.5 hơn 40%. "
@@ -334,14 +321,7 @@ namespace airsafenet_backend.Controllers
             var goodCount = activities.Count(a => a.RiskLevel is "GOOD" or "MODERATE");
             var total = activities.Count;
 
-            var groupLabel = userGroup switch
-            {
-                "child" => "trẻ em",
-                "elderly" => "người cao tuổi",
-                "respiratory" => "người bệnh hô hấp",
-                "pregnant" => "phụ nữ mang thai",
-                _ => "bạn",
-            };
+            var groupLabel = UserProfileRuleService.ShortLabel(userGroup).ToLowerInvariant();
 
             if (dangerCount == 0)
                 return $"Hôm nay chất lượng không khí tốt — {goodCount}/{total} hoạt động an toàn cho {groupLabel}.";

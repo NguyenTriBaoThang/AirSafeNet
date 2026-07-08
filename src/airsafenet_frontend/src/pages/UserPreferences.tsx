@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import { getUserPreferencesApi, updateUserPreferencesApi } from "../api/preferences";
-import type { UpdateUserPreferencesRequest, UserPreferencesResponse } from "../types/preferences";
+import type { UpdateUserPreferencesRequest, UserPreferencesResponse, UserProfileRule } from "../types/preferences";
+import { getUserProfileRule, USER_PROFILE_RULES } from "../data/userProfileRules";
 import PreferencesSkeleton from "../components/common/PreferencesSkeleton";
 import EmptyState from "../components/common/EmptyState";
 import { useToast } from "../components/common/useToast";
@@ -11,47 +12,99 @@ import AlertHistoryPanel from "../components/dashboard/AlertHistoryPanel";
 import ActivitySchedulerWidget from "../components/dashboard/ActivitySchedulerWidget";
 import FamilyProfilesPanel from "../components/dashboard/FamilyProfilesPanel";
 
-const USER_GROUP_OPTIONS = [
-  { value: "normal",      label: "Người dùng phổ thông" },
-  { value: "child",       label: "Trẻ em" },
-  { value: "elderly",     label: "Người cao tuổi" },
-  { value: "respiratory", label: "Người có bệnh hô hấp" },
-  { value: "pregnant",    label: "Phụ nữ mang thai" },
-];
-
 const CHANNEL_OPTIONS = [
-  { value: "none",     label: "Không nhận thông báo" },
+  { value: "none", label: "Không nhận thông báo" },
   { value: "telegram", label: "Telegram" },
-  { value: "email",    label: "Email" },
-  { value: "both",     label: "Cả hai (Telegram + Email)" },
+  { value: "email", label: "Email" },
+  { value: "both", label: "Cả hai (Telegram + Email)" },
 ];
 
-const THRESHOLD_PRESETS = [
-  { value: 50,  label: "AQI > 50 — Trung bình (nhạy nhất)" },
-  { value: 100, label: "AQI > 100 — Nhóm nhạy cảm (khuyến nghị)" },
-  { value: 150, label: "AQI > 150 — Không tốt" },
-  { value: 200, label: "AQI > 200 — Rất không tốt" },
-];
+function buildThresholdPresets(rule: UserProfileRule) {
+  const values = [rule.recommendedNotifyThreshold, 50, 75, 90, 100, 150, 200]
+    .filter((value, index, arr) => arr.indexOf(value) === index)
+    .sort((a, b) => a - b);
+
+  return values.map((value) => ({
+    value,
+    label: value === rule.recommendedNotifyThreshold
+      ? `AQI > ${value} - khuyến nghị cho ${rule.shortLabel}`
+      : `AQI > ${value}`,
+  }));
+}
 
 function timeAgo(iso?: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-  if (diff < 60)    return `${diff} giây trước`;
-  if (diff < 3600)  return `${Math.floor(diff / 60)} phút trước`;
+  if (diff < 60) return `${diff} giây trước`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
   if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
   return new Date(iso).toLocaleString("vi-VN");
 }
 
+function outdoorLimitText(rule: UserProfileRule): string {
+  return [
+    `AQI tốt: ${rule.maxOutdoorGoodMinutes}p`,
+    `trung bình: ${rule.maxOutdoorModerateMinutes}p`,
+    `nhạy cảm: ${rule.maxOutdoorSensitiveMinutes}p`,
+    `xấu: ${rule.maxOutdoorUnhealthyMinutes}p`,
+  ].join(" · ");
+}
+
+function ProfileRulePreview({ rule }: { rule: UserProfileRule }) {
+  return (
+    <div className="profile-rule-preview">
+      <div className="profile-rule-preview__head">
+        <div>
+          <span>Rule đang áp dụng</span>
+          <strong>{rule.label}</strong>
+        </div>
+        <em>×{rule.sensitivityMultiplier.toFixed(2)}</em>
+      </div>
+
+      <p>{rule.description}</p>
+
+      <div className="profile-rule-grid">
+        <div>
+          <span>Ngưỡng cảnh báo</span>
+          <strong>AQI {rule.recommendedNotifyThreshold}</strong>
+        </div>
+        <div>
+          <span>Khẩu trang</span>
+          <strong>{rule.maskRule}</strong>
+        </div>
+        <div>
+          <span>Thời gian ngoài trời</span>
+          <strong>{outdoorLimitText(rule)}</strong>
+        </div>
+        <div>
+          <span>Luồng cảnh báo</span>
+          <strong>{rule.alertRule}</strong>
+        </div>
+      </div>
+
+      <div className="profile-rule-actions">
+        {rule.keyActions.slice(0, 3).map((action) => (
+          <span key={action}>{action}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function UserPreferencesPage() {
-  const [data, setData]   = useState<UserPreferencesResponse | null>(null);
-  const [form, setForm]   = useState<UpdateUserPreferencesRequest>({
-    userGroup: "normal", preferredLocation: "Ho Chi Minh City",
-    notifyEnabled: true, notifyChannel: "none",
-    telegramChatId: "", notifyEmail: "", notifyThreshold: 100,
+  const [data, setData] = useState<UserPreferencesResponse | null>(null);
+  const [form, setForm] = useState<UpdateUserPreferencesRequest>({
+    userGroup: "normal",
+    preferredLocation: "Ho Chi Minh City",
+    notifyEnabled: true,
+    notifyChannel: "none",
+    telegramChatId: "",
+    notifyEmail: "",
+    notifyThreshold: 100,
   });
   const [loading, setLoading] = useState(true);
-  const [saving,  setSaving]  = useState(false);
-  const [error,   setError]   = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const { showToast } = useToast();
 
   async function loadData(silent = false) {
@@ -59,15 +112,16 @@ export default function UserPreferencesPage() {
       if (!silent) setLoading(true);
       setError("");
       const result = await getUserPreferencesApi();
+      const rule = result.profileRule ?? getUserProfileRule(result.userGroup, result.availableProfiles ?? USER_PROFILE_RULES);
       setData(result);
       setForm({
-        userGroup:         result.userGroup,
+        userGroup: rule.id,
         preferredLocation: result.preferredLocation,
-        notifyEnabled:     result.notifyEnabled,
-        notifyChannel:     result.notifyChannel  ?? "none",
-        telegramChatId:    result.telegramChatId ?? "",
-        notifyEmail:       result.notifyEmail    ?? "",
-        notifyThreshold:   result.notifyThreshold ?? 100,
+        notifyEnabled: result.notifyEnabled,
+        notifyChannel: result.notifyChannel ?? "none",
+        telegramChatId: result.telegramChatId ?? "",
+        notifyEmail: result.notifyEmail ?? "",
+        notifyThreshold: result.notifyThreshold || rule.recommendedNotifyThreshold,
       });
       if (silent) showToast("Đã tải lại cài đặt", "success");
     } catch (err) {
@@ -81,13 +135,37 @@ export default function UserPreferencesPage() {
 
   useEffect(() => { loadData(); }, []);
 
+  const profileOptions = useMemo(
+    () => data?.availableProfiles?.length ? data.availableProfiles : USER_PROFILE_RULES,
+    [data?.availableProfiles],
+  );
+  const selectedRule = useMemo(
+    () => getUserProfileRule(form.userGroup, profileOptions),
+    [form.userGroup, profileOptions],
+  );
+  const thresholdPresets = useMemo(
+    () => buildThresholdPresets(selectedRule),
+    [selectedRule],
+  );
+
+  function handleGroupChange(nextGroup: string) {
+    const nextRule = getUserProfileRule(nextGroup, profileOptions);
+    setForm((prev) => ({
+      ...prev,
+      userGroup: nextRule.id,
+      notifyThreshold: nextRule.recommendedNotifyThreshold,
+    }));
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     try {
       setSaving(true);
       setError("");
       const result = await updateUserPreferencesApi(form);
+      const rule = result.profileRule ?? getUserProfileRule(result.userGroup, result.availableProfiles ?? profileOptions);
       setData(result);
+      setForm((prev) => ({ ...prev, userGroup: rule.id, notifyThreshold: result.notifyThreshold || rule.recommendedNotifyThreshold }));
       showToast("Đã cập nhật cài đặt thành công", "success");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Cập nhật thất bại";
@@ -99,7 +177,7 @@ export default function UserPreferencesPage() {
   }
 
   const needTelegram = form.notifyChannel === "telegram" || form.notifyChannel === "both";
-  const needEmail    = form.notifyChannel === "email"    || form.notifyChannel === "both";
+  const needEmail = form.notifyChannel === "email" || form.notifyChannel === "both";
 
   if (loading) return <PreferencesSkeleton />;
   if (error && !data) return <EmptyState title="Không tải được cài đặt" description={error} />;
@@ -108,13 +186,14 @@ export default function UserPreferencesPage() {
     <div className="preferences-page">
       <SectionHeader
         eyebrow="Cài đặt cá nhân"
-        title="Tùy chỉnh trải nghiệm người dùng"
-        description="Thiết lập nhóm người dùng, kênh nhận cảnh báo AQI và ngưỡng cảnh báo phù hợp."
+        title="Hồ sơ người dùng thực tế hơn"
+        description="Chọn đúng ngữ cảnh sống hằng ngày để AirSafeNet áp dụng ngưỡng cảnh báo, khẩu trang và thời gian ngoài trời riêng."
         rightSlot={<button className="btn btn-secondary" onClick={() => loadData(true)}>Tải lại</button>}
       />
 
       <div className="section-toolbar">
-        <StatusChip label={`Nhóm: ${form.userGroup}`} variant="info" />
+        <StatusChip label={`Hồ sơ: ${selectedRule.shortLabel}`} variant="info" />
+        <StatusChip label={`Ngưỡng khuyến nghị: AQI ${selectedRule.recommendedNotifyThreshold}`} variant="warning" />
         <StatusChip
           label={form.notifyEnabled && form.notifyChannel !== "none"
             ? `Cảnh báo: ${form.notifyChannel}` : "Cảnh báo: tắt"}
@@ -126,20 +205,35 @@ export default function UserPreferencesPage() {
       </div>
 
       <div className="preferences-grid">
-        
         <form className="card preferences-form interactive-card" onSubmit={handleSave}>
           <div className="card__header card__header--with-icon">
             <div className="card__header-icon"><AppIcon name="settings" /></div>
             <div>
               <h3>Cấu hình cá nhân</h3>
-              <p className="card__header-desc">Chọn đúng thiết lập để hệ thống cảnh báo phù hợp hơn.</p>
+              <p className="card__header-desc">Mỗi hồ sơ có rule riêng về ngưỡng AQI, khẩu trang và giới hạn thời gian ngoài trời.</p>
             </div>
           </div>
 
-          <label>Nhóm người dùng</label>
-          <select value={form.userGroup} onChange={e => setForm(p => ({ ...p, userGroup: e.target.value }))}>
-            {USER_GROUP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          <label>Hồ sơ người dùng</label>
+          <select value={form.userGroup} onChange={e => handleGroupChange(e.target.value)}>
+            {profileOptions.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
           </select>
+
+          <div className="profile-option-grid">
+            {profileOptions.map((rule) => (
+              <button
+                key={rule.id}
+                type="button"
+                className={`profile-option ${selectedRule.id === rule.id ? "profile-option--active" : ""}`}
+                onClick={() => handleGroupChange(rule.id)}
+              >
+                <strong>{rule.shortLabel}</strong>
+                <span>AQI {rule.recommendedNotifyThreshold} · ×{rule.sensitivityMultiplier.toFixed(2)}</span>
+              </button>
+            ))}
+          </div>
+
+          <ProfileRulePreview rule={selectedRule} />
 
           <label>Khu vực quan tâm</label>
           <input
@@ -160,7 +254,7 @@ export default function UserPreferencesPage() {
 
           {form.notifyEnabled && (
             <div className="notify-section">
-              <div className="notify-section__header">🔔 Cài đặt thông báo</div>
+              <div className="notify-section__header">Cài đặt thông báo</div>
 
               <label>Kênh nhận thông báo</label>
               <select
@@ -180,7 +274,7 @@ export default function UserPreferencesPage() {
                     placeholder="Ví dụ: 123456789"
                   />
                   <p className="field-hint">
-                    Nhắn <code>/start</code> cho bot → dùng <code>@userinfobot</code> để lấy Chat ID
+                    Nhắn <code>/start</code> cho bot, sau đó dùng <code>@userinfobot</code> để lấy Chat ID.
                   </p>
                 </>
               )}
@@ -204,9 +298,11 @@ export default function UserPreferencesPage() {
                     value={form.notifyThreshold}
                     onChange={e => setForm(p => ({ ...p, notifyThreshold: Number(e.target.value) }))}
                   >
-                    {THRESHOLD_PRESETS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    {thresholdPresets.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
-                  <p className="field-hint">Hệ thống gửi tối đa 1 cảnh báo mỗi 4 giờ để tránh spam.</p>
+                  <p className="field-hint">
+                    Rule của {selectedRule.shortLabel} khuyến nghị cảnh báo từ AQI {selectedRule.recommendedNotifyThreshold}. Hệ thống vẫn chống spam tối đa 1 cảnh báo mỗi 4 giờ.
+                  </p>
                 </>
               )}
             </div>
@@ -225,43 +321,28 @@ export default function UserPreferencesPage() {
             <div className="card__header-icon"><AppIcon name="user" /></div>
             <div>
               <h3>Thông tin hiện tại</h3>
-              <p className="card__header-desc">Trạng thái cấu hình đang áp dụng</p>
+              <p className="card__header-desc">Rule đang áp dụng cho dashboard, cảnh báo và mô phỏng hoạt động.</p>
             </div>
           </div>
 
           <div className="info-list">
-            <div className="info-item"><span>Nhóm người dùng</span><strong>{data?.userGroup ?? "—"}</strong></div>
-            <div className="info-item"><span>Khu vực ưu tiên</span><strong>{data?.preferredLocation ?? "—"}</strong></div>
-            <div className="info-item">
-              <span>Kênh thông báo</span>
-              <strong>{data?.notifyChannel === "none" ? "Tắt" : data?.notifyChannel ?? "—"}</strong>
-            </div>
-            <div className="info-item"><span>Ngưỡng AQI</span><strong>{data?.notifyThreshold ?? 100}</strong></div>
-            {data?.telegramChatId && (
-              <div className="info-item"><span>Telegram ID</span><strong>{data.telegramChatId}</strong></div>
-            )}
-            {data?.notifyEmail && (
-              <div className="info-item"><span>Email cảnh báo</span><strong>{data.notifyEmail}</strong></div>
-            )}
-            <div className="info-item">
-              <span>Cảnh báo gần nhất</span>
-              <strong>{timeAgo(data?.lastAlertSentAt)}</strong>
-            </div>
-            <div className="info-item">
-              <span>Cập nhật lần cuối</span>
-              <strong>{data?.updatedAt ? new Date(data.updatedAt).toLocaleString("vi-VN") : "—"}</strong>
-            </div>
+            <div className="info-item"><span>Hồ sơ</span><strong>{data?.profileRule?.label ?? selectedRule.label}</strong></div>
+            <div className="info-item"><span>Khu vực ưu tiên</span><strong>{data?.preferredLocation ?? "-"}</strong></div>
+            <div className="info-item"><span>Kênh thông báo</span><strong>{data?.notifyChannel === "none" ? "Tắt" : data?.notifyChannel ?? "-"}</strong></div>
+            <div className="info-item"><span>Ngưỡng AQI đang lưu</span><strong>{data?.notifyThreshold ?? selectedRule.recommendedNotifyThreshold}</strong></div>
+            <div className="info-item"><span>Multiplier nhạy cảm</span><strong>×{selectedRule.sensitivityMultiplier.toFixed(2)}</strong></div>
+            <div className="info-item"><span>Giới hạn AQI xấu</span><strong>{selectedRule.maxOutdoorUnhealthyMinutes} phút</strong></div>
+            {data?.telegramChatId && <div className="info-item"><span>Telegram ID</span><strong>{data.telegramChatId}</strong></div>}
+            {data?.notifyEmail && <div className="info-item"><span>Email cảnh báo</span><strong>{data.notifyEmail}</strong></div>}
+            <div className="info-item"><span>Cảnh báo gần nhất</span><strong>{timeAgo(data?.lastAlertSentAt)}</strong></div>
+            <div className="info-item"><span>Cập nhật lần cuối</span><strong>{data?.updatedAt ? new Date(data.updatedAt).toLocaleString("vi-VN") : "-"}</strong></div>
           </div>
 
-          <div className="preferences-help">
-            <h4>💡 Hướng dẫn cài Telegram Bot</h4>
-            <ol style={{ paddingLeft: 16, lineHeight: 1.8, fontSize: 13 }}>
-              <li>Tìm <strong>@BotFather</strong> → <code>/newbot</code></li>
-              <li>Đặt tên → lấy <strong>BotToken</strong> → gửi Admin</li>
-              <li>Nhắn <code>/start</code> cho bot của bạn</li>
-              <li>Tìm <strong>@userinfobot</strong> → lấy Chat ID</li>
-              <li>Điền Chat ID vào ô trên → Lưu</li>
-            </ol>
+          <div className="preferences-help profile-help-card">
+            <h4>Rule thực tế đang dùng</h4>
+            <p><strong>Khẩu trang:</strong> {selectedRule.maskRule}</p>
+            <p><strong>Ngoài trời:</strong> {selectedRule.outdoorRule}</p>
+            <p><strong>Cảnh báo:</strong> {selectedRule.alertRule}</p>
           </div>
         </div>
       </div>
@@ -272,7 +353,7 @@ export default function UserPreferencesPage() {
 
       <div className="card" style={{ marginTop: 4 }}>
         <div className="card__header">
-          <h3>📬 Alert Inbox</h3>
+          <h3>Alert Inbox</h3>
         </div>
         <div style={{ padding: "0 0 16px" }}>
           <AlertHistoryPanel />

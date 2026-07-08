@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type {
   DashboardChartPointResponse,
   DashboardSummaryResponse,
 } from "../../types/dashboard";
+import { getUserProfileRule, USER_PROFILE_RULES } from "../../data/userProfileRules";
 
 type Props = {
   summary: DashboardSummaryResponse;
   points: DashboardChartPointResponse[];
 };
 
-type UserGroup = "normal" | "child" | "elderly" | "respiratory" | "pregnant";
+type UserGroup = string;
 type Intensity = "low" | "moderate" | "high";
 type ActivityKey = "run" | "school" | "work" | "football";
 
@@ -79,21 +80,13 @@ const DISTRICTS: District[] = [
   { id: "h_cn", name: "Cần Giờ", area: "Nam biển", factor: 0.82 },
 ];
 
-const GROUP_LABEL: Record<UserGroup, string> = {
-  normal: "Người dùng phổ thông",
-  child: "Trẻ em",
-  elderly: "Người cao tuổi",
-  respiratory: "Bệnh hô hấp",
-  pregnant: "Thai phụ",
-};
+function groupLabel(group: UserGroup): string {
+  return getUserProfileRule(group).label;
+}
 
-const GROUP_MULTIPLIER: Record<UserGroup, number> = {
-  normal: 1,
-  child: 1.15,
-  elderly: 1.25,
-  respiratory: 1.45,
-  pregnant: 1.2,
-};
+function groupMultiplier(group: UserGroup): number {
+  return getUserProfileRule(group).sensitivityMultiplier;
+}
 
 
 const INTENSITY_MULTIPLIER: Record<Intensity, number> = {
@@ -109,11 +102,7 @@ const VENTILATION: Record<Intensity, number> = {
 };
 
 function normalizeGroup(value: string): UserGroup {
-  const normalized = value.trim().toLowerCase();
-  if (["normal", "child", "elderly", "respiratory", "pregnant"].includes(normalized)) {
-    return normalized as UserGroup;
-  }
-  return "normal";
+  return getUserProfileRule(value).id;
 }
 
 function pm25ToAqi(pm25: number): number {
@@ -216,7 +205,7 @@ function getRecommendation(
     return `${activity.label} tại ${district.name} không nên thực hiện ở khung giờ này. Nên dời lịch hoặc chuyển vào trong nhà.`;
   }
   if (score >= 65) {
-    return `Rủi ro cao cho ${GROUP_LABEL[group].toLowerCase()}. Giảm thời lượng, đeo khẩu trang lọc tốt và tránh vận động mạnh.`;
+    return `Rủi ro cao cho ${groupLabel(group).toLowerCase()}. Giảm thời lượng, đeo khẩu trang lọc tốt và tránh vận động mạnh.`;
   }
   if (score >= 50) {
     return `Có thể thực hiện nếu cần, nhưng nên rút ngắn thời lượng và theo dõi triệu chứng hô hấp.`;
@@ -240,7 +229,7 @@ function buildScenario(
   const riskScore = Math.min(
     100,
     baseRiskFromAqi(adjustedAqi)
-      * GROUP_MULTIPLIER[group]
+      * groupMultiplier(group)
       * INTENSITY_MULTIPLIER[activity.intensity]
       * exposureFactor,
   );
@@ -399,12 +388,12 @@ export default function WhatIfActivitySimulator({ summary, points }: Props) {
 
         <div className="whatif-field">
           <label>Nhóm sức khỏe</label>
-          <select value={group} onChange={(event) => setGroup(event.target.value as UserGroup)}>
-            {(Object.keys(GROUP_LABEL) as UserGroup[]).map((key) => (
-              <option key={key} value={key}>{GROUP_LABEL[key]}</option>
+          <select value={group} onChange={(event) => setGroup(event.target.value)}>
+            {USER_PROFILE_RULES.map((rule) => (
+              <option key={rule.id} value={rule.id}>{rule.label}</option>
             ))}
           </select>
-          <span>Hệ số nhạy cảm ×{GROUP_MULTIPLIER[group].toFixed(2)}</span>
+          <span>Hệ số nhạy cảm ×{groupMultiplier(group).toFixed(2)}</span>
         </div>
       </div>
 

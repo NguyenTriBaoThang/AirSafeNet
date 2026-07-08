@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Dashboard;
 using airsafenet_backend.Services;
@@ -236,7 +236,7 @@ namespace airsafenet_backend.Controllers
                 .AsNoTracking()
                 .FirstOrDefaultAsync(x => x.UserId == userId);
 
-            return prefs?.UserGroup ?? "normal";
+            return UserProfileRuleService.NormalizeGroup(prefs?.UserGroup);
         }
     }
 }

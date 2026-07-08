@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Family;
 using airsafenet_backend.Models;
@@ -14,11 +14,6 @@ namespace airsafenet_backend.Controllers
     [Route("api/[controller]")]
     public class FamilyProfilesController : ControllerBase
     {
-        private static readonly HashSet<string> ValidGroups = new(StringComparer.OrdinalIgnoreCase)
-        {
-            "child", "elderly", "respiratory", "pregnant", "normal"
-        };
-
         private readonly AppDbContext _db;
         private readonly AiCachedService _aiService;
 
@@ -57,9 +52,6 @@ namespace airsafenet_backend.Controllers
             if (string.IsNullOrWhiteSpace(normalized.DisplayName))
                 return BadRequest(new { message = "Tên hồ sơ không được để trống." });
 
-            if (!ValidGroups.Contains(normalized.UserGroup))
-                return BadRequest(new { message = "Nhóm sức khỏe không hợp lệ." });
-
             var profile = new FamilyProfile
             {
                 UserId = userId.Value,
@@ -93,9 +85,6 @@ namespace airsafenet_backend.Controllers
             var normalized = NormalizeRequest(request);
             if (string.IsNullOrWhiteSpace(normalized.DisplayName))
                 return BadRequest(new { message = "Tên hồ sơ không được để trống." });
-
-            if (!ValidGroups.Contains(normalized.UserGroup))
-                return BadRequest(new { message = "Nhóm sức khỏe không hợp lệ." });
 
             profile.DisplayName = normalized.DisplayName;
             profile.Relationship = normalized.Relationship;
@@ -136,9 +125,10 @@ namespace airsafenet_backend.Controllers
                 .FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId);
             if (profile == null) return NotFound(new { message = "Không tìm thấy hồ sơ gia đình." });
 
+            var normalizedGroup = UserProfileRuleService.NormalizeGroup(profile.UserGroup);
             days = Math.Clamp(days, 1, 7);
-            var current = await _aiService.GetCurrentAsync(profile.UserGroup);
-            var forecast = await _aiService.GetForecastRangeAsync(profile.UserGroup, days);
+            var current = await _aiService.GetCurrentAsync(normalizedGroup);
+            var forecast = await _aiService.GetForecastRangeAsync(normalizedGroup, days);
 
             if (current == null || forecast == null)
                 return StatusCode(503, new { message = "Cache chưa sẵn sàng. Vui lòng chờ admin tính toán." });
@@ -148,6 +138,8 @@ namespace airsafenet_backend.Controllers
                 AirRiskHelper.ToSeverity(x.RiskProfile) >= AirRiskHelper.ToSeverity("UNHEALTHY_SENSITIVE"));
             var dangerCount = forecast.Forecast.Count(x =>
                 AirRiskHelper.ToSeverity(x.RiskProfile) >= AirRiskHelper.ToSeverity("UNHEALTHY"));
+
+            profile.UserGroup = normalizedGroup;
 
             return Ok(new FamilyProfileRiskResponse
             {
@@ -174,34 +166,44 @@ namespace airsafenet_backend.Controllers
 
         private static UpsertFamilyProfileRequest NormalizeRequest(UpsertFamilyProfileRequest request)
         {
+            var userGroup = UserProfileRuleService.NormalizeGroup(request.UserGroup);
+            var rule = UserProfileRuleService.GetRule(userGroup);
+
             return new UpsertFamilyProfileRequest
             {
                 DisplayName = (request.DisplayName ?? string.Empty).Trim(),
                 Relationship = string.IsNullOrWhiteSpace(request.Relationship)
                     ? "family"
-                    : request.Relationship.Trim().ToLower(),
-                UserGroup = (request.UserGroup ?? "child").Trim().ToLower(),
+                    : request.Relationship.Trim().ToLowerInvariant(),
+                UserGroup = userGroup,
                 PreferredLocation = string.IsNullOrWhiteSpace(request.PreferredLocation)
                     ? "Ho Chi Minh City"
                     : request.PreferredLocation.Trim(),
                 NotifyEnabled = request.NotifyEnabled,
-                NotifyThreshold = Math.Clamp(request.NotifyThreshold, 0, 500),
+                NotifyThreshold = request.NotifyThreshold <= 0
+                    ? rule.RecommendedNotifyThreshold
+                    : Math.Clamp(request.NotifyThreshold, 0, 500),
                 Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
             };
         }
 
-        private static FamilyProfileResponse MapToResponse(FamilyProfile profile) => new()
+        private static FamilyProfileResponse MapToResponse(FamilyProfile profile)
         {
-            Id = profile.Id,
-            DisplayName = profile.DisplayName,
-            Relationship = profile.Relationship,
-            UserGroup = profile.UserGroup,
-            PreferredLocation = profile.PreferredLocation,
-            NotifyEnabled = profile.NotifyEnabled,
-            NotifyThreshold = profile.NotifyThreshold,
-            Notes = profile.Notes,
-            CreatedAt = profile.CreatedAt,
-            UpdatedAt = profile.UpdatedAt,
-        };
+            var normalizedGroup = UserProfileRuleService.NormalizeGroup(profile.UserGroup);
+            return new FamilyProfileResponse
+            {
+                Id = profile.Id,
+                DisplayName = profile.DisplayName,
+                Relationship = profile.Relationship,
+                UserGroup = normalizedGroup,
+                PreferredLocation = profile.PreferredLocation,
+                NotifyEnabled = profile.NotifyEnabled,
+                NotifyThreshold = profile.NotifyThreshold,
+                ProfileRule = UserProfileRuleService.GetRule(normalizedGroup),
+                Notes = profile.Notes,
+                CreatedAt = profile.CreatedAt,
+                UpdatedAt = profile.UpdatedAt,
+            };
+        }
     }
 }

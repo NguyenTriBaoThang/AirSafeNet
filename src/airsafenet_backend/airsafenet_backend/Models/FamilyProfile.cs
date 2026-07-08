@@ -19,7 +19,7 @@ namespace airsafenet_backend.Models
 
         [Required]
         [MaxLength(50)]
-        public string UserGroup { get; set; } = "child";
+        public string UserGroup { get; set; } = "child_school";
 
         [MaxLength(150)]
         public string PreferredLocation { get; set; } = "Ho Chi Minh City";

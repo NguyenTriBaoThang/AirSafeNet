@@ -1,16 +1,15 @@
-import { useMemo } from "react";
+﻿import { useMemo } from "react";
 import type {
   DashboardChartPointResponse,
   DashboardSummaryResponse,
 } from "../../types/dashboard";
+import { getUserProfileRule, type UserProfileRule } from "../../data/userProfileRules";
 import RiskBadge from "./RiskBadge";
 
 type Props = {
   summary: DashboardSummaryResponse;
   points: DashboardChartPointResponse[];
 };
-
-type UserGroup = "normal" | "child" | "elderly" | "respiratory" | "pregnant";
 
 type Slot = {
   timeLabel: string;
@@ -20,44 +19,30 @@ type Slot = {
   risk: string;
 };
 
+type Tone = "good" | "watch" | "warn" | "danger";
+
 type Briefing = {
   bestSlots: Slot[];
   avoidSlots: Slot[];
-  groupLabel: string;
+  rule: UserProfileRule;
   groupAdvice: string;
   mask: {
     label: string;
     detail: string;
-    tone: "good" | "watch" | "warn" | "danger";
+    tone: Tone;
   };
   dose: {
     value: number;
     percent: number;
     label: string;
     detail: string;
-    tone: "good" | "watch" | "warn" | "danger";
+    tone: Tone;
   };
   headline: string;
 };
 
 const WHO_DAILY_DOSE = 225;
 const BREATHING_RATE = 0.625;
-
-const GROUP_LABEL: Record<UserGroup, string> = {
-  normal: "Người dùng phổ thông",
-  child: "Trẻ em",
-  elderly: "Người cao tuổi",
-  respiratory: "Người có bệnh hô hấp",
-  pregnant: "Phụ nữ mang thai",
-};
-
-function normalizeGroup(value: string): UserGroup {
-  const group = value.trim().toLowerCase();
-  if (["child", "elderly", "respiratory", "pregnant", "normal"].includes(group)) {
-    return group as UserGroup;
-  }
-  return "normal";
-}
 
 function getSeverity(risk: string, aqi: number): number {
   const normalized = risk.toUpperCase();
@@ -112,112 +97,72 @@ function pickSeparatedSlots(
   return selected.map(formatSlot);
 }
 
+function toneFromAqi(peakAqi: number, rule: UserProfileRule): Tone {
+  if (peakAqi >= 150) return "danger";
+  if (peakAqi >= rule.recommendedNotifyThreshold) return "warn";
+  if (peakAqi > 50) return "watch";
+  return "good";
+}
+
 function getMaskRecommendation(
   peakAqi: number,
-  group: UserGroup,
+  rule: UserProfileRule,
 ): Briefing["mask"] {
-  const sensitive = group !== "normal";
+  const tone = toneFromAqi(peakAqi, rule);
 
-  if (group === "respiratory") {
-    if (peakAqi > 150) {
-      return {
-        label: "N95/N99 khi ra ngoài",
-        detail: "AQI có thể lên cao với nhóm hô hấp. Mang khẩu trang lọc hạt mịn và thuốc cắt cơn nếu có chỉ định.",
-        tone: "danger",
-      };
-    }
-    if (peakAqi > 100) {
-      return {
-        label: "N95 hoặc KF94",
-        detail: "Nên đeo khi ra ngoài, đặc biệt lúc di chuyển lâu hoặc vận động.",
-        tone: "warn",
-      };
-    }
-    if (peakAqi > 50) {
-      return {
-        label: "KF94 khuyến nghị",
-        detail: "Không khí ở mức trung bình; nhóm hô hấp vẫn nên bảo vệ đường thở.",
-        tone: "watch",
-      };
-    }
+  if (tone === "danger") {
     return {
-      label: "Khẩu trang y tế tùy chọn",
-      detail: "AQI dự kiến tốt, nhưng vẫn nên mang theo nếu có triệu chứng hô hấp.",
-      tone: "good",
+      label: rule.id === "outdoor_athlete" ? "Không nên tập nặng" : "N95/KN95",
+      detail: rule.maskRule,
+      tone,
     };
   }
 
-  if (peakAqi > 150) {
+  if (tone === "warn") {
+    const label = rule.id === "asthma" || rule.id === "motorbike_commuter"
+      ? "N95/KN95"
+      : "KF94/N95";
     return {
-      label: "N95/KF94 bắt buộc",
-      detail: "Chỉ ra ngoài khi cần thiết và tránh hoạt động cường độ cao.",
-      tone: "danger",
+      label,
+      detail: rule.maskRule,
+      tone,
     };
   }
-  if (peakAqi > 100) {
+
+  if (tone === "watch") {
     return {
-      label: sensitive ? "N95 hoặc KF94" : "KF94 khuyến nghị",
-      detail: sensitive
-        ? "Nhóm nhạy cảm nên dùng khẩu trang lọc hạt mịn khi ra ngoài."
-        : "Người khỏe mạnh nên đeo KF94 nếu phải di chuyển lâu.",
-      tone: "warn",
+      label: rule.id === "asthma" ? "N95 dự phòng" : "Mang theo dự phòng",
+      detail: rule.outdoorRule,
+      tone,
     };
   }
-  if (peakAqi > 50) {
-    return {
-      label: sensitive ? "Khẩu trang y tế/KF94" : "Mang theo dự phòng",
-      detail: sensitive
-        ? "Nên đeo khi đi đường đông xe hoặc ở ngoài trời hơn 30 phút."
-        : "Không bắt buộc, nhưng nên mang theo nếu đi vào giờ cao điểm.",
-      tone: "watch",
-    };
-  }
+
   return {
-    label: "Không cần khẩu trang đặc biệt",
-    detail: "AQI dự kiến tốt. Chỉ cần khẩu trang thông thường nếu môi trường đông người.",
-    tone: "good",
+    label: "Không cần đặc biệt",
+    detail: rule.activityAdvice,
+    tone,
   };
 }
 
-function getGroupAdvice(group: UserGroup, peakAqi: number): string {
-  if (group === "respiratory") {
-    if (peakAqi > 100) {
-      return "Ưu tiên ở trong nhà trong giờ AQI cao, mang inhaler/thuốc theo chỉ định, dừng hoạt động nếu khó thở hoặc tức ngực.";
+function getGroupAdvice(rule: UserProfileRule, peakAqi: number): string {
+  if (peakAqi >= 150) {
+    if (rule.id === "outdoor_athlete") {
+      return "Không nên chạy bộ/đá bóng ngoài trời. Chuyển indoor hoặc dời sang khung AQI thấp hơn.";
     }
-    return "Theo dõi triệu chứng hô hấp, tránh chạy bộ mạnh ngoài trời và chọn các khung giờ AQI thấp nhất.";
+    if (rule.id === "motorbike_commuter") {
+      return "Giảm thời gian chạy xe ngoài đường, đeo N95/KN95 ôm kín và tránh đứng lâu sau xe tải/xe buýt.";
+    }
+    return `${rule.shortLabel}: ${rule.outdoorRule}`;
   }
 
-  if (group === "child") {
-    if (peakAqi > 100) {
-      return "Không nên cho trẻ chơi ngoài trời lâu. Nếu có tiết thể dục/ra chơi, nên chuyển vào trong nhà hoặc giảm thời lượng.";
-    }
-    return "Cho trẻ ra ngoài ở khung giờ tốt, tránh đường đông xe và nhắc trẻ uống nước sau khi hoạt động.";
+  if (peakAqi >= rule.recommendedNotifyThreshold) {
+    return `${rule.shortLabel}: ${rule.alertRule}`;
   }
 
-  if (group === "elderly") {
-    if (peakAqi > 100) {
-      return "Tránh đi bộ nhanh hoặc đứng ngoài trời lâu. Nên đi cùng người thân và nghỉ ngay nếu chóng mặt, đau ngực, khó thở.";
-    }
-    return "Có thể ra ngoài nhẹ nhàng ở giờ tốt; tránh nắng gắt, đường đông xe và uống nước trước khi đi.";
-  }
-
-  if (group === "pregnant") {
-    if (peakAqi > 100) {
-      return "Ưu tiên hoạt động trong nhà, hạn chế đi lại giờ cao điểm và đeo khẩu trang lọc tốt nếu bắt buộc ra ngoài.";
-    }
-    return "Chọn khung giờ AQI thấp, tránh vận động mạnh và vào trong nhà ngay nếu thấy mệt hoặc khó thở.";
-  }
-
-  if (peakAqi > 150) {
-    return "Hạn chế hoạt động ngoài trời, đặc biệt là chạy bộ hoặc đạp xe lâu. Chuyển lịch sang giờ AQI thấp hơn.";
-  }
-  if (peakAqi > 100) {
-    return "Có thể ra ngoài ngắn, nhưng nên tránh vận động mạnh và tránh các khung giờ AQI cao nhất.";
-  }
-  return "Có thể sinh hoạt bình thường, ưu tiên các khung giờ AQI thấp để giảm phơi nhiễm tích lũy.";
+  return rule.activityAdvice;
 }
 
-function getDoseTone(percent: number): Briefing["dose"]["tone"] {
+function getDoseTone(percent: number): Tone {
   if (percent <= 60) return "good";
   if (percent <= 85) return "watch";
   if (percent <= 100) return "warn";
@@ -237,7 +182,7 @@ function buildBriefing(
 ): Briefing {
   const firstDay = points.slice(0, 24);
   const source = firstDay.length > 0 ? firstDay : points;
-  const group = normalizeGroup(summary.userGroup);
+  const rule = getUserProfileRule(summary.userGroup);
   const peakAqi = Math.max(summary.currentAqi, summary.maxAqiNext24h);
 
   const bestSlots = pickSeparatedSlots(
@@ -253,8 +198,8 @@ function buildBriefing(
     ? source.reduce((sum, point) => sum + point.pm25, 0) / source.length
     : summary.currentPm25;
   const doseValue = avgPm25 * 24 * BREATHING_RATE;
-  const dosePercent = (doseValue / WHO_DAILY_DOSE) * 100;
-  const doseTone = getDoseTone(dosePercent);
+  const profileAdjustedPercent = (doseValue / WHO_DAILY_DOSE) * 100 * rule.sensitivityMultiplier;
+  const doseTone = getDoseTone(profileAdjustedPercent);
 
   const bestText = bestSlots.length
     ? `Nên ra ngoài quanh ${bestSlots[0].hourLabel}`
@@ -266,14 +211,14 @@ function buildBriefing(
   return {
     bestSlots,
     avoidSlots,
-    groupLabel: GROUP_LABEL[group],
-    groupAdvice: getGroupAdvice(group, peakAqi),
-    mask: getMaskRecommendation(peakAqi, group),
+    rule,
+    groupAdvice: getGroupAdvice(rule, peakAqi),
+    mask: getMaskRecommendation(peakAqi, rule),
     dose: {
       value: doseValue,
-      percent: dosePercent,
-      label: getDoseLabel(dosePercent),
-      detail: `Ước tính từ PM2.5 trung bình 24h (${avgPm25.toFixed(1)} µg/m³) so với ngưỡng WHO ${WHO_DAILY_DOSE} µg/ngày.`,
+      percent: profileAdjustedPercent,
+      label: getDoseLabel(profileAdjustedPercent),
+      detail: `Ước tính từ PM2.5 trung bình 24h (${avgPm25.toFixed(1)} µg/m³), hiệu chỉnh theo hệ số nhạy cảm ×${rule.sensitivityMultiplier.toFixed(2)} của ${rule.shortLabel}.`,
       tone: doseTone,
     },
     headline: `${bestText}; ${avoidText}.`,
@@ -281,7 +226,7 @@ function buildBriefing(
 }
 
 function TonePill({ tone, children }: {
-  tone: "good" | "watch" | "warn" | "danger";
+  tone: Tone;
   children: React.ReactNode;
 }) {
   return <span className={`daily-briefing-pill daily-briefing-pill--${tone}`}>{children}</span>;
@@ -344,8 +289,8 @@ export default function DailySafetyBriefing({ summary, points }: Props) {
 
         <div className="daily-briefing-advice">
           <div className="daily-briefing-advice__topline">
-            <span>Nhóm sức khỏe</span>
-            <strong>{briefing.groupLabel}</strong>
+            <span>Hồ sơ</span>
+            <strong>{briefing.rule.label}</strong>
           </div>
           <p>{briefing.groupAdvice}</p>
         </div>

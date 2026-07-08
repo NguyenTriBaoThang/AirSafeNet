@@ -256,5 +256,48 @@
     },
     "created_at": "2026-07-05T01:55:46.535901+00:00",
     "alerted": false
+  },
+  {
+    "detected": true,
+    "spike_pm25": 15.4,
+    "from_pm25": 75.7,
+    "to_pm25": 60.3,
+    "spike_time": "2026-07-05T07:00:00",
+    "severity": "warning",
+    "aqi_after": 153,
+    "risk_after": "UNHEALTHY",
+    "recommendation": "Không khí có thể ảnh hưởng sức khỏe. Người dùng nên hạn chế ra ngoài và cân nhắc đeo khẩu trang phù hợp.",
+    "xai": {
+      "top_factors": [
+        {
+          "feature": "pm10",
+          "label": "pm10",
+          "delta": -14.2,
+          "direction": "giảm",
+          "explanation": "Thay đổi 14.20 units",
+          "importance": 0.0
+        },
+        {
+          "feature": "co",
+          "label": "co",
+          "delta": 155.0,
+          "direction": "tăng",
+          "explanation": "Thay đổi 155.00 units",
+          "importance": 0.0
+        },
+        {
+          "feature": "no2",
+          "label": "no2",
+          "delta": -3.9,
+          "direction": "giảm",
+          "explanation": "Thay đổi 3.90 units",
+          "importance": 0.0
+        }
+      ],
+      "summary": "Spike chủ yếu do pm10. Đồng thời co cũng góp phần.",
+      "confidence": 100
+    },
+    "created_at": "2026-07-05T02:19:12.272377+00:00",
+    "alerted": false
   }
 ]

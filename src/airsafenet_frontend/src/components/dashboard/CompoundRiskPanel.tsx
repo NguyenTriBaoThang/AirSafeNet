@@ -1,4 +1,4 @@
-/**
+﻿/**
  *
  * Weather-AQI Compound Risk Score — tính toán rủi ro tổng hợp từ nhiều yếu tố:
  *
@@ -25,6 +25,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { getUserProfileRule } from "../../data/userProfileRules";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 type WeatherData = {
@@ -62,7 +63,7 @@ type CompoundResult = {
   summary:         string;
 };
 
-type UserGroup = "normal" | "child" | "elderly" | "respiratory" | "pregnant";
+type UserGroup = string;
 
 type Props = {
   userGroup: UserGroup;
@@ -71,13 +72,18 @@ type Props = {
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7276";
 const POLL_MS  = 10 * 60 * 1000;  // 10 phút
 
-const GROUP_SENSITIVITY: Record<UserGroup, { temp: number; uv: number; humidity: number; label: string }> = {
-  normal:      { temp: 1.00, uv: 1.00, humidity: 1.00, label: "Người bình thường" },
-  child:       { temp: 1.15, uv: 1.20, humidity: 1.10, label: "Trẻ em" },
-  elderly:     { temp: 1.30, uv: 1.15, humidity: 1.20, label: "Người cao tuổi" },
-  respiratory: { temp: 1.10, uv: 1.10, humidity: 1.35, label: "Bệnh hô hấp" },
-  pregnant:    { temp: 1.25, uv: 1.05, humidity: 1.15, label: "Thai phụ" },
-};
+function groupSensitivity(userGroup: UserGroup): { temp: number; uv: number; humidity: number; label: string } {
+  const rule = getUserProfileRule(userGroup);
+  switch (rule.id) {
+    case "child_school": return { temp: 1.15, uv: 1.20, humidity: 1.10, label: rule.shortLabel };
+    case "elderly": return { temp: 1.30, uv: 1.15, humidity: 1.20, label: rule.shortLabel };
+    case "asthma": return { temp: 1.10, uv: 1.10, humidity: 1.35, label: rule.shortLabel };
+    case "outdoor_athlete": return { temp: 1.18, uv: 1.18, humidity: 1.12, label: rule.shortLabel };
+    case "motorbike_commuter": return { temp: 1.12, uv: 1.08, humidity: 1.12, label: rule.shortLabel };
+    case "pregnant": return { temp: 1.25, uv: 1.05, humidity: 1.15, label: rule.shortLabel };
+    default: return { temp: 1.00, uv: 1.00, humidity: 1.00, label: rule.shortLabel };
+  }
+}
 
 function aqiToBaseScore(aqi: number): number {
   if (aqi <=  50) return aqi * 0.4;
@@ -225,7 +231,7 @@ function calcPressureMultiplier(pressure: number): { mult: number; desc: string;
 }
 
 function calcCompoundRisk(weather: WeatherData, userGroup: UserGroup): CompoundResult {
-  const sens = GROUP_SENSITIVITY[userGroup];
+  const sens = groupSensitivity(userGroup);
   const baseScore = aqiToBaseScore(weather.predAqi);
 
   const windKmh = weather.windSpeed * 3.6; 
@@ -402,7 +408,7 @@ export default function CompoundRiskPanel({ userGroup }: Props) {
   }, []);  
 
   const result = weather ? calcCompoundRisk(weather, userGroup) : null;
-  const sens   = GROUP_SENSITIVITY[userGroup];
+  const sens   = groupSensitivity(userGroup);
 
   if (loading) return (
     <div className="crs-card">

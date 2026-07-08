@@ -1,6 +1,7 @@
 ﻿using System.Security.Claims;
 using airsafenet_backend.Data;
 using airsafenet_backend.DTOs.Preferences;
+using airsafenet_backend.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -40,16 +41,24 @@ namespace airsafenet_backend.Controllers
             var p = await _db.UserPreferences.FirstOrDefaultAsync(x => x.UserId == userId);
             if (p == null) return NotFound(new { message = "Không tìm thấy cấu hình." });
 
-            p.UserGroup = req.UserGroup.Trim().ToLower();
-            p.PreferredLocation = req.PreferredLocation.Trim();
-            p.NotifyEnabled = req.NotifyEnabled;
+            var normalizedGroup = UserProfileRuleService.NormalizeGroup(req.UserGroup);
+            var rule = UserProfileRuleService.GetRule(normalizedGroup);
 
-            p.NotifyChannel = req.NotifyChannel.Trim().ToLower();
+            p.UserGroup = normalizedGroup;
+            p.PreferredLocation = string.IsNullOrWhiteSpace(req.PreferredLocation)
+                ? "Ho Chi Minh City"
+                : req.PreferredLocation.Trim();
+            p.NotifyEnabled = req.NotifyEnabled;
+            p.NotifyChannel = string.IsNullOrWhiteSpace(req.NotifyChannel)
+                ? "none"
+                : req.NotifyChannel.Trim().ToLowerInvariant();
             p.TelegramChatId = string.IsNullOrWhiteSpace(req.TelegramChatId)
                 ? null : req.TelegramChatId.Trim();
             p.NotifyEmail = string.IsNullOrWhiteSpace(req.NotifyEmail)
-                ? null : req.NotifyEmail.Trim().ToLower();
-            p.NotifyThreshold = Math.Clamp(req.NotifyThreshold, 0, 500);
+                ? null : req.NotifyEmail.Trim().ToLowerInvariant();
+            p.NotifyThreshold = req.NotifyThreshold <= 0
+                ? rule.RecommendedNotifyThreshold
+                : Math.Clamp(req.NotifyThreshold, 0, 500);
             p.UpdatedAt = DateTime.UtcNow;
 
             await _db.SaveChangesAsync();
@@ -62,18 +71,26 @@ namespace airsafenet_backend.Controllers
             return int.TryParse(v, out var id) ? id : null;
         }
 
-        private static UserPreferencesResponse MapToResponse(Models.UserPreferences p) => new()
+        private static UserPreferencesResponse MapToResponse(Models.UserPreferences p)
         {
-            UserId = p.UserId,
-            UserGroup = p.UserGroup,
-            PreferredLocation = p.PreferredLocation,
-            NotifyEnabled = p.NotifyEnabled,
-            NotifyChannel = p.NotifyChannel,
-            TelegramChatId = p.TelegramChatId,
-            NotifyEmail = p.NotifyEmail,
-            NotifyThreshold = p.NotifyThreshold,
-            LastAlertSentAt = p.LastAlertSentAt,
-            UpdatedAt = p.UpdatedAt,
-        };
+            var normalizedGroup = UserProfileRuleService.NormalizeGroup(p.UserGroup);
+            var rule = UserProfileRuleService.GetRule(normalizedGroup);
+
+            return new UserPreferencesResponse
+            {
+                UserId = p.UserId,
+                UserGroup = normalizedGroup,
+                PreferredLocation = p.PreferredLocation,
+                NotifyEnabled = p.NotifyEnabled,
+                NotifyChannel = p.NotifyChannel,
+                TelegramChatId = p.TelegramChatId,
+                NotifyEmail = p.NotifyEmail,
+                NotifyThreshold = p.NotifyThreshold,
+                ProfileRule = rule,
+                AvailableProfiles = UserProfileRuleService.GetAll().ToList(),
+                LastAlertSentAt = p.LastAlertSentAt,
+                UpdatedAt = p.UpdatedAt,
+            };
+        }
     }
 }
