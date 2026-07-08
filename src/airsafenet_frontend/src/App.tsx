@@ -7,6 +7,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import ImpactPage from "./pages/ImpactPage";
 import HeatmapPage from "./pages/HeatmapPage";
+import CleanMapPage from "./pages/CleanMapPage";
 import PresentationPage from "./pages/PresentationPage";
 import UserPreferencesPage from "./pages/UserPreferences";
 import AssistantPage from "./pages/AssistantPage";
@@ -117,35 +118,46 @@ export default function App() {
           }
         />
 
-        <Route 
-          path="/impact" 
+        <Route
+          path="/impact"
           element={
             <PrivateRoute>
               <AppShell>
                 <ImpactPage />
               </AppShell>
             </PrivateRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/heatmap" 
+        <Route
+          path="/heatmap"
           element={
             <PrivateRoute>
               <AppShell>
                 <HeatmapPage />
               </AppShell>
             </PrivateRoute>
-          } 
+          }
         />
 
-        <Route 
-          path="/presentation" 
+        <Route
+          path="/clean-map"
+          element={
+            <PrivateRoute>
+              <AppShell>
+                <CleanMapPage />
+              </AppShell>
+            </PrivateRoute>
+          }
+        />
+
+        <Route
+          path="/presentation"
           element={
             <PrivateRoute>
               <PresentationPage />
             </PrivateRoute>
-          } 
+          }
         />
 
         <Route

@@ -23,6 +23,7 @@ export default function SidebarNav() {
   const items = [
     { to: "/dashboard",   label: "Tổng quan" },
     { to: "/heatmap",     label: "Bản đồ nhiệt" },
+    { to: "/clean-map",   label: "Bản đồ sạch" },
     { to: "/impact",      label: "Chi phí & WHO" },
     { to: "/activity",    label: "Lịch hoạt động" },
     { to: "/assistant",   label: "Trợ lý ảo" },
