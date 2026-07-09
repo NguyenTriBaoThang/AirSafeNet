@@ -1,6 +1,12 @@
+import { HCMC_DISTRICT_BOUNDARIES } from "./hcmcDistrictBoundaries";
+import type { DistrictBoundaryGeometry } from "./hcmcDistrictBoundaries";
+
 export type WardBoundaryGeometry = {
   type: "Polygon";
   coordinates: number[][][];
+} | {
+  type: "MultiPolygon";
+  coordinates: number[][][][];
 };
 
 export type WardSeed = {
@@ -33,7 +39,7 @@ type WardGroup = {
 };
 
 export const HCMC_WARD_LAYER_SOURCE =
-  "Lớp demo 113 phường/khu vực nội suy từ ranh quận cũ và district AQI cache; thay bằng GeoJSON chính thức khi có dữ liệu mở.";
+  "Lớp demo 168 phường/xã/đặc khu được chia từ ranh quận/huyện OSM và district AQI cache; thay bằng GeoJSON cấp xã chính thức khi có dữ liệu mở.";
 
 const WARD_GROUPS: WardGroup[] = [
   {
@@ -284,6 +290,16 @@ const WARD_GROUPS: WardGroup[] = [
   },
 ];
 
+const EXTRA_ADMIN_UNITS: Record<string, string[]> = {
+  q_td: ["Trường Thạnh", "Phước Bình", "Linh Tây", "Linh Chiểu", "Linh Đông", "Bình Thọ", "Bình Trưng Đông", "Bình Trưng Tây", "Thủ Thiêm", "An Lợi Đông"],
+  q12: ["Tân Chánh Hiệp", "Hiệp Thành", "Tân Hưng Thuận"],
+  q_gv: ["Thông Tây", "Tân Sơn"],
+  h_bc: ["Tân Nhựt", "Lê Minh Xuân", "Bình Lợi", "Quy Đức", "Đa Phước", "Tân Túc", "Phạm Văn Hai", "Bình Chánh Đông", "Bình Chánh Tây", "Vĩnh Lộc A", "Vĩnh Lộc B", "Tân Quý Tây"],
+  h_hm: ["Thới Tam Thôn", "Nhị Bình", "Tân Xuân", "Trung Chánh", "Tân Thới Nhì", "Xuân Thới Đông", "Xuân Thới Thượng", "Thới Tứ"],
+  h_nb: ["Hiệp Phước", "Nhơn Đức", "Phước Lộc", "Phú Xuân Nam"],
+  h_cc: ["Tân Thạnh Đông", "Tân Thạnh Tây", "Tân Thông Hội", "Phước Hiệp", "Phước Thạnh", "Thái Mỹ", "Hòa Phú", "Trung An", "Phạm Văn Cội", "Tân Thạnh", "An Phú", "Tân Phú"],
+  h_cn: ["Long Hòa", "Tam Thôn Hiệp", "Cần Thạnh", "Đồng Tranh"],
+};
 function slugify(input: string): string {
   return input
     .normalize("NFD")
@@ -303,35 +319,142 @@ function hashText(input: string): number {
   return Math.abs(hash >>> 0);
 }
 
-function hexPolygon(lon: number, lat: number, radiusLon: number, radiusLat: number): WardBoundaryGeometry {
-  const ring: number[][] = [];
-  for (let index = 0; index < 6; index += 1) {
-    const angle = -Math.PI / 6 + (Math.PI * 2 * index) / 6;
-    ring.push([
-      Number((lon + Math.cos(angle) * radiusLon).toFixed(5)),
-      Number((lat + Math.sin(angle) * radiusLat).toFixed(5)),
-    ]);
+function geometryPolygons(geometry: DistrictBoundaryGeometry): number[][][][] {
+  return geometry.type === "Polygon" ? [geometry.coordinates as number[][][]] : geometry.coordinates as number[][][][];
+}
+
+function closeRing(ring: number[][]): number[][] {
+  if (ring.length === 0) return ring;
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] === last[0] && first[1] === last[1]) return ring;
+  return [...ring, first];
+}
+
+function ringArea(ring: number[][]): number {
+  let area = 0;
+  for (let index = 0; index < ring.length - 1; index += 1) {
+    const [x1, y1] = ring[index];
+    const [x2, y2] = ring[index + 1];
+    area += x1 * y2 - x2 * y1;
   }
-  ring.push(ring[0]);
+  return Math.abs(area / 2);
+}
+
+function clipHalfPlane(ring: number[][], inside: (point: number[]) => boolean, intersect: (a: number[], b: number[]) => number[]): number[][] {
+  if (ring.length === 0) return [];
+  const source = ring[0][0] === ring[ring.length - 1][0] && ring[0][1] === ring[ring.length - 1][1] ? ring.slice(0, -1) : ring;
+  const output: number[][] = [];
+  for (let index = 0; index < source.length; index += 1) {
+    const current = source[index];
+    const previous = source[(index + source.length - 1) % source.length];
+    const currentInside = inside(current);
+    const previousInside = inside(previous);
+    if (currentInside) {
+      if (!previousInside) output.push(intersect(previous, current));
+      output.push(current);
+    } else if (previousInside) {
+      output.push(intersect(previous, current));
+    }
+  }
+  return closeRing(output);
+}
+
+function clipRingByLongitude(ring: number[][], minLon: number, maxLon: number): number[][] {
+  const left = clipHalfPlane(
+    ring,
+    ([lon]) => lon >= minLon,
+    ([ax, ay], [bx, by]) => {
+      const t = (minLon - ax) / (bx - ax || 1);
+      return [minLon, ay + (by - ay) * t];
+    },
+  );
+  const right = clipHalfPlane(
+    left,
+    ([lon]) => lon <= maxLon,
+    ([ax, ay], [bx, by]) => {
+      const t = (maxLon - ax) / (bx - ax || 1);
+      return [maxLon, ay + (by - ay) * t];
+    },
+  );
+  return closeRing(right.map(([lon, lat]) => [Number(lon.toFixed(5)), Number(lat.toFixed(5))]));
+}
+
+function geometryBounds(geometry: DistrictBoundaryGeometry): { minLon: number; maxLon: number; minLat: number; maxLat: number } {
+  let minLon = Infinity;
+  let maxLon = -Infinity;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  for (const polygon of geometryPolygons(geometry)) {
+    for (const [lon, lat] of polygon[0] ?? []) {
+      minLon = Math.min(minLon, lon);
+      maxLon = Math.max(maxLon, lon);
+      minLat = Math.min(minLat, lat);
+      maxLat = Math.max(maxLat, lat);
+    }
+  }
+  return { minLon, maxLon, minLat, maxLat };
+}
+
+function fallbackPolygon(lon: number, lat: number, radiusLon: number, radiusLat: number): WardBoundaryGeometry {
+  const ring = closeRing([
+    [Number((lon - radiusLon).toFixed(5)), Number((lat - radiusLat).toFixed(5))],
+    [Number((lon + radiusLon).toFixed(5)), Number((lat - radiusLat).toFixed(5))],
+    [Number((lon + radiusLon).toFixed(5)), Number((lat + radiusLat).toFixed(5))],
+    [Number((lon - radiusLon).toFixed(5)), Number((lat + radiusLat).toFixed(5))],
+  ]);
   return { type: "Polygon", coordinates: [ring] };
 }
 
+function slicedGeometry(group: WardGroup, index: number, count: number): WardBoundaryGeometry {
+  const boundary = HCMC_DISTRICT_BOUNDARIES.find((item) => item.id === group.id);
+  if (!boundary) return fallbackPolygon(group.lon, group.lat, group.spreadLon / Math.max(3, count), group.spreadLat / Math.max(3, count));
+
+  const bounds = geometryBounds(boundary.geometry);
+  const step = (bounds.maxLon - bounds.minLon) / Math.max(1, count);
+  const minLon = bounds.minLon + step * index - step * 0.001;
+  const maxLon = index === count - 1 ? bounds.maxLon + step * 0.001 : bounds.minLon + step * (index + 1) + step * 0.001;
+  const polygons: number[][][][] = [];
+
+  for (const polygon of geometryPolygons(boundary.geometry)) {
+    const clipped = clipRingByLongitude(polygon[0] ?? [], minLon, maxLon);
+    if (clipped.length >= 4 && ringArea(clipped) > 0.0000001) polygons.push([clipped]);
+  }
+
+  if (polygons.length === 0) {
+    const lon = bounds.minLon + step * (index + 0.5);
+    const lat = (bounds.minLat + bounds.maxLat) / 2;
+    return fallbackPolygon(lon, lat, step * 0.42, (bounds.maxLat - bounds.minLat) / Math.max(4, count * 2));
+  }
+
+  return polygons.length === 1 ? { type: "Polygon", coordinates: polygons[0] } : { type: "MultiPolygon", coordinates: polygons };
+}
+
+function geometryCenter(geometry: WardBoundaryGeometry): { lon: number; lat: number } {
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+  let lonSum = 0;
+  let latSum = 0;
+  let count = 0;
+  for (const polygon of polygons) {
+    for (const [lon, lat] of (polygon[0] ?? []).slice(0, -1)) {
+      lonSum += lon;
+      latSum += lat;
+      count += 1;
+    }
+  }
+  return count > 0 ? { lon: lonSum / count, lat: latSum / count } : { lon: 0, lat: 0 };
+}
 function createWardSeeds(): WardSeed[] {
   const wards: WardSeed[] = [];
 
   for (const group of WARD_GROUPS) {
-    const count = group.wards.length;
-    const ringScale = Math.max(1, Math.sqrt(count));
-    const cellLon = Math.max(0.0052, group.spreadLon / (ringScale * 1.75));
-    const cellLat = Math.max(0.0048, group.spreadLat / (ringScale * 1.75));
+    const names = [...group.wards, ...(EXTRA_ADMIN_UNITS[group.id] ?? [])];
+    const count = names.length;
 
-    group.wards.forEach((name, index) => {
-      const angle = index * 2.399963229728653;
-      const radius = index === 0 ? 0 : Math.sqrt(index + 0.35) / Math.sqrt(count);
-      const jitter = ((hashText(`${group.id}-${name}`) % 100) - 50) / 100;
-      const lon = group.lon + Math.cos(angle) * group.spreadLon * radius + jitter * cellLon * 0.22;
-      const lat = group.lat + Math.sin(angle) * group.spreadLat * radius - jitter * cellLat * 0.18;
+    names.forEach((name, index) => {
       const hash = hashText(`${group.id}-${name}`);
+      const geometry = slicedGeometry(group, index, count);
+      const center = geometryCenter(geometry);
       const trafficWeight = Number((0.42 + (hash % 52) / 100).toFixed(2));
       const greenScore = Number((0.18 + ((hash >> 4) % 70) / 100).toFixed(2));
       const roadNotes = [
@@ -345,9 +468,9 @@ function createWardSeeds(): WardSeed[] {
         parentId: group.id,
         parentName: group.parentName,
         area: group.area,
-        lon: Number(lon.toFixed(5)),
-        lat: Number(lat.toFixed(5)),
-        geometry: hexPolygon(lon, lat, cellLon, cellLat),
+        lon: Number(center.lon.toFixed(5)),
+        lat: Number(center.lat.toFixed(5)),
+        geometry,
         schools: 1 + (hash % 5),
         hospitals: (hash >> 3) % 3,
         residentialBlocks: 4 + ((hash >> 5) % 12),
@@ -357,6 +480,7 @@ function createWardSeeds(): WardSeed[] {
         aliases: [
           name,
           `Phường ${name}`,
+          `Xã ${name}`,
           group.parentName,
           group.area,
         ],

@@ -16701,3 +16701,64 @@ input.input-error:focus {
 .cm-ward--route {
   mix-blend-mode: normal;
 }
+
+/* Ward-level heatmap refinements */
+.hm-compare-picker--wards {
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.hm-compare-picker--wards .hm-compare-toggle strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hm-compare-picker--wards .hm-compare-toggle span:last-child {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 11px;
+}
+/* Ward boundary overlays for both heatmap views */
+.hm-ward-boundary-layer,
+.hm-district-boundary-layer,
+.cm-ward-boundary-layer,
+.cm-district-boundary-layer {
+  pointer-events: none;
+}
+
+.hm-ward-boundary,
+.hm-district-boundary,
+.cm-ward-boundary,
+.cm-district-boundary {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.hm-ward-boundary {
+  stroke: rgba(255, 255, 255, 0.96);
+  stroke-width: 1.45;
+  filter: drop-shadow(0 0 2px rgba(2, 6, 23, 0.95));
+}
+
+.hm-district-boundary {
+  stroke: rgba(226, 232, 240, 0.98);
+  stroke-width: 2.35;
+  filter: drop-shadow(0 0 3px rgba(2, 6, 23, 0.98));
+}
+
+.cm-ward-boundary {
+  stroke: rgba(15, 23, 42, 0.9);
+  stroke-width: 1.35;
+  filter: drop-shadow(0 0 1.8px rgba(255, 255, 255, 0.95));
+}
+
+.cm-district-boundary {
+  stroke: rgba(2, 6, 23, 0.92);
+  stroke-width: 2.15;
+  filter: drop-shadow(0 0 2.5px rgba(255, 255, 255, 0.9));
+}

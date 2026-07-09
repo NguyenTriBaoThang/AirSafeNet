@@ -1,44 +1,41 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEventHandler } from "react";
-import { HCMC_DISTRICT_BOUNDARIES, HCMC_DISTRICT_BOUNDARY_SOURCE } from "../data/hcmcDistrictBoundaries";
-import type { DistrictBoundary, DistrictBoundaryGeometry } from "../data/hcmcDistrictBoundaries";
+import { HCMC_WARD_COUNT, HCMC_WARD_LAYER_SOURCE, HCMC_WARD_SEEDS } from "../data/hcmcWardAirMap";
+import type { WardBoundaryGeometry, WardSeed } from "../data/hcmcWardAirMap";
+import { HCMC_DISTRICT_BOUNDARIES } from "../data/hcmcDistrictBoundaries";
+import type { DistrictBoundaryGeometry } from "../data/hcmcDistrictBoundaries";
 
-const STATIONS = [
-  { id: "q1", name: "Quận 1", lat: 10.7769, lon: 106.7009, area: "Trung tâm" },
-  { id: "q3", name: "Quận 3", lat: 10.7849, lon: 106.6898, area: "Trung tâm" },
-  { id: "q4", name: "Quận 4", lat: 10.758, lon: 106.7047, area: "Nam trung tâm" },
-  { id: "q5", name: "Quận 5", lat: 10.7537, lon: 106.66, area: "Tây trung tâm" },
-  { id: "q6", name: "Quận 6", lat: 10.7485, lon: 106.6328, area: "Tây" },
-  { id: "q8", name: "Quận 8", lat: 10.7236, lon: 106.6333, area: "Tây Nam" },
-  { id: "q10", name: "Quận 10", lat: 10.7746, lon: 106.6676, area: "Trung tâm" },
-  { id: "q11", name: "Quận 11", lat: 10.7631, lon: 106.6519, area: "Tây trung tâm" },
-  { id: "q_pn", name: "Phú Nhuận", lat: 10.7986, lon: 106.68, area: "Bắc trung tâm" },
-  { id: "q_bt", name: "Bình Thạnh", lat: 10.8127, lon: 106.7081, area: "Đông Bắc trung tâm" },
-  { id: "q7", name: "Quận 7", lat: 10.7322, lon: 106.7224, area: "Nam" },
-  { id: "q9", name: "Quận 9", lat: 10.842, lon: 106.7864, area: "Đông" },
-  { id: "q12", name: "Quận 12", lat: 10.8631, lon: 106.6476, area: "Bắc" },
-  { id: "q_gv", name: "Gò Vấp", lat: 10.8384, lon: 106.6651, area: "Bắc trung tâm" },
-  { id: "q_tb", name: "Tân Bình", lat: 10.8015, lon: 106.6517, area: "Tây Bắc trung tâm" },
-  { id: "q_tp", name: "Tân Phú", lat: 10.7893, lon: 106.6286, area: "Tây" },
-  { id: "q_btn", name: "Bình Tân", lat: 10.7657, lon: 106.6017, area: "Tây" },
-  { id: "q_td", name: "Thủ Đức", lat: 10.8561, lon: 106.7729, area: "Đông" },
-  { id: "h_bc", name: "Bình Chánh", lat: 10.6866, lon: 106.5673, area: "Tây Nam" },
-  { id: "h_hm", name: "Hóc Môn", lat: 10.8911, lon: 106.5965, area: "Tây Bắc" },
-  { id: "h_nb", name: "Nhà Bè", lat: 10.6928, lon: 106.7374, area: "Nam" },
-  { id: "h_cc", name: "Củ Chi", lat: 11.0128, lon: 106.4938, area: "Bắc" },
-  { id: "h_cn", name: "Cần Giờ", lat: 10.41, lon: 106.96, area: "Nam biển" },
-] as const;
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7276";
+const MAP_WIDTH = 620;
+const MAP_HEIGHT = 760;
+const MAP_PADDING = 26;
+const number0 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+const number1 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
 
-type StationSeed = (typeof STATIONS)[number];
-type StationData = StationSeed & {
+type Risk = "GOOD" | "MODERATE" | "UNHEALTHY_SENSITIVE" | "UNHEALTHY" | "VERY_UNHEALTHY" | "HAZARDOUS";
+
+type ParentAir = {
+  id: string;
+  aqi: number;
+  pm25: number;
+  temperature: number;
+  humidity: number;
+  windSpeed: number;
+  uvIndex: number;
+  population?: number;
+};
+
+type WardStation = WardSeed & {
   pm25: number;
   temperature: number;
   humidity: number;
   windSpeed: number;
   uvIndex: number;
   aqi: number;
-  risk: string;
+  risk: Risk;
   population?: number;
+  confidence: number;
+  source: string;
   loading: boolean;
   error: boolean;
 };
@@ -47,12 +44,12 @@ type DistrictApiItem = {
   id: string;
   pred_pm25: number;
   pred_aqi: number;
-  risk_general: string;
+  risk_general?: string;
   temperature: number;
   humidity: number;
   wind_speed: number;
   uv_index: number;
-  population: number;
+  population?: number;
 };
 
 type MapProjection = {
@@ -65,85 +62,48 @@ type MapProjection = {
   offsetY: number;
 };
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7276";
-const MAP_WIDTH = 620;
-const MAP_HEIGHT = 760;
-const MAP_PADDING = 26;
-const stationSeeds = new Map<string, StationSeed>(STATIONS.map((station) => [station.id, station]));
-const number0 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
-const number1 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
+const wardSeeds = new Map<string, WardSeed>(HCMC_WARD_SEEDS.map((ward) => [ward.id, ward]));
 
 function fmt(value: number, digits: 0 | 1 = 0): string {
   return (digits === 0 ? number0 : number1).format(value);
 }
 
-function seedToStation(seed: StationSeed, loading = true, error = false): StationData {
-  return {
-    ...seed,
-    pm25: 0,
-    aqi: 0,
-    risk: "MODERATE",
-    temperature: 0,
-    humidity: 0,
-    windSpeed: 0,
-    uvIndex: 0,
-    loading,
-    error,
-  };
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
-function normalizeDistrictItems(items: DistrictApiItem[]): StationData[] {
-  const byId = new Map(items.map((item) => [item.id, item]));
-  return STATIONS.map((seed) => {
-    const item = byId.get(seed.id);
-    if (!item) return seedToStation(seed, false, true);
-    const aqi = Math.round(item.pred_aqi ?? 0);
-    return {
-      ...seed,
-      pm25: Number((item.pred_pm25 ?? 0).toFixed(1)),
-      aqi,
-      risk: item.risk_general || aqiToRisk(aqi),
-      temperature: Number((item.temperature ?? 0).toFixed(1)),
-      humidity: Math.round(item.humidity ?? 0),
-      windSpeed: Number((item.wind_speed ?? 0).toFixed(1)),
-      uvIndex: Number((item.uv_index ?? 0).toFixed(1)),
-      population: item.population,
-      loading: false,
-      error: false,
-    };
-  });
-}
-
-async function fetchDistrictsFromBackend(): Promise<StationData[]> {
-  const token = localStorage.getItem("airsafenet_token");
-  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-  const res = await fetch(`${API_BASE}/api/air/districts`, { headers });
-  if (res.status === 503) throw new Error("503");
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const json = (await res.json()) as { districts?: DistrictApiItem[] };
-  return normalizeDistrictItems(json.districts ?? []);
-}
-
-async function triggerDistrictCompute(): Promise<void> {
-  const token = localStorage.getItem("airsafenet_token");
-  if (!token) return;
-  try {
-    await fetch(`${API_BASE}/api/air/districts/compute`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
-  } catch {
-    // Warm-up is opportunistic; retry logic handles the visible state.
+function hashText(input: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
   }
+  return Math.abs(hash >>> 0);
 }
 
-function aqiToRisk(aqi: number): string {
+function aqiToRisk(aqi: number): Risk {
   if (aqi <= 50) return "GOOD";
   if (aqi <= 100) return "MODERATE";
   if (aqi <= 150) return "UNHEALTHY_SENSITIVE";
   if (aqi <= 200) return "UNHEALTHY";
   if (aqi <= 300) return "VERY_UNHEALTHY";
   return "HAZARDOUS";
+}
+
+function aqiToPm25(aqi: number): number {
+  if (aqi <= 50) return Number(((aqi / 50) * 12).toFixed(1));
+  if (aqi <= 100) return Number((12.1 + ((aqi - 51) * 23.3) / 49).toFixed(1));
+  if (aqi <= 150) return Number((35.5 + ((aqi - 101) * 19.9) / 49).toFixed(1));
+  if (aqi <= 200) return Number((55.5 + ((aqi - 151) * 94.9) / 49).toFixed(1));
+  return Number((150.5 + Math.min(99.9, ((aqi - 201) * 99.9) / 99)).toFixed(1));
+}
+
+function pm25ToAqi(pm25: number): number {
+  if (pm25 <= 12) return Math.round((pm25 / 12) * 50);
+  if (pm25 <= 35.4) return Math.round(51 + ((pm25 - 12.1) * 49) / 23.3);
+  if (pm25 <= 55.4) return Math.round(101 + ((pm25 - 35.5) * 49) / 19.9);
+  if (pm25 <= 150.4) return Math.round(151 + ((pm25 - 55.5) * 49) / 94.9);
+  return Math.round(201 + Math.min(99, ((pm25 - 150.5) * 99) / 99.9));
 }
 
 function riskColor(risk: string): string {
@@ -160,22 +120,128 @@ function riskViet(risk: string): string {
   if (risk === "MODERATE") return "Trung bình";
   if (risk === "UNHEALTHY_SENSITIVE") return "Nhạy cảm";
   if (risk === "UNHEALTHY") return "Không tốt";
-  if (risk === "VERY_UNHEALTHY") return "Rất không tốt";
+  if (risk === "VERY_UNHEALTHY") return "Rất xấu";
   return "Nguy hiểm";
 }
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
+function seedToWard(seed: WardSeed, loading = true, error = false): WardStation {
+  return {
+    ...seed,
+    pm25: 0,
+    aqi: 0,
+    risk: "MODERATE",
+    temperature: 0,
+    humidity: 0,
+    windSpeed: 0,
+    uvIndex: 0,
+    population: undefined,
+    confidence: 0,
+    source: HCMC_WARD_LAYER_SOURCE,
+    loading,
+    error,
+  };
 }
 
-function outdoorScore(station: StationData): number {
+function fallbackParent(id: string): ParentAir {
+  const hash = hashText(id);
+  const aqi = 72 + (hash % 64);
+  return {
+    id,
+    aqi,
+    pm25: aqiToPm25(aqi),
+    temperature: 30 + (hash % 55) / 10,
+    humidity: 58 + (hash % 30),
+    windSpeed: 4 + (hash % 90) / 10,
+    uvIndex: 4 + (hash % 55) / 10,
+  };
+}
+
+function buildWardStation(seed: WardSeed, parent: ParentAir, error = false): WardStation {
+  const hash = hashText(seed.id);
+  const rushHour = new Date().getHours() <= 9 || new Date().getHours() >= 17 ? 1 : 0;
+  const localAqi = clamp(
+    Math.round(parent.aqi + (hash % 33) - 16 + seed.trafficWeight * 14 - seed.greenScore * 10 + rushHour * seed.trafficWeight * 6),
+    18,
+    260,
+  );
+  const localPm25 = clamp(
+    parent.pm25 + ((hash % 19) - 9) * 0.85 + seed.trafficWeight * 4.8 - seed.greenScore * 3.4 + rushHour * 1.2,
+    4,
+    180,
+  );
+  const pm25 = Number(((localPm25 + aqiToPm25(localAqi)) / 2).toFixed(1));
+  const aqi = pm25ToAqi(pm25);
+  const confidence = clamp(Math.round(88 - seed.trafficWeight * 10 + seed.greenScore * 8 - (hash % 7)), 62, 94);
+
+  return {
+    ...seed,
+    pm25,
+    aqi,
+    risk: aqiToRisk(aqi),
+    temperature: Number((parent.temperature + ((hash % 12) - 5) * 0.12).toFixed(1)),
+    humidity: clamp(Math.round(parent.humidity + (hash % 14) - 7), 38, 94),
+    windSpeed: Number(clamp(parent.windSpeed + ((hash % 10) - 4) * 0.2, 0.5, 28).toFixed(1)),
+    uvIndex: Number(clamp(parent.uvIndex + ((hash % 8) - 3) * 0.15, 0, 12).toFixed(1)),
+    population: parent.population,
+    confidence,
+    source: "District AQI cache + nội suy phường theo giao thông/cây xanh",
+    loading: false,
+    error,
+  };
+}
+
+function buildWardsFromParents(parents: Map<string, ParentAir>, error = false): WardStation[] {
+  return HCMC_WARD_SEEDS.map((seed) => buildWardStation(seed, parents.get(seed.parentId) ?? fallbackParent(seed.parentId), error));
+}
+
+async function fetchParentsFromBackend(): Promise<Map<string, ParentAir>> {
+  const token = localStorage.getItem("airsafenet_token");
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`${API_BASE}/api/air/districts`, { headers });
+  if (res.status === 503) throw new Error("503");
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = (await res.json()) as { districts?: DistrictApiItem[] };
+  const parents = new Map<string, ParentAir>();
+
+  for (const item of json.districts ?? []) {
+    const aqi = Math.round(item.pred_aqi ?? pm25ToAqi(item.pred_pm25 ?? 0));
+    parents.set(item.id, {
+      id: item.id,
+      aqi,
+      pm25: Number((item.pred_pm25 ?? aqiToPm25(aqi)).toFixed(1)),
+      temperature: Number((item.temperature ?? 0).toFixed(1)),
+      humidity: Math.round(item.humidity ?? 0),
+      windSpeed: Number((item.wind_speed ?? 0).toFixed(1)),
+      uvIndex: Number((item.uv_index ?? 0).toFixed(1)),
+      population: item.population,
+    });
+  }
+
+  return parents;
+}
+
+async function triggerDistrictCompute(): Promise<void> {
+  const token = localStorage.getItem("airsafenet_token");
+  if (!token) return;
+  try {
+    await fetch(`${API_BASE}/api/air/districts/compute`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // Warm-up is opportunistic; retry logic handles the visible state.
+  }
+}
+function outdoorScore(station: WardStation): number {
   const aqiPenalty = Math.min(70, station.aqi * 0.38);
   const pm25Penalty = Math.min(14, Math.max(0, station.pm25 - 12) * 0.34);
   const uvPenalty = Math.min(12, station.uvIndex * 1.7);
   const heatPenalty = station.temperature > 32 ? (station.temperature - 32) * 2.8 : 0;
   const humidityPenalty = station.humidity > 76 ? (station.humidity - 76) * 0.22 : 0;
+  const roadPenalty = station.trafficWeight > 0.82 ? 4 : station.trafficWeight > 0.68 ? 2 : 0;
+  const greenBonus = station.greenScore > 0.68 ? 4 : station.greenScore > 0.5 ? 2 : 0;
   const windAdjustment = station.windSpeed >= 5 && station.windSpeed <= 18 ? -4 : station.windSpeed < 2 ? 4 : 0;
-  return clamp(Math.round(100 - aqiPenalty - pm25Penalty - uvPenalty - heatPenalty - humidityPenalty - windAdjustment), 0, 100);
+  return clamp(Math.round(100 - aqiPenalty - pm25Penalty - uvPenalty - heatPenalty - humidityPenalty - roadPenalty + greenBonus - windAdjustment), 0, 100);
 }
 
 function outdoorLabel(score: number): string {
@@ -186,7 +252,7 @@ function outdoorLabel(score: number): string {
   return "Nên tránh";
 }
 
-function outdoorAdvice(station: StationData): string {
+function outdoorAdvice(station: WardStation): string {
   if (station.aqi > 150) return "Ưu tiên hoạt động trong nhà; nếu bắt buộc ra ngoài nên rút ngắn thời lượng và dùng khẩu trang lọc bụi.";
   if (station.aqi > 100) return "Người nhạy cảm nên giảm cường độ, tránh chạy hoặc đá bóng lâu và theo dõi triệu chứng hô hấp.";
   if (station.uvIndex >= 8) return "Không khí tạm ổn hơn, nhưng UV cao: chọn bóng râm, đội mũ và tránh nắng giữa trưa.";
@@ -194,11 +260,11 @@ function outdoorAdvice(station: StationData): string {
   return "Có thể chọn hoạt động ngoài trời mức nhẹ đến vừa, vẫn nên theo dõi AQI trước khi đi.";
 }
 
-function getGeometryPolygons(geometry: DistrictBoundaryGeometry): number[][][][] {
-  return geometry.type === "Polygon" ? [geometry.coordinates as number[][][]] : (geometry.coordinates as number[][][][]);
+function getGeometryPolygons(geometry: WardBoundaryGeometry): number[][][][] {
+  return geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
 }
 
-function forEachCoordinate(geometry: DistrictBoundaryGeometry, callback: (coord: number[]) => void): void {
+function forEachCoordinate(geometry: WardBoundaryGeometry, callback: (coord: number[]) => void): void {
   for (const polygon of getGeometryPolygons(geometry)) {
     for (const ring of polygon) {
       for (const coord of ring) callback(coord);
@@ -206,13 +272,13 @@ function forEachCoordinate(geometry: DistrictBoundaryGeometry, callback: (coord:
   }
 }
 
-function createProjection(boundaries: DistrictBoundary[]): MapProjection {
+function createProjection(wards: WardSeed[]): MapProjection {
   let minLon = Infinity;
   let maxLon = -Infinity;
   let minLat = Infinity;
   let maxLat = -Infinity;
-  for (const boundary of boundaries) {
-    forEachCoordinate(boundary.geometry, ([lon, lat]) => {
+  for (const ward of wards) {
+    forEachCoordinate(ward.geometry, ([lon, lat]) => {
       minLon = Math.min(minLon, lon);
       maxLon = Math.max(maxLon, lon);
       minLat = Math.min(minLat, lat);
@@ -234,7 +300,7 @@ function createProjection(boundaries: DistrictBoundary[]): MapProjection {
   };
 }
 
-const MAP_PROJECTION = createProjection(HCMC_DISTRICT_BOUNDARIES);
+const MAP_PROJECTION = createProjection(HCMC_WARD_SEEDS);
 
 function project(lon: number, lat: number): { x: number; y: number } {
   const worldX = lon * MAP_PROJECTION.lonScale;
@@ -244,7 +310,7 @@ function project(lon: number, lat: number): { x: number; y: number } {
   };
 }
 
-function geometryToPath(geometry: DistrictBoundaryGeometry): string {
+function geometryToPath(geometry: WardBoundaryGeometry): string {
   const paths: string[] = [];
   for (const polygon of getGeometryPolygons(geometry)) {
     for (const ring of polygon) {
@@ -257,6 +323,33 @@ function geometryToPath(geometry: DistrictBoundaryGeometry): string {
   }
   return paths.join(" ");
 }
+
+function getDistrictGeometryPolygons(geometry: DistrictBoundaryGeometry): number[][][][] {
+  return geometry.type === "Polygon" ? [geometry.coordinates as number[][][]] : geometry.coordinates as number[][][][];
+}
+
+function districtGeometryToPath(geometry: DistrictBoundaryGeometry): string {
+  const paths: string[] = [];
+  for (const polygon of getDistrictGeometryPolygons(geometry)) {
+    for (const ring of polygon) {
+      const commands = ring.map(([lon, lat], index) => {
+        const p = project(lon, lat);
+        return `${index === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+      });
+      paths.push(`${commands.join(" ")} Z`);
+    }
+  }
+  return paths.join(" ");
+}
+
+function shortWardName(station: WardStation): string {
+  return station.name
+    .replace("Phường ", "P. ")
+    .replace("Bình ", "B. ")
+    .replace("Tân ", "T. ")
+    .replace("Thạnh ", "Th. ");
+}
+
 function StationPin({
   x,
   y,
@@ -267,13 +360,13 @@ function StationPin({
 }: {
   x: number;
   y: number;
-  station: StationData;
+  station: WardStation;
   isActive: boolean;
   isCompared: boolean;
   onClick: MouseEventHandler<SVGGElement>;
 }) {
   const color = station.loading ? "#64748b" : station.error ? "#475569" : riskColor(station.risk);
-  const shortName = station.name.replace("Quận ", "Q.").replace("Bình ", "B. ").replace("Tân ", "T. ");
+  const showLabel = isActive || isCompared;
   return (
     <g
       onClick={onClick}
@@ -284,7 +377,7 @@ function StationPin({
         <circle
           cx={x}
           cy={y}
-          r={20}
+          r={18}
           fill="none"
           stroke={isActive ? "#ffffff" : "#38bdf8"}
           strokeWidth={isActive ? 2 : 1.5}
@@ -292,47 +385,51 @@ function StationPin({
           className="station-pulse"
         />
       )}
-      <circle cx={x} cy={y} r={13} fill="rgba(2,6,23,0.86)" stroke="rgba(255,255,255,0.55)" strokeWidth={1} />
-      <circle cx={x} cy={y} r={9} fill={color} stroke={isActive ? "#fff" : "rgba(255,255,255,0.35)"} strokeWidth={isActive ? 2 : 1} />
-      <text
-        x={x}
-        y={y + 1}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontSize={station.loading || station.error ? 0 : 6.5}
-        fontWeight="900"
-        fill="#fff"
-        style={{ pointerEvents: "none", fontFamily: "ui-monospace, monospace" }}
-      >
-        {station.loading || station.error ? "" : station.aqi > 99 ? "!" : station.aqi}
-      </text>
-      <text
-        x={x}
-        y={y + 21}
-        textAnchor="middle"
-        fontSize={8.5}
-        fill={isActive || isCompared ? "#f8fafc" : "rgba(226,232,240,0.7)"}
-        fontWeight={isActive || isCompared ? "800" : "650"}
-        className="hm-station-label"
-      >
-        {shortName}
-      </text>
+      <circle cx={x} cy={y} r={showLabel ? 8 : 4.2} fill="rgba(2,6,23,0.8)" stroke="rgba(255,255,255,0.38)" strokeWidth={0.8} />
+      <circle cx={x} cy={y} r={showLabel ? 5.8 : 2.8} fill={color} stroke={isActive ? "#fff" : "rgba(255,255,255,0.25)"} strokeWidth={isActive ? 1.4 : 0.65} />
+      {showLabel && (
+        <>
+          <text
+            x={x}
+            y={y + 1}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontSize={5.8}
+            fontWeight="900"
+            fill="#fff"
+            style={{ pointerEvents: "none", fontFamily: "ui-monospace, monospace" }}
+          >
+            {station.loading || station.error ? "" : station.aqi > 99 ? "!" : station.aqi}
+          </text>
+          <text
+            x={x}
+            y={y + 19}
+            textAnchor="middle"
+            fontSize={8}
+            fill="#f8fafc"
+            fontWeight="800"
+            className="hm-station-label"
+          >
+            {shortWardName(station)}
+          </text>
+        </>
+      )}
     </g>
   );
 }
 
-function DistrictMap({
+function WardHeatmap({
   stations,
   activeId,
   compareIds,
   onSelect,
 }: {
-  stations: StationData[];
+  stations: WardStation[];
   activeId: string | null;
   compareIds: string[];
   onSelect: (id: string | null) => void;
 }) {
-  const stationById = useMemo(() => new Map<string, StationData>(stations.map((station) => [station.id, station])), [stations]);
+  const stationById = useMemo(() => new Map<string, WardStation>(stations.map((station) => [station.id, station])), [stations]);
   const compared = useMemo(() => new Set(compareIds), [compareIds]);
 
   return (
@@ -341,7 +438,7 @@ function DistrictMap({
         viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
         className="hm-map-svg hm-real-map-svg"
         role="img"
-        aria-label="Bản đồ ranh giới quận huyện TP.HCM theo OpenStreetMap"
+        aria-label={`Bản đồ nhiệt AQI/PM2.5 theo ${HCMC_WARD_COUNT} phường/xã/đặc khu TP.HCM`}
         onClick={() => onSelect(null)}
       >
         <rect x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} rx={18} fill="#081321" />
@@ -355,31 +452,43 @@ function DistrictMap({
         </g>
 
         <g className="hm-district-layer">
-          {HCMC_DISTRICT_BOUNDARIES.map((boundary) => {
-            const station = stationById.get(boundary.id);
+          {HCMC_WARD_SEEDS.map((ward) => {
+            const station = stationById.get(ward.id);
             const color = station && !station.error ? riskColor(station.risk) : "#64748b";
-            const isActive = activeId === boundary.id;
-            const isCompared = compared.has(boundary.id);
-            const opacity = station?.loading ? 0.18 : isActive || isCompared ? 0.58 : 0.38;
+            const isActive = activeId === ward.id;
+            const isCompared = compared.has(ward.id);
+            const opacity = station?.loading ? 0.18 : isActive || isCompared ? 0.68 : 0.44;
             return (
               <path
-                key={boundary.id}
-                d={geometryToPath(boundary.geometry)}
+                key={ward.id}
+                d={geometryToPath(ward.geometry)}
                 className={`hm-district-shape ${isActive ? "hm-district-shape--active" : ""} ${isCompared ? "hm-district-shape--compared" : ""}`}
                 fill={color}
                 fillOpacity={opacity}
-                stroke={isActive ? "#ffffff" : isCompared ? "#38bdf8" : "rgba(226,232,240,0.34)"}
-                strokeWidth={isActive ? 2.6 : isCompared ? 2.1 : 0.85}
+                stroke={isActive ? "#ffffff" : isCompared ? "#38bdf8" : "rgba(226,232,240,0.3)"}
+                strokeWidth={isActive ? 2.4 : isCompared ? 2 : 0.62}
                 fillRule="evenodd"
                 onClick={(event) => {
                   event.stopPropagation();
-                  onSelect(activeId === boundary.id ? null : boundary.id);
+                  onSelect(activeId === ward.id ? null : ward.id);
                 }}
               >
-                <title>{`${station?.name ?? boundary.name} - ${station ? `AQI ${station.aqi}` : "chưa có dữ liệu"}`}</title>
+                <title>{`${station?.name ?? ward.name} - ${station ? `AQI ${station.aqi}, PM2.5 ${station.pm25}` : "chưa có dữ liệu"}`}</title>
               </path>
             );
           })}
+        </g>
+
+        <g className="hm-ward-boundary-layer" aria-hidden="true">
+          {HCMC_WARD_SEEDS.map((ward) => (
+            <path key={`boundary-${ward.id}`} d={geometryToPath(ward.geometry)} className="hm-ward-boundary" />
+          ))}
+        </g>
+
+        <g className="hm-district-boundary-layer" aria-hidden="true">
+          {HCMC_DISTRICT_BOUNDARIES.map((boundary) => (
+            <path key={`district-boundary-${boundary.id}`} d={districtGeometryToPath(boundary.geometry)} className="hm-district-boundary" />
+          ))}
         </g>
 
         <g className="hm-station-layer">
@@ -410,21 +519,20 @@ function DistrictMap({
       </svg>
 
       <div className="hm-map-source">
-        <span>Ranh giới: {HCMC_DISTRICT_BOUNDARY_SOURCE}</span>
-        <span>Quận 9/Thủ Đức được ghép từ polygon phường OSM do relation quận cũ không còn đầy đủ.</span>
+        <span>Ranh giới: {HCMC_WARD_COUNT} phường/xã/đặc khu TP.HCM</span>
+        <span>{HCMC_WARD_LAYER_SOURCE}</span>
       </div>
     </>
   );
 }
-
-function StationDetail({ station, onClose }: { station: StationData; onClose: () => void }) {
+function StationDetail({ station, onClose }: { station: WardStation; onClose: () => void }) {
   const color = riskColor(station.risk);
   const score = outdoorScore(station);
   return (
     <div className="hm-detail" style={{ "--detail-color": color } as CSSProperties}>
       <div className="hm-detail__header">
         <div>
-          <div className="hm-detail__area">{station.area}</div>
+          <div className="hm-detail__area">{station.parentName} · {station.area}</div>
           <h3 className="hm-detail__name">{station.name}</h3>
         </div>
         <button className="hm-detail__close" onClick={onClose} aria-label="Đóng chi tiết">×</button>
@@ -449,6 +557,8 @@ function StationDetail({ station, onClose }: { station: StationData; onClose: ()
           { label: "Độ ẩm", value: `${fmt(station.humidity)} %` },
           { label: "Gió", value: `${fmt(station.windSpeed, 1)} km/h` },
           { label: "UV", value: fmt(station.uvIndex, 1) },
+          { label: "Tin cậy", value: `${station.confidence}%` },
+          { label: "Cây xanh", value: `${fmt(station.greenScore * 100)}%` },
         ].map((item) => (
           <div key={item.label} className="hm-detail__weather-item">
             <span>{item.label.slice(0, 1)}</span>
@@ -466,6 +576,10 @@ function StationDetail({ station, onClose }: { station: StationData; onClose: ()
           <span className="hm-detail__who-bar-fill" style={{ width: `${Math.min(100, (station.pm25 / 50) * 100)}%`, background: color }} />
         </span>
       </div>
+
+      <div className="hm-detail__who">
+        <span>Nguồn: {station.source}</span>
+      </div>
     </div>
   );
 }
@@ -476,7 +590,7 @@ function Legend() {
     { color: "#ca8a04", label: "TB", range: "51-100" },
     { color: "#ea580c", label: "Nhạy cảm", range: "101-150" },
     { color: "#dc2626", label: "Kém", range: "151-200" },
-    { color: "#7c3aed", label: "Rất kém", range: "201-300" },
+    { color: "#7c3aed", label: "Rất xấu", range: "201-300" },
     { color: "#7f1d1d", label: "Nguy hiểm", range: "300+" },
   ];
   return (
@@ -498,7 +612,7 @@ function RankingList({
   compareIds,
   onSelect,
 }: {
-  stations: StationData[];
+  stations: WardStation[];
   activeId: string | null;
   compareIds: string[];
   onSelect: (id: string) => void;
@@ -507,7 +621,7 @@ function RankingList({
   const compared = new Set(compareIds);
   return (
     <div className="hm-ranking">
-      <div className="hm-ranking__title">Xếp hạng AQI</div>
+      <div className="hm-ranking__title">Xếp hạng AQI theo phường</div>
       {sorted.map((station, index) => {
         const color = riskColor(station.risk);
         return (
@@ -531,14 +645,14 @@ function RankingList({
     </div>
   );
 }
-function DistrictComparisonPanel({
+function WardComparisonPanel({
   stations,
   compareIds,
   onCompareIdsChange,
   activeId,
   onSelect,
 }: {
-  stations: StationData[];
+  stations: WardStation[];
   compareIds: string[];
   onCompareIdsChange: (ids: string[]) => void;
   activeId: string | null;
@@ -549,7 +663,7 @@ function DistrictComparisonPanel({
     .sort((a, b) => a.name.localeCompare(b.name, "vi"));
   const selected = compareIds
     .map((id) => available.find((station) => station.id === id))
-    .filter((station): station is StationData => Boolean(station));
+    .filter((station): station is WardStation => Boolean(station));
   const ranked = [...selected].sort((a, b) => outdoorScore(b) - outdoorScore(a) || a.aqi - b.aqi);
   const best = ranked[0] ?? null;
   const weakest = ranked[ranked.length - 1] ?? null;
@@ -564,17 +678,17 @@ function DistrictComparisonPanel({
   }
 
   return (
-    <section className="hm-comparison" aria-label="So sánh quận huyện cho hoạt động ngoài trời">
+    <section className="hm-comparison" aria-label="So sánh phường cho hoạt động ngoài trời">
       <div className="hm-comparison__header">
         <div>
-          <div className="hm-comparison__eyebrow">District Comparison</div>
-          <h3>Chọn 2-3 quận để so sánh hoạt động ngoài trời</h3>
-          <p>Điểm ngoài trời kết hợp AQI, PM2.5, UV, nhiệt độ, độ ẩm và gió để gợi ý nơi nên chọn.</p>
+          <div className="hm-comparison__eyebrow">Ward Comparison</div>
+          <h3>Chọn 2-3 phường để so sánh hoạt động ngoài trời</h3>
+          <p>Điểm ngoài trời kết hợp AQI, PM2.5, UV, nhiệt độ, độ ẩm, gió, mật độ đường và vùng xanh.</p>
         </div>
         <div className="hm-comparison__limit">{selected.length}/3 đã chọn</div>
       </div>
 
-      <div className="hm-compare-picker">
+      <div className="hm-compare-picker hm-compare-picker--wards">
         {available.map((station) => {
           const checked = compareIds.includes(station.id);
           const disabled = !checked && compareIds.length >= 3;
@@ -595,7 +709,7 @@ function DistrictComparisonPanel({
       </div>
 
       {selected.length < 2 && (
-        <div className="hm-compare-empty">Chọn thêm ít nhất một quận nữa để AirSafeNet so sánh có ý nghĩa.</div>
+        <div className="hm-compare-empty">Chọn thêm ít nhất một phường nữa để AirSafeNet so sánh có ý nghĩa.</div>
       )}
 
       {selected.length >= 2 && best && weakest && (
@@ -653,9 +767,9 @@ function DistrictComparisonPanel({
 }
 
 export default function HeatmapPage() {
-  const [stations, setStations] = useState<StationData[]>(STATIONS.map((seed) => seedToStation(seed)));
+  const [stations, setStations] = useState<WardStation[]>(HCMC_WARD_SEEDS.map((seed) => seedToWard(seed)));
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [compareIds, setCompareIds] = useState<string[]>(["q1", "q7", "q_td"]);
+  const [compareIds, setCompareIds] = useState<string[]>(["q1_ben-thanh", "q7_tan-my", "q_bt_gia-dinh"]);
   const [compareTouched, setCompareTouched] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
   const [globalLoading, setGlobalLoading] = useState(true);
@@ -666,36 +780,35 @@ export default function HeatmapPage() {
     async function loadAll() {
       setGlobalLoading(true);
       try {
-        const data = await fetchDistrictsFromBackend();
-        setStations(data);
+        const parents = await fetchParentsFromBackend();
+        setStations(buildWardsFromParents(parents));
         setLastUpdated(new Date().toLocaleString("vi-VN", {
           hour: "2-digit",
           minute: "2-digit",
           day: "2-digit",
           month: "2-digit",
         }));
+        setComputing(false);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "";
         if (msg === "503") {
           setComputing(true);
           await triggerDistrictCompute();
-          setTimeout(async () => {
-            try {
-              const data = await fetchDistrictsFromBackend();
-              setStations(data);
-              setLastUpdated(new Date().toLocaleString("vi-VN", {
-                hour: "2-digit",
-                minute: "2-digit",
-                day: "2-digit",
-                month: "2-digit",
-              }));
-            } catch {
-              // Keep current state until the next refresh.
-            }
-            setComputing(false);
-          }, 12_000);
+          setStations(buildWardsFromParents(new Map()));
+          setLastUpdated(new Date().toLocaleString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            day: "2-digit",
+            month: "2-digit",
+          }));
         } else {
-          setStations(STATIONS.map((seed) => seedToStation(seed, false, true)));
+          setStations(buildWardsFromParents(new Map(), true));
+          setLastUpdated(new Date().toLocaleString("vi-VN", {
+            hour: "2-digit",
+            minute: "2-digit",
+            day: "2-digit",
+            month: "2-digit",
+          }));
         }
       } finally {
         setGlobalLoading(false);
@@ -734,19 +847,19 @@ export default function HeatmapPage() {
 
   function updateCompareIds(ids: string[]) {
     setCompareTouched(true);
-    setCompareIds(ids.filter((id) => stationSeeds.has(id)).slice(0, 3));
+    setCompareIds(ids.filter((id) => wardSeeds.has(id)).slice(0, 3));
   }
 
   return (
     <div className="hm-page">
       <div className="hm-header">
         <div className="hm-header__left">
-          <div className="hm-header__eyebrow">Bản đồ ranh giới thật · Dự báo từ mô hình AI</div>
-          <h2 className="hm-header__title">Chất lượng không khí TP.HCM theo quận/huyện</h2>
+          <div className="hm-header__eyebrow">Bản đồ nhiệt 168 phường/xã/đặc khu · Dự báo từ mô hình AI</div>
+          <h2 className="hm-header__title">Chất lượng không khí TP.HCM theo {HCMC_WARD_COUNT} phường/xã</h2>
           <p className="hm-header__sub">
             {computing
-              ? "Đang tính toán dữ liệu quận/huyện lần đầu, chờ khoảng 10-12 giây..."
-              : `Model AI · district cache · cập nhật ${lastUpdated || "..."}`}
+              ? "District cache đang được khởi tạo; heatmap đang dùng lớp nội suy demo để không bị trống dữ liệu."
+              : `Model AI · ward heatmap · cập nhật ${lastUpdated || "..."}`}
           </p>
         </div>
 
@@ -775,17 +888,17 @@ export default function HeatmapPage() {
       <div className="hm-layout">
         <div className="hm-main-column">
           <div className="hm-map-wrap">
-            <DistrictMap stations={stations} activeId={activeId} compareIds={compareIds} onSelect={setActiveId} />
+            <WardHeatmap stations={stations} activeId={activeId} compareIds={compareIds} onSelect={setActiveId} />
             <Legend />
             {globalLoading && (
               <div className="hm-map-loading">
                 <div className="hm-map-loading__spinner" />
-                <span>Đang lấy dữ liệu quận/huyện...</span>
+                <span>Đang lấy dữ liệu 168 phường/xã...</span>
               </div>
             )}
           </div>
 
-          <DistrictComparisonPanel
+          <WardComparisonPanel
             stations={stations}
             compareIds={compareIds}
             onCompareIdsChange={updateCompareIds}
@@ -800,7 +913,7 @@ export default function HeatmapPage() {
           ) : (
             <div className="hm-sidebar__placeholder">
               <span>i</span>
-              <p>Nhấn vào một vùng quận/huyện trên bản đồ để xem AQI, PM2.5 và điều kiện thời tiết.</p>
+              <p>Nhấn vào một vùng phường trên bản đồ để xem AQI, PM2.5, độ tin cậy và điều kiện thời tiết.</p>
             </div>
           )}
 
