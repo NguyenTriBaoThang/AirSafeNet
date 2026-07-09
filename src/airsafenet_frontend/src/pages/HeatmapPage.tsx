@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, MouseEventHandler } from "react";
-import { HCMC_WARD_COUNT, HCMC_WARD_LAYER_SOURCE, HCMC_WARD_SEEDS } from "../data/hcmcWardAirMap";
+import { HCMC_CITY_BOUNDARY, HCMC_WARD_COUNT, HCMC_WARD_LAYER_SOURCE, HCMC_WARD_SEEDS } from "../data/hcmcWardAirMap";
 import type { WardBoundaryGeometry, WardSeed } from "../data/hcmcWardAirMap";
-import { HCMC_DISTRICT_BOUNDARIES } from "../data/hcmcDistrictBoundaries";
-import type { DistrictBoundaryGeometry } from "../data/hcmcDistrictBoundaries";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7276";
 const MAP_WIDTH = 620;
@@ -324,23 +322,6 @@ function geometryToPath(geometry: WardBoundaryGeometry): string {
   return paths.join(" ");
 }
 
-function getDistrictGeometryPolygons(geometry: DistrictBoundaryGeometry): number[][][][] {
-  return geometry.type === "Polygon" ? [geometry.coordinates as number[][][]] : geometry.coordinates as number[][][][];
-}
-
-function districtGeometryToPath(geometry: DistrictBoundaryGeometry): string {
-  const paths: string[] = [];
-  for (const polygon of getDistrictGeometryPolygons(geometry)) {
-    for (const ring of polygon) {
-      const commands = ring.map(([lon, lat], index) => {
-        const p = project(lon, lat);
-        return `${index === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
-      });
-      paths.push(`${commands.join(" ")} Z`);
-    }
-  }
-  return paths.join(" ");
-}
 
 function shortWardName(station: WardStation): string {
   return station.name
@@ -486,9 +467,7 @@ function WardHeatmap({
         </g>
 
         <g className="hm-district-boundary-layer" aria-hidden="true">
-          {HCMC_DISTRICT_BOUNDARIES.map((boundary) => (
-            <path key={`district-boundary-${boundary.id}`} d={districtGeometryToPath(boundary.geometry)} className="hm-district-boundary" />
-          ))}
+          <path d={geometryToPath(HCMC_CITY_BOUNDARY)} className="hm-district-boundary" />
         </g>
 
         <g className="hm-station-layer">
