@@ -20,9 +20,11 @@ import AppIcon from "../components/common/AppIcon";
 import AnomalyBanner from "../components/dashboard/AnomalyBanner";
 import ContextualAlertsPanel from "../components/dashboard/ContextualAlertsPanel";
 import DailySafetyBriefing from "../components/dashboard/DailySafetyBriefing";
+import AirQualityManagementPanel from "../components/dashboard/AirQualityManagementPanel";
 import CommuteSafetyPlanner from "../components/dashboard/CommuteSafetyPlanner";
+import NetZeroMobilityPanel from "../components/dashboard/NetZeroMobilityPanel";
 import WhatIfActivitySimulator from "../components/dashboard/WhatIfActivitySimulator";
-import SchoolOutdoorEventMode from "../components/dashboard/SchoolOutdoorEventMode";
+import SchoolGreenSafetyMode from "../components/dashboard/SchoolGreenSafetyMode";
 import TrustExplainabilityPanel from "../components/dashboard/TrustExplainabilityPanel";
 
 function CacheInitializingState({ onRetry }: { onRetry: () => void }) {
@@ -130,7 +132,15 @@ export default function Dashboard() {
       )}
 
       {mode === "forecast" && (
+        <AirQualityManagementPanel summary={summary} points={chart.points} />
+      )}
+
+      {mode === "forecast" && (
         <CommuteSafetyPlanner summary={summary} points={chart.points} />
+      )}
+
+      {mode === "forecast" && (
+        <NetZeroMobilityPanel summary={summary} points={chart.points} />
       )}
 
       {mode === "forecast" && (
@@ -138,7 +148,7 @@ export default function Dashboard() {
       )}
 
       {mode === "forecast" && (
-        <SchoolOutdoorEventMode summary={summary} points={chart.points} />
+        <SchoolGreenSafetyMode summary={summary} points={chart.points} />
       )}
 
       {mode === "forecast" && (
