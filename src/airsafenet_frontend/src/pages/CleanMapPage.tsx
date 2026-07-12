@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, MouseEventHandler, PointerEventHandler } from "react";
 import { HCMC_CITY_BOUNDARY, HCMC_WARD_COUNT, HCMC_WARD_LAYER_SOURCE, HCMC_WARD_SEEDS } from "../data/hcmcWardAirMap";
 import type { WardBoundaryGeometry, WardSeed } from "../data/hcmcWardAirMap";
 import { getUserProfileRule, USER_PROFILE_RULES } from "../data/userProfileRules";
@@ -27,6 +27,8 @@ type Vehicle = { id: VehicleId; label: string; speed: number; co2: number; expos
 type Segment = { from: WardAir; to: WardAir; distance: number; minutes: number; aqi: number; pm25: number; confidence: number; kind: "avoid" | "normal" | "clean"; color: string; note: string };
 type RouteOption = { id: RouteId; label: string; subtitle: string; points: WardAir[]; segments: Segment[]; distance: number; minutes: number; aqi: number; pm25: number; exposure: number; co2: number; score: number; confidence: number; recommendation: string };
 type Projection = { minX: number; maxX: number; maxLat: number; lonScale: number; scale: number; ox: number; oy: number };
+type MapPan = { x: number; y: number };
+type ViewBoxFrame = { x: number; y: number; w: number; h: number };
 
 const VEHICLES: Vehicle[] = [
   { id: "motorbike", label: "Xe máy", speed: 24, co2: 0.085, exposure: 1.15, penalty: 7, note: "Nhanh nhưng hít bụi trực tiếp; nên dùng N95/KF94 khi AQI cao." },
@@ -40,6 +42,7 @@ const LANDMARKS: Record<string, string> = {
   "sai gon": "Sài Gòn", "san bay": "Tân Sơn Nhất", "tan son nhat": "Tân Sơn Nhất", "suoi tien": "Long Bình",
   "thu duc": "Thủ Đức", "phu my hung": "Tân Mỹ", "nha be": "Nhà Bè", "can gio": "Cần Giờ", "cu chi": "Củ Chi", "binh chanh": "Bình Chánh",
 };
+const DEFAULT_MAP_PAN: MapPan = { x: 0, y: 0 };
 
 function hashText(s: string) { let h = 2166136261; for (let i = 0; i < s.length; i += 1) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return Math.abs(h >>> 0); }
 function norm(s: string) { return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/đ/g, "d").replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim(); }
@@ -77,7 +80,36 @@ function mids(wards: WardAir[], start: WardAir, end: WardAir, hour: number) { co
 function routeOptions(wards: WardAir[], start: WardAir | null, end: WardAir | null, vehicleId: VehicleId, profileId: string, time: string) { if (!start || !end || start.id === end.id) return []; const vehicle = VEHICLES.find(v => v.id === vehicleId) ?? VEHICLES[0]; const hour = Number(time.split(":")[0] ?? new Date().getHours()); const candidates = mids(wards, start, end, hour); const clean = candidates.slice(0, 2).map(x => x.w); const balanced = [...candidates].sort((a, b) => a.pollution + Math.max(0, a.detour) * 4.8 - (b.pollution + Math.max(0, b.detour) * 4.8))[0]?.w; return [calcRoute("fastest", "Nhanh nhất", "Ít vòng, ưu tiên thời gian", [start, end], vehicle, profileId, hour), calcRoute("cleanest", "Ít ô nhiễm nhất", "Né vùng AQI/PM2.5 cao", [start, ...clean, end], vehicle, profileId, hour), calcRoute("balanced", "Cân bằng nhất", "Không vòng quá xa nhưng giảm phơi nhiễm", balanced ? [start, balanced, end] : [start, end], vehicle, profileId, hour)]; }
 function exposureAt(route: RouteOption, vehicleId: VehicleId, profileId: string, hour: number) { const vehicle = VEHICLES.find(v => v.id === vehicleId) ?? VEHICLES[0], rule = getUserProfileRule(profileId); return +route.points.slice(0, -1).reduce((sum, p, i) => { const to = route.points[i + 1], minutes = Math.max(3, km(p, to) / vehicle.speed * 60), pm = (atHour(p, hour).pm25 + atHour(to, hour).pm25) / 2; return sum + pm * minutes / 60 * vehicle.exposure * rule.sensitivityMultiplier; }, 0).toFixed(1); }
 function shiftTip(route: RouteOption | null, vehicleId: VehicleId, profileId: string, time: string) { if (!route) return null; const hour = Number(time.split(":")[0] ?? new Date().getHours()); const cur = exposureAt(route, vehicleId, profileId, hour); const best = Array.from({ length: 24 }, (_, h) => ({ hour: h, exposure: exposureAt(route, vehicleId, profileId, h) })).sort((a, b) => a.exposure - b.exposure)[0]; if (!best || cur <= 0) return null; const reduction = Math.round((cur - best.exposure) / cur * 100); return reduction >= 6 && best.hour !== hour ? { ...best, reduction } : null; }
-function viewBox(route: RouteOption | null, active: WardAir | null, mode: Mode, zoom: number) { let pts: { x: number; y: number }[]; if (mode === "route" && route) pts = route.points.map(w => project(w.lon, w.lat)); else if (mode === "ward" && active) pts = coords(active).map(([lon, lat]) => project(lon, lat)); else return `0 0 ${MAP_W} ${MAP_H}`; let minX = Math.min(...pts.map(p => p.x)), maxX = Math.max(...pts.map(p => p.x)), minY = Math.min(...pts.map(p => p.y)), maxY = Math.max(...pts.map(p => p.y)); const pad = mode === "route" ? 110 : 70; minX = clamp(minX - pad, 0, MAP_W); maxX = clamp(maxX + pad, 0, MAP_W); minY = clamp(minY - pad, 0, MAP_H); maxY = clamp(maxY + pad, 0, MAP_H); const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, w = clamp((maxX - minX) / zoom, 150, MAP_W), h = clamp((maxY - minY) / zoom, 130, MAP_H); return `${clamp(cx - w / 2, 0, MAP_W - w).toFixed(1)} ${clamp(cy - h / 2, 0, MAP_H - h).toFixed(1)} ${w.toFixed(1)} ${h.toFixed(1)}`; }
+function clampMapPan(frame: ViewBoxFrame, pan: MapPan): MapPan {
+  return {
+    x: clamp(pan.x, -frame.x, MAP_W - frame.w - frame.x),
+    y: clamp(pan.y, -frame.y, MAP_H - frame.h - frame.y),
+  };
+}
+
+function frameToViewBox(frame: ViewBoxFrame, pan: MapPan) {
+  const clampedPan = clampMapPan(frame, pan);
+  return `${(frame.x + clampedPan.x).toFixed(1)} ${(frame.y + clampedPan.y).toFixed(1)} ${frame.w.toFixed(1)} ${frame.h.toFixed(1)}`;
+}
+
+function baseViewBox(route: RouteOption | null, active: WardAir | null, mode: Mode, zoom: number): ViewBoxFrame {
+  let pts: { x: number; y: number }[];
+  if (mode === "route" && route) pts = route.points.map(w => project(w.lon, w.lat));
+  else if (mode === "ward" && active) pts = coords(active).map(([lon, lat]) => project(lon, lat));
+  else {
+    const w = MAP_W / zoom, h = MAP_H / zoom;
+    return { x: (MAP_W - w) / 2, y: (MAP_H - h) / 2, w, h };
+  }
+  let minX = Math.min(...pts.map(p => p.x)), maxX = Math.max(...pts.map(p => p.x)), minY = Math.min(...pts.map(p => p.y)), maxY = Math.max(...pts.map(p => p.y));
+  const pad = mode === "route" ? 110 : 70;
+  minX = clamp(minX - pad, 0, MAP_W); maxX = clamp(maxX + pad, 0, MAP_W); minY = clamp(minY - pad, 0, MAP_H); maxY = clamp(maxY + pad, 0, MAP_H);
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, w = clamp((maxX - minX) / zoom, 150, MAP_W), h = clamp((maxY - minY) / zoom, 130, MAP_H);
+  return { x: clamp(cx - w / 2, 0, MAP_W - w), y: clamp(cy - h / 2, 0, MAP_H - h), w, h };
+}
+
+function viewBox(route: RouteOption | null, active: WardAir | null, mode: Mode, zoom: number, pan: MapPan) {
+  return frameToViewBox(baseViewBox(route, active, mode, zoom), pan);
+}
 
 function unproject(x: number, y: number) {
   const worldX = (x - PROJ.ox) / PROJ.scale + PROJ.minX;
@@ -147,11 +179,53 @@ function TileLayer({ viewBoxValue, mode }: { viewBoxValue: string; mode: Mode })
   return <g className="cm-basemap" aria-hidden="true">{tiles.map(tile => <image key={tile.key} href={tile.url} x={tile.x} y={tile.y} width={tile.w} height={tile.h} preserveAspectRatio="none" />)}</g>;
 }
 function Legend() { const levels = [{ c: "#16a34a", l: "Tốt", r: "0-50" }, { c: "#eab308", l: "Trung bình", r: "51-100" }, { c: "#f97316", l: "Nhạy cảm", r: "101-150" }, { c: "#ef4444", l: "Không tốt", r: "151-200" }, { c: "#7c3aed", l: "Rất xấu", r: "201+" }]; return <div className="cm-legend">{levels.map(x => <div key={x.r} className="cm-legend__item"><span style={{ background: x.c }} /><strong>{x.r}</strong><em>{x.l}</em></div>)}</div>; }
-function WardMap({ wards, activeId, mode, zoom, route, onSelect }: { wards: WardAir[]; activeId: string | null; mode: Mode; zoom: number; route: RouteOption | null; onSelect: (id: string | null) => void }) {
+function WardMap({ wards, activeId, mode, zoom, pan, route, onSelect, onZoomChange, onPanChange }: { wards: WardAir[]; activeId: string | null; mode: Mode; zoom: number; pan: MapPan; route: RouteOption | null; onSelect: (id: string | null) => void; onZoomChange: (direction: -1 | 1) => void; onPanChange: (pan: MapPan) => void }) {
   const active = wards.find(w => w.id === activeId) ?? null;
   const routeIds = new Set(route?.points.map(w => w.id) ?? []);
-  const vb = viewBox(route, active, mode, zoom);
-  return <svg className="cm-map" viewBox={vb} role="img" aria-label="Bản đồ nền kiểu Google Map với lớp heatmap AQI/PM2.5 168 phường/xã/đặc khu TP.HCM" onClick={() => onSelect(null)}>
+  const vb = viewBox(route, active, mode, zoom, pan);
+  const [, , viewWidth, viewHeight] = vb.split(" ").map(Number);
+  const canPan = viewWidth < MAP_W || viewHeight < MAP_H;
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startPan: MapPan;
+    viewWidth: number;
+    viewHeight: number;
+    rectWidth: number;
+    rectHeight: number;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const handlePointerDown: PointerEventHandler<SVGSVGElement> = (event) => {
+    if (event.button !== 0 || !canPan) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startPan: pan, viewWidth, viewHeight, rectWidth: rect.width, rectHeight: rect.height };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const handlePointerMove: PointerEventHandler<SVGSVGElement> = (event) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    event.preventDefault();
+    const moveX = event.clientX - drag.startX, moveY = event.clientY - drag.startY;
+    if (Math.abs(moveX) > 3 || Math.abs(moveY) > 3) suppressClickRef.current = true;
+    onPanChange({
+      x: drag.startPan.x + ((drag.startX - event.clientX) * drag.viewWidth) / Math.max(1, drag.rectWidth),
+      y: drag.startPan.y + ((drag.startY - event.clientY) * drag.viewHeight) / Math.max(1, drag.rectHeight),
+    });
+  };
+  const handlePointerEnd: PointerEventHandler<SVGSVGElement> = (event) => {
+    if (dragRef.current?.pointerId === event.pointerId && event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    dragRef.current = null;
+  };
+  const handleClickCapture: MouseEventHandler<SVGSVGElement> = (event) => {
+    if (!suppressClickRef.current) return;
+    suppressClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  return <svg className={`cm-map ${canPan ? "cm-map--draggable" : ""}`} viewBox={vb} role="img" aria-label="Bản đồ nền kiểu Google Map với lớp heatmap AQI/PM2.5 168 phường/xã/đặc khu TP.HCM" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerEnd} onPointerCancel={handlePointerEnd} onClickCapture={handleClickCapture} onWheel={(event) => { event.preventDefault(); onZoomChange(event.deltaY > 0 ? -1 : 1); }} onClick={() => onSelect(null)}>
     <rect x={0} y={0} width={MAP_W} height={MAP_H} rx={18} fill="#eef3f8" />
     <TileLayer viewBoxValue={vb} mode={mode} />
     <rect className="cm-map-wash" x={0} y={0} width={MAP_W} height={MAP_H} rx={18} />
@@ -178,6 +252,7 @@ export default function CleanMapPage() {
   const [activeId, setActiveId] = useState<string | null>("26743_ben-thanh");
   const [mode, setMode] = useState<Mode>("city");
   const [zoom, setZoom] = useState(1);
+  const [mapPan, setMapPan] = useState<MapPan>(DEFAULT_MAP_PAN);
   const [startInput, setStartInput] = useState("Bến Thành");
   const [endInput, setEndInput] = useState("Thủ Đức");
   const [departureTime, setDepartureTime] = useState("07:30");
@@ -214,8 +289,15 @@ export default function CleanMapPage() {
   const best = [...wards].sort((a, b) => a.aqi - b.aqi)[0];
   const worst = [...wards].sort((a, b) => b.aqi - a.aqi)[0];
 
-  function selectWard(id: string | null) { setActiveId(id); if (id && mode === "city") setMode("ward"); }
-  function selectRoute(id: RouteId) { setSelectedRouteId(id); setMode("route"); }
+  function clampCurrentPan(nextPan: MapPan, nextZoom = zoom, nextMode = mode, nextRoute = selectedRoute, nextActive = activeWard) {
+    return clampMapPan(baseViewBox(nextRoute, nextActive, nextMode, nextZoom), nextPan);
+  }
+  function resetMapView() { setZoom(1); setMapPan(DEFAULT_MAP_PAN); }
+  function selectMode(nextMode: Mode) { setMode(nextMode); setMapPan(DEFAULT_MAP_PAN); }
+  function selectWard(id: string | null) { setActiveId(id); setMapPan(DEFAULT_MAP_PAN); if (id && mode === "city") setMode("ward"); }
+  function selectRoute(id: RouteId) { setSelectedRouteId(id); setMode("route"); setMapPan(DEFAULT_MAP_PAN); }
+  function changeZoom(direction: -1 | 1) { setZoom(v => { const nextZoom = clamp(+(v + direction * 0.25).toFixed(2), 1, 2.8); setMapPan(current => clampCurrentPan(current, nextZoom)); return nextZoom; }); }
+  function changeMapPan(nextPan: MapPan) { setMapPan(clampCurrentPan(nextPan)); }
 
-  return <main className="cm-page"><header className="cm-header"><div><span className="cm-eyebrow">Clean Route & Ward Air Quality Map</span><h2>Bản đồ AQI/PM2.5 theo {HCMC_WARD_COUNT} phường/xã/đặc khu TP.HCM</h2><p>{computing ? "AI district cache đang được khởi tạo; bản đồ vẫn hiển thị bằng lớp ước tính để demo." : `Dữ liệu cập nhật ${lastUpdated} · ${HCMC_WARD_LAYER_SOURCE}`}</p></div><div className="cm-header__stats"><div><span>AQI trung bình</span><strong style={{ color: color(avgAqi) }}>{avgAqi}</strong></div><div><span>Sạch nhất</span><strong>{best?.name} · AQI {best?.aqi}</strong></div><div><span>Ô nhiễm cao</span><strong>{worst?.name} · AQI {worst?.aqi}</strong></div></div></header><div className="cm-toolbar"><div className="cm-mode-tabs" role="tablist" aria-label="Cấp zoom bản đồ">{[{ id: "city", text: "Cấp thành phố" }, { id: "ward", text: "Cấp phường/xã" }, { id: "route", text: "Cấp tuyến đường" }].map(x => <button key={x.id} className={mode === x.id ? "active" : ""} onClick={() => setMode(x.id as Mode)} type="button">{x.text}</button>)}</div><div className="cm-zoom-controls"><button type="button" onClick={() => setZoom(v => clamp(+(v - 0.25).toFixed(2), 1, 2.8))}>-</button><span>Zoom {zoom.toFixed(2)}x</span><button type="button" onClick={() => setZoom(v => clamp(+(v + 0.25).toFixed(2), 1, 2.8))}>+</button></div></div><section className="cm-layout"><div className="cm-map-panel"><WardMap wards={wards} activeId={activeId} mode={mode} zoom={zoom} route={selectedRoute} onSelect={selectWard} /><Legend />{loading && <div className="cm-map-loading">Đang đồng bộ dữ liệu AQI...</div>}</div><aside className="cm-side-panel">{activeWard ? <WardDetail ward={activeWard} /> : <section className="cm-empty-detail"><h3>Chọn một phường/xã trên bản đồ</h3><p>Bấm vào vùng màu để xem AQI, PM2.5, nguồn dữ liệu, confidence, khuyến nghị sức khỏe và giờ sạch hơn trong ngày.</p></section>}<Ranking wards={wards} activeId={activeId} onSelect={selectWard} /></aside></section><RoutePlanner wards={wards} startInput={startInput} endInput={endInput} departureTime={departureTime} vehicleId={vehicleId} profileId={profileId} selectedRouteId={selectedRouteId} routes={routes} startWard={startWard} endWard={endWard} onStart={setStartInput} onEnd={setEndInput} onTime={setDepartureTime} onVehicle={setVehicleId} onProfile={setProfileId} onRoute={selectRoute} /></main>;
+  return <main className="cm-page"><header className="cm-header"><div><span className="cm-eyebrow">Clean Route & Ward Air Quality Map</span><h2>Bản đồ AQI/PM2.5 theo {HCMC_WARD_COUNT} phường/xã/đặc khu TP.HCM</h2><p>{computing ? "AI district cache đang được khởi tạo; bản đồ vẫn hiển thị bằng lớp ước tính để demo." : `Dữ liệu cập nhật ${lastUpdated} · ${HCMC_WARD_LAYER_SOURCE}`}</p></div><div className="cm-header__stats"><div><span>AQI trung bình</span><strong style={{ color: color(avgAqi) }}>{avgAqi}</strong></div><div><span>Sạch nhất</span><strong>{best?.name} · AQI {best?.aqi}</strong></div><div><span>Ô nhiễm cao</span><strong>{worst?.name} · AQI {worst?.aqi}</strong></div></div></header><div className="cm-toolbar"><div className="cm-mode-tabs" role="tablist" aria-label="Cấp zoom bản đồ">{[{ id: "city", text: "Cấp thành phố" }, { id: "ward", text: "Cấp phường/xã" }, { id: "route", text: "Cấp tuyến đường" }].map(x => <button key={x.id} className={mode === x.id ? "active" : ""} onClick={() => selectMode(x.id as Mode)} type="button">{x.text}</button>)}</div><div className="cm-zoom-controls"><button type="button" onClick={() => changeZoom(-1)}>-</button><span>Zoom {zoom.toFixed(2)}x</span><button type="button" onClick={() => changeZoom(1)}>+</button><button type="button" onClick={resetMapView}>Reset</button></div></div><section className="cm-layout"><div className="cm-map-panel"><WardMap wards={wards} activeId={activeId} mode={mode} zoom={zoom} pan={mapPan} route={selectedRoute} onSelect={selectWard} onZoomChange={changeZoom} onPanChange={changeMapPan} /><Legend />{loading && <div className="cm-map-loading">Đang đồng bộ dữ liệu AQI...</div>}</div><aside className="cm-side-panel">{activeWard ? <WardDetail ward={activeWard} /> : <section className="cm-empty-detail"><h3>Chọn một phường/xã trên bản đồ</h3><p>Bấm vào vùng màu để xem AQI, PM2.5, nguồn dữ liệu, confidence, khuyến nghị sức khỏe và giờ sạch hơn trong ngày.</p></section>}<Ranking wards={wards} activeId={activeId} onSelect={selectWard} /></aside></section><RoutePlanner wards={wards} startInput={startInput} endInput={endInput} departureTime={departureTime} vehicleId={vehicleId} profileId={profileId} selectedRouteId={selectedRouteId} routes={routes} startWard={startWard} endWard={endWard} onStart={setStartInput} onEnd={setEndInput} onTime={setDepartureTime} onVehicle={setVehicleId} onProfile={setProfileId} onRoute={selectRoute} /></main>;
 }

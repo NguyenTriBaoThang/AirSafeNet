@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, MouseEventHandler } from "react";
+import type { CSSProperties, MouseEventHandler, PointerEventHandler } from "react";
 import { HCMC_CITY_BOUNDARY, HCMC_WARD_COUNT, HCMC_WARD_LAYER_SOURCE, HCMC_WARD_SEEDS } from "../data/hcmcWardAirMap";
 import type { WardBoundaryGeometry, WardSeed } from "../data/hcmcWardAirMap";
 
@@ -7,6 +7,9 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7276";
 const MAP_WIDTH = 620;
 const MAP_HEIGHT = 760;
 const MAP_PADDING = 26;
+const HEATMAP_MIN_ZOOM = 1;
+const HEATMAP_MAX_ZOOM = 3.2;
+const HEATMAP_ZOOM_STEP = 0.25;
 const number0 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const number1 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
 
@@ -60,7 +63,10 @@ type MapProjection = {
   offsetY: number;
 };
 
+type MapPan = { x: number; y: number };
+
 const wardSeeds = new Map<string, WardSeed>(HCMC_WARD_SEEDS.map((ward) => [ward.id, ward]));
+const DEFAULT_MAP_PAN: MapPan = { x: 0, y: 0 };
 
 function fmt(value: number, digits: 0 | 1 = 0): string {
   return (digits === 0 ? number0 : number1).format(value);
@@ -68,6 +74,26 @@ function fmt(value: number, digits: 0 | 1 = 0): string {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function clampHeatmapPan(zoom: number, pan: MapPan): MapPan {
+  const width = MAP_WIDTH / zoom;
+  const height = MAP_HEIGHT / zoom;
+  const baseX = (MAP_WIDTH - width) / 2;
+  const baseY = (MAP_HEIGHT - height) / 2;
+  return {
+    x: clamp(pan.x, -baseX, MAP_WIDTH - width - baseX),
+    y: clamp(pan.y, -baseY, MAP_HEIGHT - height - baseY),
+  };
+}
+
+function heatmapViewBox(zoom: number, pan: MapPan): string {
+  const width = MAP_WIDTH / zoom;
+  const height = MAP_HEIGHT / zoom;
+  const baseX = (MAP_WIDTH - width) / 2;
+  const baseY = (MAP_HEIGHT - height) / 2;
+  const clampedPan = clampHeatmapPan(zoom, pan);
+  return `${(baseX + clampedPan.x).toFixed(1)} ${(baseY + clampedPan.y).toFixed(1)} ${width.toFixed(1)} ${height.toFixed(1)}`;
 }
 
 function hashText(input: string): number {
@@ -403,23 +429,105 @@ function WardHeatmap({
   stations,
   activeId,
   compareIds,
+  zoom,
+  pan,
   onSelect,
+  onZoomChange,
+  onPanChange,
+  onZoomReset,
 }: {
   stations: WardStation[];
   activeId: string | null;
   compareIds: string[];
+  zoom: number;
+  pan: MapPan;
   onSelect: (id: string | null) => void;
+  onZoomChange: (direction: -1 | 1) => void;
+  onPanChange: (pan: MapPan) => void;
+  onZoomReset: () => void;
 }) {
   const stationById = useMemo(() => new Map<string, WardStation>(stations.map((station) => [station.id, station])), [stations]);
   const compared = useMemo(() => new Set(compareIds), [compareIds]);
+  const viewBoxValue = heatmapViewBox(zoom, pan);
+  const canPan = zoom > HEATMAP_MIN_ZOOM;
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startPan: MapPan;
+    viewWidth: number;
+    viewHeight: number;
+    rectWidth: number;
+    rectHeight: number;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
+
+  const handlePointerDown: PointerEventHandler<SVGSVGElement> = (event) => {
+    if (event.button !== 0 || !canPan) return;
+    const [, , viewWidth, viewHeight] = viewBoxValue.split(" ").map(Number);
+    const rect = event.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startPan: pan,
+      viewWidth,
+      viewHeight,
+      rectWidth: rect.width,
+      rectHeight: rect.height,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove: PointerEventHandler<SVGSVGElement> = (event) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    event.preventDefault();
+    const moveX = event.clientX - drag.startX;
+    const moveY = event.clientY - drag.startY;
+    if (Math.abs(moveX) > 3 || Math.abs(moveY) > 3) suppressClickRef.current = true;
+    onPanChange(clampHeatmapPan(zoom, {
+      x: drag.startPan.x + ((drag.startX - event.clientX) * drag.viewWidth) / Math.max(1, drag.rectWidth),
+      y: drag.startPan.y + ((drag.startY - event.clientY) * drag.viewHeight) / Math.max(1, drag.rectHeight),
+    }));
+  };
+
+  const handlePointerEnd: PointerEventHandler<SVGSVGElement> = (event) => {
+    if (dragRef.current?.pointerId === event.pointerId && event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current = null;
+  };
+
+  const handleClickCapture: MouseEventHandler<SVGSVGElement> = (event) => {
+    if (!suppressClickRef.current) return;
+    suppressClickRef.current = false;
+    event.preventDefault();
+    event.stopPropagation();
+  };
 
   return (
     <>
+      <div className="hm-zoom-controls" role="toolbar" aria-label="Dieu khien zoom ban do nhiet">
+        <button type="button" onClick={() => onZoomChange(-1)} aria-label="Thu nho ban do">-</button>
+        <span>Zoom {zoom.toFixed(2)}x</span>
+        <button type="button" onClick={() => onZoomChange(1)} aria-label="Phong to ban do">+</button>
+        <button type="button" onClick={onZoomReset}>Reset</button>
+      </div>
       <svg
-        viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
-        className="hm-map-svg hm-real-map-svg"
+        viewBox={viewBoxValue}
+        className={`hm-map-svg hm-real-map-svg ${canPan ? "hm-map-svg--draggable" : ""}`}
         role="img"
         aria-label={`Bản đồ nhiệt AQI/PM2.5 theo ${HCMC_WARD_COUNT} phường/xã/đặc khu TP.HCM`}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onClickCapture={handleClickCapture}
+        onWheel={(event) => {
+          event.preventDefault();
+          onZoomChange(event.deltaY > 0 ? -1 : 1);
+        }}
         onClick={() => onSelect(null)}
       >
         <rect x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} rx={18} fill="#081321" />
@@ -748,6 +856,8 @@ function WardComparisonPanel({
 export default function HeatmapPage() {
   const [stations, setStations] = useState<WardStation[]>(HCMC_WARD_SEEDS.map((seed) => seedToWard(seed)));
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [mapZoom, setMapZoom] = useState(1);
+  const [mapPan, setMapPan] = useState<MapPan>(DEFAULT_MAP_PAN);
   const [compareIds, setCompareIds] = useState<string[]>(["q1_ben-thanh", "q7_tan-my", "q_bt_gia-dinh"]);
   const [compareTouched, setCompareTouched] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
@@ -824,6 +934,23 @@ export default function HeatmapPage() {
     ? loadedStations.reduce((current, station) => (current.aqi < station.aqi ? current : station))
     : null;
 
+  function changeMapZoom(direction: -1 | 1) {
+    setMapZoom((value) => {
+      const nextZoom = clamp(+(value + direction * HEATMAP_ZOOM_STEP).toFixed(2), HEATMAP_MIN_ZOOM, HEATMAP_MAX_ZOOM);
+      setMapPan((current) => clampHeatmapPan(nextZoom, current));
+      return nextZoom;
+    });
+  }
+
+  function changeMapPan(nextPan: MapPan) {
+    setMapPan(clampHeatmapPan(mapZoom, nextPan));
+  }
+
+  function resetMapView() {
+    setMapZoom(HEATMAP_MIN_ZOOM);
+    setMapPan(DEFAULT_MAP_PAN);
+  }
+
   function updateCompareIds(ids: string[]) {
     setCompareTouched(true);
     setCompareIds(ids.filter((id) => wardSeeds.has(id)).slice(0, 3));
@@ -867,7 +994,17 @@ export default function HeatmapPage() {
       <div className="hm-layout">
         <div className="hm-main-column">
           <div className="hm-map-wrap">
-            <WardHeatmap stations={stations} activeId={activeId} compareIds={compareIds} onSelect={setActiveId} />
+            <WardHeatmap
+              stations={stations}
+              activeId={activeId}
+              compareIds={compareIds}
+              zoom={mapZoom}
+              pan={mapPan}
+              onSelect={setActiveId}
+              onZoomChange={changeMapZoom}
+              onPanChange={changeMapPan}
+              onZoomReset={resetMapView}
+            />
             <Legend />
             {globalLoading && (
               <div className="hm-map-loading">
