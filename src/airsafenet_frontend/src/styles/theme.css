@@ -10,6 +10,8 @@
   --primary-2: #06b6d4;
   --border: rgba(255, 255, 255, 0.12);
   --shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+  --font-sans: "Segoe UI", "Roboto", "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+  --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, "Roboto Mono", "Liberation Mono", monospace;
 
   --good: #16a34a;
   --moderate: #eab308;
@@ -25,7 +27,7 @@
 
 body {
   margin: 0;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: var(--font-sans);
   background:
     radial-gradient(circle at top left, rgba(37, 99, 235, 0.25), transparent 30%),
     radial-gradient(circle at top right, rgba(6, 182, 212, 0.18), transparent 25%),
@@ -4300,7 +4302,7 @@ p {
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 6px;
   padding: 7px 12px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11.5px;
   color: #93c5fd;
   word-break: break-word;
@@ -4861,7 +4863,7 @@ p {
 }
 
 .admin-compute-card__title-row code {
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   background: rgba(255, 255, 255, 0.07);
   padding: 1px 5px;
@@ -5087,7 +5089,7 @@ p {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text, #f1f5f9);
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .admin-file-row__meta {
@@ -5634,7 +5636,7 @@ input.input-error:focus {
   background: rgba(255,255,255,0.08);
   padding: 1px 5px;
   border-radius: 4px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: #93c5fd;
 }
@@ -6538,7 +6540,7 @@ input.input-error:focus {
     radial-gradient(circle at 80% 80%, color-mix(in srgb, var(--accent, #3b82f6) 15%, transparent) 0%, transparent 50%),
     #070e1f;
   color: #f1f5f9;
-  font-family: Inter, system-ui, sans-serif;
+  font-family: var(--font-sans);
   overflow: hidden;
   z-index: 9999;
 }
@@ -7255,7 +7257,7 @@ input.input-error:focus {
 
 .hm-legend-range {
   font-size: 9.5px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   color: rgba(255,255,255,0.45);
   min-width: 48px;
 }
@@ -7474,7 +7476,7 @@ input.input-error:focus {
   font-size: 11px;
   font-weight: 800;
   min-width: 14px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .hm-ranking-row__name {
@@ -7492,7 +7494,7 @@ input.input-error:focus {
   font-weight: 800;
   min-width: 32px;
   text-align: right;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .hm-ranking-row__bar-bg {
@@ -7697,7 +7699,7 @@ input.input-error:focus {
 
 .hm-legend-range {
   font-size: 9.5px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   color: rgba(255,255,255,0.45);
   min-width: 48px;
 }
@@ -7916,7 +7918,7 @@ input.input-error:focus {
   font-size: 11px;
   font-weight: 800;
   min-width: 14px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .hm-ranking-row__name {
@@ -7934,7 +7936,7 @@ input.input-error:focus {
   font-weight: 800;
   min-width: 32px;
   text-align: right;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .hm-ranking-row__bar-bg {
@@ -8275,7 +8277,7 @@ input.input-error:focus {
 .anomaly-factor__delta {
   font-size: 12px;
   font-weight: 800;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   flex-shrink: 0;
 }
 
@@ -8574,7 +8576,7 @@ input.input-error:focus {
   min-width: 44px;
   flex-shrink: 0;
 }
-.act-card__time { font-size: 15px; font-weight: 800; color: var(--text, #e8eefc); font-family: ui-monospace, monospace; }
+.act-card__time { font-size: 15px; font-weight: 800; color: var(--text, #e8eefc); font-family: var(--font-mono); }
 .act-card__duration { font-size: 10px; color: var(--muted, #64748b); }
 
 .act-card__info { flex: 1; min-width: 0; }
@@ -9051,7 +9053,7 @@ input.input-error:focus {
 }
 .ap-card__time > strong {
   font-size: 16px; font-weight: 800;
-  color: var(--text, #e8eefc); font-family: ui-monospace,monospace;
+  color: var(--text, #e8eefc); font-family: var(--font-mono);
 }
 .ap-card__time > span { font-size: 10px; color: var(--muted, #64748b); }
 .ap-card__time > small { font-size: 9.5px; color: #475569; white-space: nowrap; }
@@ -9450,7 +9452,7 @@ input.input-error:focus {
   position: absolute; bottom: 3px;
   font-size: 8px; font-weight: 700;
   color: rgba(255,255,255,.4); text-align: center;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .ghp-cell--sel .ghp-cell__hour { color: var(--cell-color); }
 
@@ -9519,7 +9521,7 @@ input.input-error:focus {
 .ghp-slider-labels span {
   position: absolute; transform: translateX(-50%);
   font-size: 9.5px; color: rgba(255,255,255,.3);
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 /* ── Selected info card ───────────────────────────────────────────── */
@@ -9538,7 +9540,7 @@ input.input-error:focus {
 }
 .ghp-info-card__time {
   font-size: 26px; font-weight: 900; line-height: 1;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .ghp-info-card__label {
   font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
@@ -9581,7 +9583,7 @@ input.input-error:focus {
 }
 .ghp-top3-item__time {
   font-size: 17px; font-weight: 900; min-width: 52px;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 .ghp-top3-item__meta {
   display: flex; flex-direction: column; gap: 1px; flex: 1;
@@ -10047,7 +10049,7 @@ input.input-error:focus {
 }
 .exp-detail__formula code {
   font-size: 11.5px; color: #93c5fd;
-  font-family: ui-monospace, monospace; line-height: 1.5;
+  font-family: var(--font-mono); line-height: 1.5;
 }
 .exp-detail__rates {
   display: flex; gap: 14px; flex-wrap: wrap;
@@ -10363,7 +10365,7 @@ input.input-error:focus {
   min-width: 58px; flex-shrink: 0;
 }
 .sso-card__time > strong {
-  font-size: 18px; font-weight: 900; font-family: ui-monospace, monospace;
+  font-size: 18px; font-weight: 900; font-family: var(--font-mono);
   line-height: 1;
 }
 .sso-card__rel {
@@ -10436,7 +10438,7 @@ input.input-error:focus {
 .sso-existing__item > span:nth-child(2) { flex: 1; }
 .sso-existing__time {
   font-size: 11px; color: rgba(255,255,255,.3) !important;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 /* ── Responsive ───────────────────────────────────────────────────── */
@@ -10516,7 +10518,7 @@ input.input-error:focus {
 .wplanner-timeaxis__cell {
   display: flex; align-items: flex-start; justify-content: flex-end;
   padding-right: 6px;
-  font-size: 9px; font-family: ui-monospace, monospace;
+  font-size: 9px; font-family: var(--font-mono);
   color: rgba(255,255,255,.25); line-height: 1;
 }
 
@@ -10592,7 +10594,7 @@ input.input-error:focus {
 .wplanner-cell__aqi-label {
   position: absolute; right: 3px; top: 2px;
   font-size: 8px; font-weight: 700;
-  opacity: .7; font-family: ui-monospace, monospace;
+  opacity: .7; font-family: var(--font-mono);
 }
 
 /* ── Activity block ───────────────────────────────────────────────── */
@@ -10632,7 +10634,7 @@ input.input-error:focus {
 .wplanner-block__name > span:first-child { font-size: 12px; flex-shrink: 0; }
 .wplanner-block__time {
   font-size: 9px; color: rgba(255,255,255,.4);
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
 }
 
 .wplanner-block__del {
@@ -11224,7 +11226,7 @@ input.input-error:focus {
 .hpanel-borg__labels {
   display: flex; justify-content: space-between;
   font-size: 8.5px; color: rgba(255,255,255,.25);
-  font-family: ui-monospace, monospace; padding: 0 1px;
+  font-family: var(--font-mono); padding: 0 1px;
 }
 
 /* ── Mask ─────────────────────────────────────────────────────────── */
@@ -11263,7 +11265,7 @@ input.input-error:focus {
 .hpanel__maxtime-legend {
   display: flex; justify-content: space-between; position: relative;
   font-size: 8.5px; color: rgba(255,255,255,.25);
-  font-family: ui-monospace, monospace; margin-top: 2px;
+  font-family: var(--font-mono); margin-top: 2px;
 }
 .hpanel__maxtime-legend > span:nth-child(2) {
   position: absolute; transform: translateX(-50%); font-weight: 700;
@@ -11317,7 +11319,7 @@ input.input-error:focus {
 
 .ddb-compact__left { display: flex; align-items: baseline; gap: 5px; flex-shrink: 0; }
 .ddb-compact__dose {
-  font-size: 16px; font-weight: 900; font-family: ui-monospace, monospace;
+  font-size: 16px; font-weight: 900; font-family: var(--font-mono);
   line-height: 1;
 }
 .ddb-compact__label { font-size: 11px; color: rgba(255,255,255,.35); }
@@ -11479,7 +11481,7 @@ input.input-error:focus {
 .ddb-formula {
   padding: 7px 14px;
   font-size: 10px; color: rgba(255,255,255,.2);
-  font-family: ui-monospace, monospace; line-height: 1.4;
+  font-family: var(--font-mono); line-height: 1.4;
   border-top: 1px solid rgba(255,255,255,.04);
 }
 .ddb-formula > strong { color: rgba(255,255,255,.5); }
@@ -11857,7 +11859,7 @@ input.input-error:focus {
 }
 .sia-arrow__from > span:first-child,
 .sia-arrow__to   > span:first-child {
-  font-size: 24px; font-weight: 900; font-family: ui-monospace, monospace;
+  font-size: 24px; font-weight: 900; font-family: var(--font-mono);
   line-height: 1;
 }
 .sia-arrow__unit  { font-size: 9px; color: rgba(255,255,255,.35); text-transform: uppercase; }
@@ -11921,7 +11923,7 @@ input.input-error:focus {
 }
 .sia-countdown__time {
   font-size: 26px; font-weight: 900; color: #f0f6ff;
-  font-family: ui-monospace, monospace; line-height: 1;
+  font-family: var(--font-mono); line-height: 1;
   transition: color .3s;
 }
 .sia-countdown--urgent .sia-countdown__time {
@@ -12128,7 +12130,7 @@ input.input-error:focus {
 /* Multiplier badge */
 .crs-mult {
   font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 999px;
-  border: 1px solid; flex-shrink: 0; font-family: ui-monospace, monospace;
+  border: 1px solid; flex-shrink: 0; font-family: var(--font-mono);
   transition: color .3s, background .3s;
 }
 
@@ -16550,7 +16552,7 @@ input.input-error:focus {
 .cm-ward:hover, .cm-ward--active { filter: brightness(1.18); }
 .cm-ward--active { stroke-linejoin: round; }
 .cm-route-layer line { filter: drop-shadow(0 5px 12px rgba(0,0,0,0.28)); }
-.cm-route-pin text, .cm-map-label { font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+.cm-route-pin text, .cm-map-label { font-family: var(--font-sans); }
 .cm-map-label { fill: #f8fafc; font-size: 14px; font-weight: 900; paint-order: stroke; stroke: rgba(2, 6, 23, 0.86); stroke-width: 4px; }
 
 .cm-legend {
@@ -17231,4 +17233,41 @@ input.input-error:focus {
 .hm-map-svg--draggable:active,
 .cm-map--draggable:active {
   cursor: grabbing;
+}
+/* Font normalization for Vietnamese UI */
+html,
+body,
+button,
+input,
+select,
+textarea {
+  font-family: var(--font-sans);
+  font-kerning: normal;
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  letter-spacing: 0;
+}
+
+svg text,
+.hm-station-label,
+.cm-map-label,
+.cm-route-pin text {
+  font-family: var(--font-sans) !important;
+}
+
+code,
+pre,
+kbd,
+samp,
+.hm-ranking-row__rank,
+.hm-ranking-row__aqi,
+.hm-legend-range {
+  font-family: var(--font-mono);
 }
