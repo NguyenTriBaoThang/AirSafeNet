@@ -7,6 +7,7 @@ import { getUserProfileRule, USER_PROFILE_RULES } from "../data/userProfileRules
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "https://localhost:7276";
 const MAP_W = 860;
 const MAP_H = 720;
+const CLEAN_MAP_MAX_ZOOM = 6.0;
 const nf0 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const nf1 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
 const fmt = (n: number, d: 0 | 1 = 0) => (d ? nf1 : nf0).format(n);
@@ -68,6 +69,9 @@ const PROJ = projection(HCMC_WARD_SEEDS);
 function project(lon: number, lat: number) { const x = lon * PROJ.lonScale; return { x: PROJ.ox + (x - PROJ.minX) * PROJ.scale, y: PROJ.oy + (PROJ.maxLat - lat) * PROJ.scale }; }
 function pathOfGeometry(geometry: WardBoundaryGeometry) { return geometryPolygons(geometry).flatMap((polygon) => polygon.map((ring) => ring.map(([lon, lat], i) => { const p = project(lon, lat); return `${i ? "L" : "M"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`; }).join(" ") + " Z")).join(" "); }
 function pathOf(w: WardSeed) { return pathOfGeometry(w.geometry); }
+function pointInRing(point: { x: number; y: number }, ring: number[][]) { let inside = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) { const pi = project(ring[i][0], ring[i][1]); const pj = project(ring[j][0], ring[j][1]); const intersects = (pi.y > point.y) !== (pj.y > point.y) && point.x < ((pj.x - pi.x) * (point.y - pi.y)) / Math.max(0.000001, pj.y - pi.y) + pi.x; if (intersects) inside = !inside; } return inside; }
+function pointInWard(point: { x: number; y: number }, ward: WardSeed) { return geometryPolygons(ward.geometry).some((polygon) => { const [outer, ...holes] = polygon; return Boolean(outer && pointInRing(point, outer) && !holes.some((hole) => pointInRing(point, hole))); }); }
+function eventToSvgPoint(event: { currentTarget: SVGSVGElement; clientX: number; clientY: number }, viewBoxValue: string) { const rect = event.currentTarget.getBoundingClientRect(); const [vx, vy, vw, vh] = viewBoxValue.split(" ").map(Number); return { x: vx + ((event.clientX - rect.left) / Math.max(1, rect.width)) * vw, y: vy + ((event.clientY - rect.top) / Math.max(1, rect.height)) * vh }; }
 function km(a: { lat: number; lon: number }, b: { lat: number; lon: number }) { const r = 6371, dLat = (b.lat - a.lat) * Math.PI / 180, dLon = (b.lon - a.lon) * Math.PI / 180, la1 = a.lat * Math.PI / 180, la2 = b.lat * Math.PI / 180; const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2; return r * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h)); }
 function atHour(w: WardAir, hour: number) { return w.forecast[((hour % 24) + 24) % 24] ?? w.forecast[0]; }
 function resolveAddress(input: string, wards: WardAir[]) { const n = norm(input); if (!n) return null; const query = norm(LANDMARKS[n] ?? input); const exact = wards.find(w => norm(w.name) === query || w.aliases.some(a => norm(a) === query)); if (exact) return exact; const contains = wards.find(w => { const hay = norm(`${w.name} ${w.parentName} ${w.area} ${w.aliases.join(" ")}`); return hay.includes(query) || query.includes(norm(w.name)); }); if (contains) return contains; const tokens = query.split(" ").filter(Boolean); return [...wards].map(w => ({ w, score: tokens.reduce((s, t) => s + (norm(`${w.name} ${w.parentName} ${w.area}`).includes(t) ? 1 : 0), 0) })).sort((a, b) => b.score - a.score)[0]?.w ?? null; }
@@ -138,7 +142,7 @@ function tileList(viewBoxValue: string, mode: Mode) {
   const east = Math.max(nw.lon, se.lon);
   const north = Math.max(nw.lat, se.lat);
   const south = Math.min(nw.lat, se.lat);
-  let z = mode === "city" ? 11 : 13;
+  let z = mode === "city" ? 11 : 12;
 
   function build(zoom: number) {
     const minX = clamp(lonToTileX(west, zoom), 0, 2 ** zoom - 1);
@@ -168,7 +172,7 @@ function tileList(viewBoxValue: string, mode: Mode) {
   }
 
   let tiles = build(z);
-  while (tiles.length > 180 && z > 10) {
+  while (tiles.length > 72 && z > 10) {
     z -= 1;
     tiles = build(z);
   }
@@ -196,8 +200,12 @@ function WardMap({ wards, activeId, mode, zoom, pan, route, onSelect, onZoomChan
     rectHeight: number;
   } | null>(null);
   const suppressClickRef = useRef(false);
+  const panFrameRef = useRef<number | null>(null);
+  const pendingPanRef = useRef<MapPan | null>(null);
+  function schedulePanChange(nextPan: MapPan) { pendingPanRef.current = nextPan; if (panFrameRef.current !== null) return; panFrameRef.current = requestAnimationFrame(() => { panFrameRef.current = null; const pending = pendingPanRef.current; pendingPanRef.current = null; if (pending) onPanChange(pending); }); }
 
   const handlePointerDown: PointerEventHandler<SVGSVGElement> = (event) => {
+    suppressClickRef.current = false;
     if (event.button !== 0 || !canPan) return;
     const rect = event.currentTarget.getBoundingClientRect();
     dragRef.current = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, startPan: pan, viewWidth, viewHeight, rectWidth: rect.width, rectHeight: rect.height };
@@ -208,8 +216,8 @@ function WardMap({ wards, activeId, mode, zoom, pan, route, onSelect, onZoomChan
     if (!drag) return;
     event.preventDefault();
     const moveX = event.clientX - drag.startX, moveY = event.clientY - drag.startY;
-    if (Math.abs(moveX) > 3 || Math.abs(moveY) > 3) suppressClickRef.current = true;
-    onPanChange({
+    if (Math.abs(moveX) > 8 || Math.abs(moveY) > 8) suppressClickRef.current = true;
+    schedulePanChange({
       x: drag.startPan.x + ((drag.startX - event.clientX) * drag.viewWidth) / Math.max(1, drag.rectWidth),
       y: drag.startPan.y + ((drag.startY - event.clientY) * drag.viewHeight) / Math.max(1, drag.rectHeight),
     });
@@ -224,14 +232,15 @@ function WardMap({ wards, activeId, mode, zoom, pan, route, onSelect, onZoomChan
     event.preventDefault();
     event.stopPropagation();
   };
+  const handleMapClick: MouseEventHandler<SVGSVGElement> = (event) => { const point = eventToSvgPoint(event, vb); const ward = wards.find((candidate) => pointInWard(point, candidate)); if (ward) onSelect(ward.id); };
 
-  return <svg className={`cm-map ${canPan ? "cm-map--draggable" : ""}`} viewBox={vb} role="img" aria-label="Bản đồ nền kiểu Google Map với lớp heatmap AQI/PM2.5 168 phường/xã/đặc khu TP.HCM" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerEnd} onPointerCancel={handlePointerEnd} onClickCapture={handleClickCapture} onWheel={(event) => { event.preventDefault(); onZoomChange(event.deltaY > 0 ? -1 : 1); }} onClick={() => onSelect(null)}>
+  return <svg className={`cm-map ${canPan ? "cm-map--draggable" : ""}`} viewBox={vb} role="img" aria-label="Bản đồ nền kiểu Google Map với lớp heatmap AQI/PM2.5 168 phường/xã/đặc khu TP.HCM" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerEnd} onPointerCancel={handlePointerEnd} onClickCapture={handleClickCapture} onClick={handleMapClick} onWheel={(event) => { event.preventDefault(); onZoomChange(event.deltaY > 0 ? -1 : 1); }}>
     <rect x={0} y={0} width={MAP_W} height={MAP_H} rx={18} fill="#eef3f8" />
     <TileLayer viewBoxValue={vb} mode={mode} />
     <rect className="cm-map-wash" x={0} y={0} width={MAP_W} height={MAP_H} rx={18} />
     <g>{wards.map(w => {
       const isActive = activeId === w.id, inRoute = routeIds.has(w.id);
-      return <path key={w.id} d={pathOf(w)} className={`cm-ward ${isActive ? "cm-ward--active" : ""} ${inRoute ? "cm-ward--route" : ""}`} fill={color(w.risk)} fillOpacity={isActive ? 0.72 : inRoute ? 0.58 : 0.42} stroke={isActive ? "#0f172a" : inRoute ? "#0369a1" : "rgba(15,23,42,0.42)"} strokeWidth={isActive ? 2.4 : inRoute ? 1.8 : 0.75} onClick={e => { e.stopPropagation(); onSelect(isActive ? null : w.id); }}><title>{`${w.name} - AQI ${w.aqi}, PM2.5 ${w.pm25} µg/m³`}</title></path>;
+      return <path key={w.id} d={pathOf(w)} className={`cm-ward ${isActive ? "cm-ward--active" : ""} ${inRoute ? "cm-ward--route" : ""}`} fill={color(w.risk)} fillOpacity={isActive ? 0.72 : inRoute ? 0.58 : 0.42} stroke={isActive ? "#0f172a" : inRoute ? "#0369a1" : "rgba(15,23,42,0.42)"} strokeWidth={isActive ? 2.4 : inRoute ? 1.8 : 0.75} onClick={e => { e.stopPropagation(); onSelect(w.id); }}><title>{`${w.name} - AQI ${w.aqi}, PM2.5 ${w.pm25} µg/m³`}</title></path>;
     })}</g>
     <g className="cm-ward-boundary-layer" aria-hidden="true">{wards.map(w => <path key={`boundary-${w.id}`} d={pathOf(w)} className="cm-ward-boundary" />)}</g>
     <g className="cm-district-boundary-layer" aria-hidden="true"><path d={pathOfGeometry(HCMC_CITY_BOUNDARY)} className="cm-district-boundary" /></g>
@@ -296,7 +305,7 @@ export default function CleanMapPage() {
   function selectMode(nextMode: Mode) { setMode(nextMode); setMapPan(DEFAULT_MAP_PAN); }
   function selectWard(id: string | null) { setActiveId(id); setMapPan(DEFAULT_MAP_PAN); if (id && mode === "city") setMode("ward"); }
   function selectRoute(id: RouteId) { setSelectedRouteId(id); setMode("route"); setMapPan(DEFAULT_MAP_PAN); }
-  function changeZoom(direction: -1 | 1) { setZoom(v => { const nextZoom = clamp(+(v + direction * 0.25).toFixed(2), 1, 2.8); setMapPan(current => clampCurrentPan(current, nextZoom)); return nextZoom; }); }
+  function changeZoom(direction: -1 | 1) { setZoom(v => { const nextZoom = clamp(+(v + direction * 0.25).toFixed(2), 1, CLEAN_MAP_MAX_ZOOM); setMapPan(current => clampCurrentPan(current, nextZoom)); return nextZoom; }); }
   function changeMapPan(nextPan: MapPan) { setMapPan(clampCurrentPan(nextPan)); }
 
   return <main className="cm-page"><header className="cm-header"><div><span className="cm-eyebrow">Clean Route & Ward Air Quality Map</span><h2>Bản đồ AQI/PM2.5 theo {HCMC_WARD_COUNT} phường/xã/đặc khu TP.HCM</h2><p>{computing ? "AI district cache đang được khởi tạo; bản đồ vẫn hiển thị bằng lớp ước tính để demo." : `Dữ liệu cập nhật ${lastUpdated} · ${HCMC_WARD_LAYER_SOURCE}`}</p></div><div className="cm-header__stats"><div><span>AQI trung bình</span><strong style={{ color: color(avgAqi) }}>{avgAqi}</strong></div><div><span>Sạch nhất</span><strong>{best?.name} · AQI {best?.aqi}</strong></div><div><span>Ô nhiễm cao</span><strong>{worst?.name} · AQI {worst?.aqi}</strong></div></div></header><div className="cm-toolbar"><div className="cm-mode-tabs" role="tablist" aria-label="Cấp zoom bản đồ">{[{ id: "city", text: "Cấp thành phố" }, { id: "ward", text: "Cấp phường/xã" }, { id: "route", text: "Cấp tuyến đường" }].map(x => <button key={x.id} className={mode === x.id ? "active" : ""} onClick={() => selectMode(x.id as Mode)} type="button">{x.text}</button>)}</div><div className="cm-zoom-controls"><button type="button" onClick={() => changeZoom(-1)}>-</button><span>Zoom {zoom.toFixed(2)}x</span><button type="button" onClick={() => changeZoom(1)}>+</button><button type="button" onClick={resetMapView}>Reset</button></div></div><section className="cm-layout"><div className="cm-map-panel"><WardMap wards={wards} activeId={activeId} mode={mode} zoom={zoom} pan={mapPan} route={selectedRoute} onSelect={selectWard} onZoomChange={changeZoom} onPanChange={changeMapPan} /><Legend />{loading && <div className="cm-map-loading">Đang đồng bộ dữ liệu AQI...</div>}</div><aside className="cm-side-panel">{activeWard ? <WardDetail ward={activeWard} /> : <section className="cm-empty-detail"><h3>Chọn một phường/xã trên bản đồ</h3><p>Bấm vào vùng màu để xem AQI, PM2.5, nguồn dữ liệu, confidence, khuyến nghị sức khỏe và giờ sạch hơn trong ngày.</p></section>}<Ranking wards={wards} activeId={activeId} onSelect={selectWard} /></aside></section><RoutePlanner wards={wards} startInput={startInput} endInput={endInput} departureTime={departureTime} vehicleId={vehicleId} profileId={profileId} selectedRouteId={selectedRouteId} routes={routes} startWard={startWard} endWard={endWard} onStart={setStartInput} onEnd={setEndInput} onTime={setDepartureTime} onVehicle={setVehicleId} onProfile={setProfileId} onRoute={selectRoute} /></main>;

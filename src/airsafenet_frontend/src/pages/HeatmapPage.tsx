@@ -8,7 +8,7 @@ const MAP_WIDTH = 620;
 const MAP_HEIGHT = 760;
 const MAP_PADDING = 26;
 const HEATMAP_MIN_ZOOM = 1;
-const HEATMAP_MAX_ZOOM = 3.2;
+const HEATMAP_MAX_ZOOM = 6.0;
 const HEATMAP_ZOOM_STEP = 0.25;
 const number0 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
 const number1 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
@@ -334,6 +334,90 @@ function project(lon: number, lat: number): { x: number; y: number } {
   };
 }
 
+function unproject(x: number, y: number): { lon: number; lat: number } {
+  const worldX = (x - MAP_PROJECTION.offsetX) / MAP_PROJECTION.scale + MAP_PROJECTION.minX;
+  return {
+    lon: worldX / MAP_PROJECTION.lonScale,
+    lat: MAP_PROJECTION.maxLat - (y - MAP_PROJECTION.offsetY) / MAP_PROJECTION.scale,
+  };
+}
+
+function lonToTileX(lon: number, z: number): number {
+  return Math.floor(((lon + 180) / 360) * 2 ** z);
+}
+
+function latToTileY(lat: number, z: number): number {
+  const rad = (lat * Math.PI) / 180;
+  return Math.floor(((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * 2 ** z);
+}
+
+function tileXToLon(x: number, z: number): number {
+  return (x / 2 ** z) * 360 - 180;
+}
+
+function tileYToLat(y: number, z: number): number {
+  const n = Math.PI - (2 * Math.PI * y) / 2 ** z;
+  return (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+
+function heatmapTileList(viewBoxValue: string) {
+  const [vx, vy, vw, vh] = viewBoxValue.split(" ").map(Number);
+  const padX = vw * 0.08;
+  const padY = vh * 0.08;
+  const nw = unproject(clamp(vx - padX, 0, MAP_WIDTH), clamp(vy - padY, 0, MAP_HEIGHT));
+  const se = unproject(clamp(vx + vw + padX, 0, MAP_WIDTH), clamp(vy + vh + padY, 0, MAP_HEIGHT));
+  const west = Math.min(nw.lon, se.lon);
+  const east = Math.max(nw.lon, se.lon);
+  const north = Math.max(nw.lat, se.lat);
+  const south = Math.min(nw.lat, se.lat);
+  let z = vw < MAP_WIDTH / 2 ? 12 : 11;
+
+  function build(zoom: number) {
+    const minX = clamp(lonToTileX(west, zoom), 0, 2 ** zoom - 1);
+    const maxX = clamp(lonToTileX(east, zoom), 0, 2 ** zoom - 1);
+    const minY = clamp(latToTileY(north, zoom), 0, 2 ** zoom - 1);
+    const maxY = clamp(latToTileY(south, zoom), 0, 2 ** zoom - 1);
+    const tiles: Array<{ key: string; url: string; x: number; y: number; w: number; h: number }> = [];
+    for (let tx = minX; tx <= maxX; tx += 1) {
+      for (let ty = minY; ty <= maxY; ty += 1) {
+        const leftLon = tileXToLon(tx, zoom);
+        const rightLon = tileXToLon(tx + 1, zoom);
+        const topLat = tileYToLat(ty, zoom);
+        const bottomLat = tileYToLat(ty + 1, zoom);
+        const p1 = project(leftLon, topLat);
+        const p2 = project(rightLon, bottomLat);
+        tiles.push({
+          key: `${zoom}-${tx}-${ty}`,
+          url: `https://tile.openstreetmap.org/${zoom}/${tx}/${ty}.png`,
+          x: Math.min(p1.x, p2.x),
+          y: Math.min(p1.y, p2.y),
+          w: Math.abs(p2.x - p1.x) + 0.5,
+          h: Math.abs(p2.y - p1.y) + 0.5,
+        });
+      }
+    }
+    return tiles;
+  }
+
+  let tiles = build(z);
+  while (tiles.length > 72 && z > 10) {
+    z -= 1;
+    tiles = build(z);
+  }
+  return tiles;
+}
+
+function HeatmapTileLayer({ viewBoxValue }: { viewBoxValue: string }) {
+  const tiles = heatmapTileList(viewBoxValue);
+  return (
+    <g className="hm-gis-basemap" aria-hidden="true">
+      {tiles.map((tile) => (
+        <image key={tile.key} href={tile.url} x={tile.x} y={tile.y} width={tile.w} height={tile.h} preserveAspectRatio="none" />
+      ))}
+    </g>
+  );
+}
+
 function geometryToPath(geometry: WardBoundaryGeometry): string {
   const paths: string[] = [];
   for (const polygon of getGeometryPolygons(geometry)) {
@@ -346,6 +430,34 @@ function geometryToPath(geometry: WardBoundaryGeometry): string {
     }
   }
   return paths.join(" ");
+}
+
+function pointInRing(point: { x: number; y: number }, ring: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const pi = project(ring[i][0], ring[i][1]);
+    const pj = project(ring[j][0], ring[j][1]);
+    const intersects = (pi.y > point.y) !== (pj.y > point.y) && point.x < ((pj.x - pi.x) * (point.y - pi.y)) / Math.max(0.000001, pj.y - pi.y) + pi.x;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function pointInGeometry(point: { x: number; y: number }, geometry: WardBoundaryGeometry): boolean {
+  for (const polygon of getGeometryPolygons(geometry)) {
+    const [outer, ...holes] = polygon;
+    if (outer && pointInRing(point, outer) && !holes.some((hole) => pointInRing(point, hole))) return true;
+  }
+  return false;
+}
+
+function eventToSvgPoint(event: { currentTarget: SVGSVGElement; clientX: number; clientY: number }, viewBoxValue: string) {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const [vx, vy, vw, vh] = viewBoxValue.split(" ").map(Number);
+  return {
+    x: vx + ((event.clientX - rect.left) / Math.max(1, rect.width)) * vw,
+    y: vy + ((event.clientY - rect.top) / Math.max(1, rect.height)) * vh,
+  };
 }
 
 
@@ -429,9 +541,11 @@ function WardHeatmap({
   stations,
   activeId,
   compareIds,
+  compareMode,
   zoom,
   pan,
   onSelect,
+  onCompareToggle,
   onZoomChange,
   onPanChange,
   onZoomReset,
@@ -439,9 +553,11 @@ function WardHeatmap({
   stations: WardStation[];
   activeId: string | null;
   compareIds: string[];
+  compareMode: boolean;
   zoom: number;
   pan: MapPan;
   onSelect: (id: string | null) => void;
+  onCompareToggle: (id: string) => void;
   onZoomChange: (direction: -1 | 1) => void;
   onPanChange: (pan: MapPan) => void;
   onZoomReset: () => void;
@@ -461,8 +577,30 @@ function WardHeatmap({
     rectHeight: number;
   } | null>(null);
   const suppressClickRef = useRef(false);
+  const panFrameRef = useRef<number | null>(null);
+  const pendingPanRef = useRef<MapPan | null>(null);
+
+  function pickWard(id: string) {
+    if (compareMode) {
+      onCompareToggle(id);
+      return;
+    }
+    onSelect(id);
+  }
+
+  function schedulePanChange(nextPan: MapPan) {
+    pendingPanRef.current = nextPan;
+    if (panFrameRef.current !== null) return;
+    panFrameRef.current = requestAnimationFrame(() => {
+      panFrameRef.current = null;
+      const pending = pendingPanRef.current;
+      pendingPanRef.current = null;
+      if (pending) onPanChange(pending);
+    });
+  }
 
   const handlePointerDown: PointerEventHandler<SVGSVGElement> = (event) => {
+    suppressClickRef.current = false;
     if (event.button !== 0 || !canPan) return;
     const [, , viewWidth, viewHeight] = viewBoxValue.split(" ").map(Number);
     const rect = event.currentTarget.getBoundingClientRect();
@@ -485,8 +623,8 @@ function WardHeatmap({
     event.preventDefault();
     const moveX = event.clientX - drag.startX;
     const moveY = event.clientY - drag.startY;
-    if (Math.abs(moveX) > 3 || Math.abs(moveY) > 3) suppressClickRef.current = true;
-    onPanChange(clampHeatmapPan(zoom, {
+    if (Math.abs(moveX) > 8 || Math.abs(moveY) > 8) suppressClickRef.current = true;
+    schedulePanChange(clampHeatmapPan(zoom, {
       x: drag.startPan.x + ((drag.startX - event.clientX) * drag.viewWidth) / Math.max(1, drag.rectWidth),
       y: drag.startPan.y + ((drag.startY - event.clientY) * drag.viewHeight) / Math.max(1, drag.rectHeight),
     }));
@@ -504,6 +642,12 @@ function WardHeatmap({
     suppressClickRef.current = false;
     event.preventDefault();
     event.stopPropagation();
+  };
+
+  const handleMapClick: MouseEventHandler<SVGSVGElement> = (event) => {
+    const point = eventToSvgPoint(event, viewBoxValue);
+    const ward = HCMC_WARD_SEEDS.find((seed) => pointInGeometry(point, seed.geometry));
+    if (ward) pickWard(ward.id);
   };
 
   return (
@@ -524,13 +668,15 @@ function WardHeatmap({
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
         onClickCapture={handleClickCapture}
+        onClick={handleMapClick}
         onWheel={(event) => {
           event.preventDefault();
           onZoomChange(event.deltaY > 0 ? -1 : 1);
         }}
-        onClick={() => onSelect(null)}
       >
         <rect x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} rx={18} fill="#081321" />
+        <HeatmapTileLayer viewBoxValue={viewBoxValue} />
+        <rect className="hm-map-wash" x={0} y={0} width={MAP_WIDTH} height={MAP_HEIGHT} rx={18} />
         <g className="hm-map-grid" aria-hidden="true">
           {[0.18, 0.34, 0.5, 0.66, 0.82].map((ratio) => (
             <line key={`h-${ratio}`} x1={28} x2={MAP_WIDTH - 28} y1={MAP_HEIGHT * ratio} y2={MAP_HEIGHT * ratio} />
@@ -559,7 +705,7 @@ function WardHeatmap({
                 fillRule="evenodd"
                 onClick={(event) => {
                   event.stopPropagation();
-                  onSelect(activeId === ward.id ? null : ward.id);
+                  pickWard(ward.id);
                 }}
               >
                 <title>{`${station?.name ?? ward.name} - ${station ? `AQI ${station.aqi}, PM2.5 ${station.pm25}` : "chưa có dữ liệu"}`}</title>
@@ -591,7 +737,7 @@ function WardHeatmap({
                 isCompared={compared.has(station.id)}
                 onClick={(event) => {
                   event.stopPropagation();
-                  onSelect(activeId === station.id ? null : station.id);
+                  pickWard(station.id);
                 }}
               />
             );
@@ -612,7 +758,7 @@ function WardHeatmap({
     </>
   );
 }
-function StationDetail({ station, onClose }: { station: WardStation; onClose: () => void }) {
+function StationDetail({ station, onClose }: { station: WardStation; onClose?: () => void }) {
   const color = riskColor(station.risk);
   const score = outdoorScore(station);
   return (
@@ -622,7 +768,7 @@ function StationDetail({ station, onClose }: { station: WardStation; onClose: ()
           <div className="hm-detail__area">{station.parentName} · {station.area}</div>
           <h3 className="hm-detail__name">{station.name}</h3>
         </div>
-        <button className="hm-detail__close" onClick={onClose} aria-label="Đóng chi tiết">×</button>
+        {onClose && <button className="hm-detail__close" onClick={onClose} aria-label="Dong chi tiet">x</button>}
       </div>
 
       <div className="hm-detail__aqi-row">
@@ -858,6 +1004,7 @@ export default function HeatmapPage() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [mapZoom, setMapZoom] = useState(1);
   const [mapPan, setMapPan] = useState<MapPan>(DEFAULT_MAP_PAN);
+  const [mapCompareMode, setMapCompareMode] = useState(false);
   const [compareIds, setCompareIds] = useState<string[]>(["q1_ben-thanh", "q7_tan-my", "q_bt_gia-dinh"]);
   const [compareTouched, setCompareTouched] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
@@ -951,6 +1098,21 @@ export default function HeatmapPage() {
     setMapPan(DEFAULT_MAP_PAN);
   }
 
+  function toggleMapCompare(id: string) {
+    if (!wardSeeds.has(id)) return;
+    setCompareTouched(true);
+    setActiveId(id);
+    setCompareIds((current) => {
+      if (current.includes(id)) {
+        return current.filter((selectedId) => selectedId !== id);
+      }
+      if (current.length >= 3) {
+        return [...current.slice(1), id];
+      }
+      return [...current, id];
+    });
+  }
+
   function updateCompareIds(ids: string[]) {
     setCompareTouched(true);
     setCompareIds(ids.filter((id) => wardSeeds.has(id)).slice(0, 3));
@@ -998,13 +1160,22 @@ export default function HeatmapPage() {
               stations={stations}
               activeId={activeId}
               compareIds={compareIds}
+              compareMode={mapCompareMode}
               zoom={mapZoom}
               pan={mapPan}
               onSelect={setActiveId}
+              onCompareToggle={toggleMapCompare}
               onZoomChange={changeMapZoom}
               onPanChange={changeMapPan}
               onZoomReset={resetMapView}
             />
+            <button
+              type="button"
+              className={`hm-map-compare-toggle ${mapCompareMode ? "hm-map-compare-toggle--active" : ""}`}
+              onClick={() => setMapCompareMode((value) => !value)}
+            >
+              {mapCompareMode ? `Đang chọn ${compareIds.length}/3` : "Chọn 2-3 phường"}
+            </button>
             <Legend />
             {globalLoading && (
               <div className="hm-map-loading">
@@ -1019,13 +1190,13 @@ export default function HeatmapPage() {
             compareIds={compareIds}
             onCompareIdsChange={updateCompareIds}
             activeId={activeId}
-            onSelect={(id) => setActiveId((current) => (current === id ? null : id))}
+            onSelect={(id) => setActiveId(id)}
           />
         </div>
 
         <div className="hm-sidebar">
           {activeStation && !activeStation.loading ? (
-            <StationDetail station={activeStation} onClose={() => setActiveId(null)} />
+            <StationDetail station={activeStation} />
           ) : (
             <div className="hm-sidebar__placeholder">
               <span>i</span>
@@ -1037,7 +1208,7 @@ export default function HeatmapPage() {
             stations={stations}
             activeId={activeId}
             compareIds={compareIds}
-            onSelect={(id) => setActiveId((current) => (current === id ? null : id))}
+            onSelect={(id) => setActiveId(id)}
           />
         </div>
       </div>

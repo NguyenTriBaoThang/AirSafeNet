@@ -17222,6 +17222,45 @@ input.input-error:focus {
     overflow-x: auto;
   }
 }
+
+.hm-map-compare-toggle {
+  position: absolute;
+  top: 62px;
+  left: 14px;
+  z-index: 8;
+  min-height: 34px;
+  max-width: calc(100% - 28px);
+  padding: 0 13px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(2, 6, 23, 0.72);
+  color: #e5edff;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+}
+
+.hm-map-compare-toggle:hover {
+  border-color: rgba(56, 189, 248, 0.62);
+  background: rgba(14, 165, 233, 0.2);
+}
+
+.hm-map-compare-toggle--active {
+  border-color: rgba(56, 189, 248, 0.76);
+  background: rgba(14, 165, 233, 0.28);
+  color: #e0f2fe;
+}
+
+@media (max-width: 600px) {
+  .hm-map-compare-toggle {
+    top: 58px;
+    left: 10px;
+    max-width: calc(100% - 20px);
+  }
+}
 /* Map drag affordance */
 .hm-map-svg--draggable,
 .cm-map--draggable {
@@ -17270,4 +17309,34 @@ samp,
 .hm-ranking-row__aqi,
 .hm-legend-range {
   font-family: var(--font-mono);
+}
+
+/* GIS-style basemap for Heatmap */
+.hm-gis-basemap image {
+  opacity: 0.5;
+  image-rendering: auto;
+  filter: saturate(0.85) brightness(0.72) contrast(1.05);
+}
+
+.hm-map-wash {
+  fill: rgba(2, 6, 23, 0.46);
+  pointer-events: none;
+}
+
+/* Map hit-test performance */
+.hm-gis-basemap,
+.hm-gis-basemap image,
+.hm-map-grid,
+.hm-map-grid line,
+.cm-basemap,
+.cm-basemap image,
+.cm-map-wash,
+.hm-map-wash {
+  pointer-events: none;
+}
+
+.hm-district-layer,
+.hm-station-layer,
+.cm-ward {
+  pointer-events: auto;
 }
