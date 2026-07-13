@@ -19,6 +19,8 @@ namespace airsafenet_backend.Controllers
         private readonly AiCachedService _aiService;
         private readonly AssistantDomainService _domainService;
         private readonly GeminiChatService _geminiChatService;
+        private readonly AssistantGenerationService _generationService;
+        private readonly AssistantIntentService _intentService;
         private readonly AssistantTimeResolverService _timeResolverService;
 
         public AssistantController(
@@ -26,12 +28,16 @@ namespace airsafenet_backend.Controllers
             AiCachedService aiService,
             AssistantDomainService domainService,
             GeminiChatService geminiChatService,
+            AssistantGenerationService generationService,
+            AssistantIntentService intentService,
             AssistantTimeResolverService timeResolverService)
         {
             _db = db;
             _aiService = aiService;
             _domainService = domainService;
             _geminiChatService = geminiChatService;
+            _generationService = generationService;
+            _intentService = intentService;
             _timeResolverService = timeResolverService;
         }
 
@@ -266,6 +272,8 @@ namespace airsafenet_backend.Controllers
                     .First();
             }
 
+            var intentContext = _intentService.Build(request.Message, userGroup, matched);
+
             var systemPrompt = $"""
 Bạn là AirSafeNet Assistant — trợ lý ảo thông minh về chất lượng không khí tại TP. Hồ Chí Minh.
 
@@ -285,6 +293,7 @@ CÁCH TRẢ LỜI (quan trọng):
 - Giờ hiện tại: {nowStr}
 
 {(hasLiveData ? "" : "LƯU Ý: Hệ thống chưa có dữ liệu real-time. Trả lời dựa trên kiến thức chung về không khí TP.HCM.")}
+{intentContext.SystemInstruction}
 """;
 
             // ── User prompt với context đầy đủ ────────────────────────────────
@@ -376,14 +385,27 @@ và nhắc người dùng xem dashboard sau khi hệ thống hoàn tất khởi 
             var userPrompt = $"""
 {contextBlock}
 
+{intentContext.PromptContext}
+
 Câu hỏi của người dùng:
 {request.Message}
 """;
 
-            var answer = await _geminiChatService.GenerateAssistantAnswerAsync(
-                systemPrompt,
-                userPrompt
+            var localFallbackAnswer = _intentService.BuildRuleBasedAnswer(
+                userGroup,
+                current,
+                matched,
+                intentContext,
+                hasLiveData,
+                nowLocal
             );
+
+            var generation = await _generationService.GenerateAsync(
+                systemPrompt,
+                userPrompt,
+                localFallbackAnswer
+            );
+            var answer = generation.Answer;
 
             var assistantMessage = new ChatMessage
             {
@@ -422,18 +444,16 @@ Câu hỏi của người dùng:
                 InDomain = true,
                 Answer = answer,
                 ConversationId = conversation.Id,
-                Source = hasLiveData ? (object)new
-                {
+                Source = BuildAssistantSource(
                     userGroup,
-                    currentAqi = current!.PredAqi,
-                    currentPm25 = current.PredPm25,
-                    matchedPhrase = forecastMatch!.MatchedPhrase,
-                    targetTime = forecastMatch.TargetTime,
-                    isFallback = forecastMatch.IsFallback,
-                    matchedForecastTime = matched!.Time,
-                    matchedForecastAqi = matched.PredAqi,
-                    matchedForecastPm25 = matched.PredPm25,
-                } : new { userGroup, note = "no live data" }
+                    hasLiveData,
+                    current,
+                    matched,
+                    forecastMatch,
+                    intentContext,
+                    generation,
+                    nowLocal
+                )
             });
         }
 
@@ -678,6 +698,7 @@ Câu hỏi của người dùng:
                     .First();
             }
 
+            var intentContextRegen = _intentService.Build(sourceUserMessage.Content, userGroup, matchedRegen);
             var groupVietRegen = UserProfileRuleService.Label(userGroup);
 
             var systemPromptRegen = $"""
@@ -693,6 +714,7 @@ CÁCH TRẢ LỜI:
 - Đây là lần regenerate — hãy trả lời theo góc độ hoặc cách diễn đạt KHÁC so với lần trước
 - Nhóm người dùng: {groupVietRegen}. Thời điểm: {nowStrRegen}
 {(hasLiveDataRegen ? "" : "LƯU Ý: Dữ liệu real-time chưa sẵn sàng, trả lời dựa trên kiến thức chung.")}
+{intentContextRegen.SystemInstruction}
 """;
 
             string contextBlockRegen = hasLiveDataRegen
@@ -720,11 +742,27 @@ Mức độ: {matchedRegen.RiskProfile} | Khuyến nghị: {matchedRegen.Recomme
             var userPromptRegen = $"""
 {contextBlockRegen}
 
+{intentContextRegen.PromptContext}
+
 Câu hỏi của người dùng:
 {sourceUserMessage.Content}
 """;
 
-            var answer = await _geminiChatService.GenerateAssistantAnswerAsync(systemPromptRegen, userPromptRegen);
+            var localFallbackAnswerRegen = _intentService.BuildRuleBasedAnswer(
+                userGroup,
+                current,
+                matchedRegen,
+                intentContextRegen,
+                hasLiveDataRegen,
+                nowLocalRegen
+            );
+
+            var generationRegen = await _generationService.GenerateAsync(
+                systemPromptRegen,
+                userPromptRegen,
+                localFallbackAnswerRegen
+            );
+            var answer = generationRegen.Answer;
 
             assistantMessage.Content = answer;
             assistantMessage.UserGroup = userGroup;
@@ -746,20 +784,70 @@ Câu hỏi của người dùng:
                 Answer = answer,
                 RegeneratedCount = assistantMessage.RegeneratedCount,
                 UpdatedAt = assistantMessage.UpdatedAt ?? DateTime.UtcNow,
-                Source = hasLiveDataRegen ? (object)new
-                {
+                Source = BuildAssistantSource(
                     userGroup,
-                    currentAqi = current!.PredAqi,
-                    currentPm25 = current.PredPm25,
-                    matchedPhrase = forecastMatchRegen?.MatchedPhrase,
-                    targetTime = forecastMatchRegen?.TargetTime,
-                    isFallback = forecastMatchRegen?.IsFallback ?? true,
-                    matchedForecastTime = matchedRegen?.Time,
-                    matchedForecastAqi = matchedRegen?.PredAqi,
-                    matchedForecastPm25 = matchedRegen?.PredPm25,
-                } : new { userGroup, note = "no live data" }
+                    hasLiveDataRegen,
+                    current,
+                    matchedRegen,
+                    forecastMatchRegen,
+                    intentContextRegen,
+                    generationRegen,
+                    nowLocalRegen
+                )
             });
         }
+        private static object BuildAssistantSource(
+            string userGroup,
+            bool hasLiveData,
+            AiCurrentResponse? current,
+            AiForecastItem? matched,
+            AssistantTimeResolverService.ForecastMatchResult? forecastMatch,
+            AssistantIntentContext intentContext,
+            AssistantGenerationResult generation,
+            DateTime checkedAtLocal)
+        {
+            var confidence = hasLiveData
+                ? (forecastMatch?.IsFallback == true ? 72 : 82)
+                : 42;
+
+            var dataLabel = hasLiveData
+                ? (forecastMatch?.IsFallback == true ? "forecast-fallback" : "forecast")
+                : "stale-local-fallback";
+
+            return new
+            {
+                userGroup,
+                currentAqi = hasLiveData && current != null ? (int?)current.PredAqi : null,
+                currentPm25 = hasLiveData && current != null ? (double?)current.PredPm25 : null,
+                matchedPhrase = forecastMatch?.MatchedPhrase,
+                targetTime = forecastMatch?.TargetTime,
+                isFallback = forecastMatch?.IsFallback ?? !hasLiveData,
+                matchedForecastTime = matched?.Time,
+                matchedForecastAqi = matched != null ? (int?)matched.PredAqi : null,
+                matchedForecastPm25 = matched != null ? (double?)matched.PredPm25 : null,
+                dataUpdatedAt = checkedAtLocal,
+                primarySource = "AirSafeNet AI cache",
+                upstreamSources = new[]
+                {
+                    "AirSafeNet AI cache",
+                    "Open-Meteo weather",
+                    "OpenAQ/official stations when configured"
+                },
+                dataLabel,
+                confidence,
+                answerProvider = generation.Provider,
+                fallbackLevel = generation.FallbackLevel,
+                intent = intentContext.Intent,
+                module = intentContext.ModuleName,
+                moduleHints = intentContext.ModuleHints,
+                durationMinutes = intentContext.DurationMinutes,
+                doseEstimateUg = intentContext.DoseEstimateUg,
+                doseBudgetPercent = intentContext.DoseBudgetPercent,
+                maxOutdoorMinutes = intentContext.MaxOutdoorMinutes,
+                actions = intentContext.Actions
+            };
+        }
+
         private static string WindDirectionToText(double degrees)
         {
             return ((degrees % 360 + 360) % 360) switch

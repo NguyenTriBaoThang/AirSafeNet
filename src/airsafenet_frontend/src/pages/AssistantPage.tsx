@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   createConversationApi,
   deleteConversationApi,
@@ -8,6 +9,8 @@ import {
   sendAssistantMessageApi,
 } from "../api/assistant";
 import type {
+  AssistantIntentAction,
+  AssistantSourceMeta,
   ChatMessage,
   ConversationDetailResponse,
   ConversationListItemResponse,
@@ -35,6 +38,116 @@ const STARTER_PROMPTS = [
   "3 ngày tới có thời điểm nào không nên tập thể dục ngoài trời?",
 ];
 
+const HISTORY_ACTIONS: AssistantIntentAction[] = [
+  { type: "create_alert", label: "Tạo cảnh báo", route: "/activity" },
+  { type: "open_map", label: "Xem trên bản đồ", route: "/heatmap" },
+  { type: "find_cleaner_time", label: "Tìm giờ sạch hơn", prompt: "Tìm 3 khung giờ sạch hơn cho hoạt động này." },
+  { type: "compare_route", label: "So sánh tuyến đường", route: "/clean-map" },
+];
+
+function buildHistoryMeta(message: ConversationDetailResponse["messages"][number]): AssistantSourceMeta {
+  const hasAirData = typeof message.currentAqi === "number" || typeof message.currentPm25 === "number";
+  return {
+    userGroup: message.userGroup ?? undefined,
+    currentAqi: typeof message.currentAqi === "number" ? message.currentAqi : undefined,
+    currentPm25: typeof message.currentPm25 === "number" ? message.currentPm25 : undefined,
+    dataUpdatedAt: message.updatedAt ?? message.createdAt,
+    primarySource: "AirSafeNet AI cache",
+    upstreamSources: ["AirSafeNet AI cache", "Open-Meteo weather", "OpenAQ/official stations when configured"],
+    dataLabel: hasAirData ? "saved-context" : "conversation-history",
+    confidence: hasAirData ? 70 : 45,
+    answerProvider: "Saved response",
+    fallbackLevel: "history",
+    module: "Air Quality Management",
+    actions: HISTORY_ACTIONS,
+  };
+}
+
+function formatTrustDate(value?: string | null): string {
+  if (!value) return "Theo thời điểm trả lời";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("vi-VN");
+}
+
+function dataLabelText(value?: string | null): string {
+  switch (value) {
+    case "forecast": return "Forecast";
+    case "forecast-fallback": return "Forecast gần nhất";
+    case "stale-local-fallback": return "Fallback/local";
+    case "saved-context": return "Lịch sử đã lưu";
+    case "conversation-history": return "Lịch sử hội thoại";
+    default: return value ?? "AirSafeNet context";
+  }
+}
+
+function fallbackLabel(value?: string | null): string {
+  switch (value) {
+    case "primary": return "Primary AI";
+    case "fallback-openai": return "OpenAI fallback";
+    case "fallback-local": return "Rule-based fallback";
+    case "history": return "Saved";
+    default: return value ?? "AI";
+  }
+}
+
+function AssistantDataTrustCard({ meta }: { meta: AssistantSourceMeta }) {
+  const confidence = typeof meta.confidence === "number" ? `${Math.round(meta.confidence)}%` : "Đang ước tính";
+  const source = meta.primarySource || "AirSafeNet AI cache";
+  const provider = [meta.answerProvider, fallbackLabel(meta.fallbackLevel)].filter(Boolean).join(" · ");
+
+  return (
+    <div className="assistant-trust-card">
+      <div className="assistant-trust-card__head">
+        <span>Data Trust Card</span>
+        <strong>{dataLabelText(meta.dataLabel)}</strong>
+      </div>
+
+      <div className="assistant-trust-grid">
+        <span>Cập nhật</span>
+        <strong>{formatTrustDate(meta.dataUpdatedAt)}</strong>
+        <span>Nguồn</span>
+        <strong>{source}</strong>
+        <span>Độ tin cậy</span>
+        <strong>{confidence}</strong>
+        <span>AI provider</span>
+        <strong>{provider}</strong>
+      </div>
+
+      <div className="assistant-trust-metrics">
+        {typeof meta.currentAqi === "number" ? <span>AQI hiện tại <strong>{meta.currentAqi}</strong></span> : null}
+        {typeof meta.currentPm25 === "number" ? <span>PM2.5 <strong>{meta.currentPm25.toFixed(1)}</strong></span> : null}
+        {typeof meta.matchedForecastAqi === "number" ? <span>Forecast AQI <strong>{meta.matchedForecastAqi}</strong></span> : null}
+        {typeof meta.matchedForecastPm25 === "number" ? <span>Forecast PM2.5 <strong>{meta.matchedForecastPm25.toFixed(1)}</strong></span> : null}
+        {typeof meta.doseBudgetPercent === "number" ? <span>Dose budget <strong>{meta.doseBudgetPercent.toFixed(1)}%</strong></span> : null}
+        {typeof meta.maxOutdoorMinutes === "number" ? <span>Giới hạn ngoài trời <strong>{meta.maxOutdoorMinutes} phút</strong></span> : null}
+      </div>
+
+      {meta.module ? <div className="assistant-trust-module">Module: <strong>{meta.module}</strong></div> : null}
+    </div>
+  );
+}
+
+function AssistantIntentActions({
+  actions,
+  onAction,
+}: {
+  actions?: AssistantIntentAction[] | null;
+  onAction: (action: AssistantIntentAction) => void;
+}) {
+  const visibleActions = (actions ?? []).filter((action) => action.label).slice(0, 5);
+  if (visibleActions.length === 0) return null;
+
+  return (
+    <div className="assistant-intent-actions">
+      {visibleActions.map((action) => (
+        <button key={`${action.type}-${action.label}`} type="button" onClick={() => onAction(action)}>
+          {action.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function mapConversationMessages(detail: ConversationDetailResponse): ChatMessage[] {
   const mapped = detail.messages.map((m) => ({
     id: m.messageId,
@@ -45,16 +158,7 @@ function mapConversationMessages(detail: ConversationDetailResponse): ChatMessag
     regeneratedCount: m.regeneratedCount ?? 0,
     sourceUserMessageId: m.sourceUserMessageId ?? null,
     isStreaming: false,
-    meta:
-      m.role === "assistant"
-        ? {
-            userGroup: m.userGroup ?? undefined,
-            currentAqi:
-              typeof m.currentAqi === "number" ? m.currentAqi : undefined,
-            currentPm25:
-              typeof m.currentPm25 === "number" ? m.currentPm25 : undefined,
-          }
-        : undefined,
+    meta: m.role === "assistant" ? buildHistoryMeta(m) : undefined,
   })) as ChatMessage[];
 
   for (let i = 0; i < mapped.length; i++) {
@@ -71,6 +175,7 @@ function mapConversationMessages(detail: ConversationDetailResponse): ChatMessag
 
 export default function AssistantPage() {
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
   const [sort, setSort] = useState<ConversationSort>("recent");
 
@@ -338,6 +443,18 @@ export default function AssistantPage() {
       ]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function handleIntentAction(action: AssistantIntentAction) {
+    if (action.route) {
+      navigate(action.route);
+      return;
+    }
+
+    if (action.prompt) {
+      setInput(action.prompt);
+      window.setTimeout(() => textareaRef.current?.focus(), 0);
     }
   }
 
@@ -846,17 +963,12 @@ export default function AssistantPage() {
                       </div>
 
                       {message.role === "assistant" && message.meta ? (
-                        <div className="chatgpt-message__meta">
-                          {typeof message.meta.currentAqi === "number" ? (
-                            <span>AQI hiện tại: {message.meta.currentAqi}</span>
+                        <>
+                          <AssistantDataTrustCard meta={message.meta} />
+                          {!message.isStreaming ? (
+                            <AssistantIntentActions actions={message.meta.actions} onAction={handleIntentAction} />
                           ) : null}
-                          {typeof message.meta.currentPm25 === "number" ? (
-                            <span>PM2.5: {message.meta.currentPm25}</span>
-                          ) : null}
-                          {message.meta.userGroup ? (
-                            <span>Nhóm: {message.meta.userGroup}</span>
-                          ) : null}
-                        </div>
+                        </>
                       ) : null}
                     </div>
                   </div>

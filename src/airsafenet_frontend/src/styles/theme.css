@@ -17340,3 +17340,123 @@ samp,
 .cm-ward {
   pointer-events: auto;
 }
+/* Assistant data trust card */
+.assistant-trust-card {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.32);
+  color: rgba(226, 232, 240, 0.92);
+}
+
+.assistant-trust-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  color: rgba(186, 230, 253, 0.86);
+}
+
+.assistant-trust-card__head strong {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.16);
+  color: #e0f2fe;
+  font-size: 11px;
+  text-transform: none;
+}
+
+.assistant-trust-grid {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.7fr) minmax(0, 1.3fr);
+  gap: 7px 12px;
+  font-size: 12px;
+}
+
+.assistant-trust-grid span {
+  color: rgba(148, 163, 184, 0.92);
+}
+
+.assistant-trust-grid strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #f8fafc;
+  font-weight: 800;
+}
+
+.assistant-trust-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 11px;
+}
+
+.assistant-trust-metrics span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.62);
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 12px;
+}
+
+.assistant-trust-metrics strong {
+  color: #f8fafc;
+}
+
+.assistant-trust-module {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 12px;
+}
+
+.assistant-trust-module strong {
+  color: #e0f2fe;
+}
+
+.assistant-intent-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.assistant-intent-actions button {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid rgba(96, 165, 250, 0.32);
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.16);
+  color: #dbeafe;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.assistant-intent-actions button:hover {
+  border-color: rgba(125, 211, 252, 0.58);
+  background: rgba(14, 165, 233, 0.24);
+  color: #f8fafc;
+}
+
+@media (max-width: 640px) {
+  .assistant-trust-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .assistant-intent-actions button {
+    flex: 1 1 auto;
+  }
+}

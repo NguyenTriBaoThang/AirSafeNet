@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Threading.RateLimiting;
 using airsafenet_backend.Data;
 using airsafenet_backend.Models;
@@ -25,6 +25,8 @@ builder.Services.AddScoped<AlertService>();
 builder.Services.AddScoped<ContextualAlertService>();
 builder.Services.AddScoped<AssistantDomainService>();
 builder.Services.AddScoped<AssistantTimeResolverService>();
+builder.Services.AddScoped<AssistantIntentService>();
+builder.Services.AddScoped<AssistantGenerationService>();
 builder.Services.AddScoped<ForecastAccuracyService>();
 
 builder.Services.AddHttpClient<AiService>();

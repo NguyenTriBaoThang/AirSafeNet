@@ -74,7 +74,7 @@ namespace airsafenet_backend.Services
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("Gemini error body: {Body}", body);
-                return "Xin lỗi, mình đang gặp sự cố kết nối. Bạn thử lại sau một chút nhé! 🙏";
+                throw new Exception($"Gemini error: {(int)response.StatusCode} - {body}");
             }
 
             try
@@ -84,7 +84,7 @@ namespace airsafenet_backend.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Lỗi parse Gemini response. Body: {Body}", body[..Math.Min(500, body.Length)]);
-                return "Xin lỗi, mình chưa thể xử lý câu trả lời lúc này. Bạn thử lại sau nhé!";
+                throw;
             }
         }
 

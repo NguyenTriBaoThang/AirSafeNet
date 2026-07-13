@@ -2,6 +2,7 @@ import { http } from "./http";
 import type {
   AssistantChatRequest,
   AssistantChatResponse,
+  AssistantSourceMeta,
   ConversationDetailResponse,
   ConversationListItemResponse,
   CreateConversationResponse,
@@ -107,14 +108,7 @@ export async function regenerateAssistantMessageApi(
     answer: string;
     regeneratedCount: number;
     updatedAt: string;
-    source?: {
-      userGroup?: string;
-      currentAqi?: number;
-      currentPm25?: number;
-      matchedForecastTime?: string;
-      matchedForecastAqi?: number;
-      matchedForecastPm25?: number;
-    } | null;
+    source?: AssistantSourceMeta | null;
   }>("/api/assistant/regenerate", {
     method: "POST",
     auth: true,

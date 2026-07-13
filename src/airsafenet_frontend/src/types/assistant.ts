@@ -1,3 +1,37 @@
+export type AssistantIntentAction = {
+  type: string;
+  label: string;
+  route?: string | null;
+  prompt?: string | null;
+};
+
+export type AssistantSourceMeta = {
+  userGroup?: string;
+  currentAqi?: number | null;
+  currentPm25?: number | null;
+  matchedPhrase?: string | null;
+  targetTime?: string | null;
+  isFallback?: boolean | null;
+  matchedForecastTime?: string | null;
+  matchedForecastAqi?: number | null;
+  matchedForecastPm25?: number | null;
+  dataUpdatedAt?: string | null;
+  primarySource?: string | null;
+  upstreamSources?: string[] | null;
+  dataLabel?: string | null;
+  confidence?: number | null;
+  answerProvider?: string | null;
+  fallbackLevel?: string | null;
+  intent?: string | null;
+  module?: string | null;
+  moduleHints?: string[] | null;
+  durationMinutes?: number | null;
+  doseEstimateUg?: number | null;
+  doseBudgetPercent?: number | null;
+  maxOutdoorMinutes?: number | null;
+  actions?: AssistantIntentAction[] | null;
+};
+
 export type AssistantChatRequest = {
   conversationId?: number | null;
   message: string;
@@ -7,14 +41,7 @@ export type AssistantChatResponse = {
   inDomain: boolean;
   answer: string;
   conversationId: number;
-  source?: {
-    userGroup?: string;
-    currentAqi?: number;
-    currentPm25?: number;
-    matchedForecastTime?: string;
-    matchedForecastAqi?: number;
-    matchedForecastPm25?: number;
-  } | null;
+  source?: AssistantSourceMeta | null;
 };
 
 export type ChatMessage = {
